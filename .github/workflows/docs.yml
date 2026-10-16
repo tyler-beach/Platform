@@ -43,6 +43,55 @@ jobs:
         run: openapi-spec-validator docs/openapi.yaml
       - name: Build documentation site
         run: mkdocs build --strict
+      - name: Verify homepage layout structure
+        run: |
+          python - <<'PY'
+          from html.parser import HTMLParser
+          from pathlib import Path
+          import re
+
+          class HomepageParser(HTMLParser):
+              VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"}
+
+              def __init__(self):
+                  super().__init__(convert_charrefs=True)
+                  self.stack = []
+                  self.classes = []
+                  self.nodes = {}
+
+              def handle_starttag(self, tag, attrs):
+                  attrs = dict(attrs)
+                  classes = set((attrs.get("class") or "").split())
+                  for name in ("home-hero", "home-section", "home-comparison", "home-status", "home-feature-grid", "home-feature", "home-principles"):
+                      if name in classes:
+                          self.nodes.setdefault(name, []).append([parent_classes for _, parent_classes in self.stack])
+                  if classes.intersection({"home-section", "home-comparison", "home-status"}) and any("home-hero" in parent_classes for _, parent_classes in self.stack):
+                      raise AssertionError(f"{classes} is incorrectly nested inside .home-hero")
+                  if tag not in self.VOID:
+                      self.stack.append((tag, classes))
+
+              def handle_endtag(self, tag):
+                  for i in range(len(self.stack) - 1, -1, -1):
+                      if self.stack[i][0] == tag:
+                          del self.stack[i:]
+                          break
+
+          html = Path("site/index.html").read_text(encoding="utf-8")
+          assert "Make architectural drift" in html and "visible." in html, "Expected homepage headline is missing."
+          assert "home-hero" in html and "stylesheets/extra.css" in html, "Homepage hero or custom stylesheet is missing."
+          assert Path("site/assets/brand-mark.svg").is_file(), "Custom brand mark is missing."
+          assert not re.findall(r":(?:material|octicons)-[a-z0-9-]+:", html), "Unrendered Material/Octicons shortcode found on homepage."
+
+          parser = HomepageParser()
+          parser.feed(html)
+          assert len(parser.nodes.get("home-hero", [])) == 1, "Expected exactly one homepage hero."
+          assert len(parser.nodes.get("home-section", [])) == 2, "Homepage sections were not rendered as separate blocks."
+          assert len(parser.nodes.get("home-comparison", [])) == 1, "Expected one comparison block."
+          assert len(parser.nodes.get("home-status", [])) == 1, "Expected one status block."
+          assert len(parser.nodes.get("home-feature", [])) == 6, "Expected six feature cards."
+          assert len(parser.nodes.get("home-principles", [])) == 1, "Expected one principles grid."
+          print("Homepage markup verified: hero, feature grid, comparison, principles and status are separate blocks.")
+          PY
       - name: Upload Pages artifact
         if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v3
