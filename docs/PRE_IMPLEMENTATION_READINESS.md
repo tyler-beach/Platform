@@ -73,6 +73,6 @@ This milestone intentionally adds no Go application implementation, generated se
 - [Requirement-to-proof matrix](REQUIREMENT_TO_PROOF_MATRIX.md)
 - [Evaluation corpus guide](evaluation/README.md)
 - [Starter corpus](evaluation/STARTER_CORPUS.md)
-- [Vertical-slice OpenSpec proposal](../openspec/changes/mvp-vertical-slice/proposal.md)
+- [Vertical-slice OpenSpec proposal](https://github.com/tyler-beach/Platform/blob/main/openspec/changes/mvp-vertical-slice/proposal.md)
 - [Implementation roadmap](ROADMAP.md)
 - [Open questions](OPEN_QUESTIONS.md)
