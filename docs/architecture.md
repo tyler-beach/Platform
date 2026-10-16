@@ -1,3 +1,9 @@
+---
+hide:
+  - navigation
+  - toc
+---
+
 # Architecture and system design
 
 <span class="page-eyebrow">SYSTEM DESIGN</span>
