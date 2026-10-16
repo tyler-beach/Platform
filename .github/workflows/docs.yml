@@ -43,6 +43,23 @@ jobs:
         run: openapi-spec-validator docs/openapi.yaml
       - name: Build documentation site
         run: mkdocs build --strict
+      - name: Verify homepage artifact
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          html = Path("site/index.html").read_text(encoding="utf-8")
+          assert "Make architectural drift" in html, "Homepage headline is missing; unexpected homepage may have been built."
+          assert "home-hero" in html, "Branded homepage hero markup is missing."
+          assert "stylesheets/extra.css" in html, "Custom design stylesheet is not referenced."
+          assert Path("site/assets/brand-mark.svg").is_file(), "Expected custom brand mark is missing."
+
+          raw_icons = re.findall(r":(?:material|octicons)-[a-z0-9-]+:", html)
+          assert not raw_icons, f"Unrendered icon shortcodes found on homepage: {raw_icons}"
+
+          print("Homepage artifact contains the expected branded hero, stylesheet, logo, and no raw Material/Octicons shortcode text.")
+          PY
       - name: Upload Pages artifact
         if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v3
