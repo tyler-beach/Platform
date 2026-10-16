@@ -22,7 +22,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: docs-\${{ github.ref }}
+  group: docs-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -39,6 +39,8 @@ jobs:
           cache-dependency-path: docs-requirements.txt
       - name: Install documentation dependencies
         run: python -m pip install -r docs-requirements.txt
+      - name: Validate OpenAPI contract
+        run: openapi-spec-validator docs/openapi.yaml
       - name: Build documentation site
         run: mkdocs build --strict
       - name: Upload Pages artifact
@@ -53,7 +55,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: \${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page_url }}
     permissions:
       pages: write
       id-token: write

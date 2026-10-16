@@ -34,7 +34,13 @@ The Pages URL is expected but will not be live until GitHub Actions deploys the 
 - [Decision log](docs/DECISIONS.md)
 - [Open questions](docs/OPEN_QUESTIONS.md)
 - [Architecture diagrams](docs/diagrams/architecture.md)
+- [Tools and references](docs/TOOLS_AND_REFERENCES.md)
+- [Contributing](docs/CONTRIBUTING.md)
+- [Agent guardrails](AGENTS.md) and [Claude Code guidance](CLAUDE.md)
+- [OpenSpec current-state specs](openspec/specs/README.md)
+- [Proposed gRPC/Protobuf OpenSpec change](openspec/changes/grpc-protobuf-contracts/proposal.md)
 - [Protobuf contract](proto/adrplatform/v1/platform.proto)
+- [Buf configuration](buf.yaml) and [generation config](buf.gen.yaml)
 
 ## Current direction at a glance
 
@@ -66,6 +72,8 @@ These are recommendations, not proof that infrastructure exists. The gRPC API ho
 - [AI technology decision matrix](docs/AI_TECHNOLOGY_DECISION_MATRIX.md)
 - [AI evaluation and observability](docs/AI_EVALUATION_OBSERVABILITY.md)
 - [Functional core / imperative shell review](docs/FUNCTIONAL_CORE.md)
+- [Proposed AI runtime tooling change](openspec/changes/ai-runtime-tooling/proposal.md)
+- [Proposed functional-core change](openspec/changes/functional-core-design/proposal.md)
 
 Current recommendation: official Anthropic Go SDK behind a small typed harness; Step Functions for distributed workflows; OpenTelemetry for traces; Promptfoo plus Go tests for AI regression; PostgreSQL for versioned architecture knowledge. Use functional-core/imperative-shell: pure Go domain transforms and explicit effect boundaries. Agent frameworks, conversational-memory services and hosted observability products remain conditional.
 
