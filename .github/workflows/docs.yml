@@ -112,14 +112,25 @@ jobs:
           missing = expected - present
           assert not missing, f"Missing architecture diagrams: {sorted(missing)}"
 
+          minimum_text_nodes = {
+              "system-architecture.svg": 65,
+              "trust-boundaries.svg": 70,
+              "analysis-workflow.svg": 45,
+              "token-budget.svg": 40,
+              "engineering-loop.svg": 30,
+          }
           for path in diagrams:
               root = ET.parse(path).getroot()
               assert root.attrib.get("viewBox"), f"{path} must have a viewBox so it scales to the page."
+              text_nodes = root.findall(".//{http://www.w3.org/2000/svg}text")
+              assert len(text_nodes) >= minimum_text_nodes.get(path.name, 1), (
+                  f"{path} appears incomplete: found only {len(text_nodes)} text elements."
+              )
               for node in root.iter():
                   href = node.attrib.get("href") or node.attrib.get("{http://www.w3.org/1999/xlink}href")
-                  if href and href.startswith("../aws-icons/"):
-                      icon = (path.parent / href).resolve()
-                      assert icon.is_file(), f"{path} references missing icon {href}"
+                  assert not (href and href.startswith("../aws-icons/")), (
+                      f"{path} must inline its AWS icons; SVG-in-img external icon references are unreliable."
+                  )
           styles = Path("docs/stylesheets/extra.css").read_text(encoding="utf-8")
           diagram_css = styles.split("/* Architecture diagrams scale", 1)[1].split("/* Swagger UI", 1)[0]
           assert "width: 100% !important" in diagram_css
