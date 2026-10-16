@@ -66,3 +66,8 @@ LangGraph is optional for a bounded AI sub-workflow if conditional reasoning loo
 Workers return typed results or classified errors. Retry transient faults with bounded backoff; do not blindly retry invalid input, authorization failures, unsupported formats, stale references or deterministic validation failures. All jobs end as completed, review-required, failed, cancelled or expired. gRPC calls use deadlines, message-size limits and standard status codes. Creation is idempotent by key.
 
 See docs/RPC_AND_PROTOBUF.md, docs/diagrams/architecture.md, docs/DATA_MODEL.md and docs/OPERATIONS.md.
+
+
+## Functional core / imperative shell
+
+Keep deterministic policy and evidence transforms in pure domain functions. Infrastructure adapters load facts, call Anthropic, write databases, start workflows and publish results. Avoid hidden effects in applicability/resolution functions, mutable global job state, and prompt-only policy enforcement. Model calls are explicit nondeterministic effects; their inputs/outputs and versions are recorded. Sort evidence deterministically before constructing prompts and fingerprints. Use idiomatic Go errors, and keep domain outcomes such as inconclusive separate from execution failures. See [functional core review](FUNCTIONAL_CORE.md).

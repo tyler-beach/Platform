@@ -14,3 +14,11 @@ Project constraints:
 - Protobuf schema changes require Buf checks and compatibility review.
 - Do not enable AI-only merge blocking.
 - Report truthfully which tests/checks ran.
+
+Functional programming style:
+- Prefer a functional core with an imperative shell; keep business policy pure over explicit inputs and effects at adapter boundaries.
+- Do not add FP frameworks/custom monads. Use ordinary Go types/errors.
+- Do not mutate evidence/job values after passing them to another stage; define ownership and canonicalize ordering.
+- Keep model calls explicit and record versions/metadata; do not call Anthropic from deterministic pure functions.
+- Side effects need idempotency on retries. Test deterministic core without live infrastructure and evaluate real model behavior separately.
+- Review docs/FUNCTIONAL_CORE.md for design hazards.

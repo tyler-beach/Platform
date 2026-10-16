@@ -59,3 +59,13 @@ Confirm acceptance scenarios pass; relevant tests/evaluations and schema checks 
 
 ## Tool integrations
 Use OpenSpec CLI to create/refresh Claude Code skills/commands. Generated tooling files are not the source of truth. Root AGENTS.md and CLAUDE.md provide agent guardrails; openspec/config.yaml provides artifact-specific guidance.
+
+
+## Functional-core guardrails
+- Put deterministic policy and normalization in pure functions over explicit input values where practical.
+- Keep DB/network/clock/random/model/filesystem/workflow effects at adapter or use-case boundaries.
+- Do not pass shared mutable job context through every stage; use stage-specific value inputs/outputs and versioned source references.
+- Canonicalize evidence order where it affects prompts, hashes, output ordering or eval fixtures.
+- Keep domain outcomes distinct from execution errors.
+- Define idempotency and duplicate-effect behavior for retries; purity does not make external effects safe.
+- Test deterministic transforms and ownership assumptions. Avoid functional abstractions that make normal Go harder to read.

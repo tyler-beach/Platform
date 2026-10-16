@@ -41,5 +41,9 @@ These are interim planning choices. **Recommended** means a proposed default; it
 **Trade-off:** strong typed contracts/generated clients and schema compatibility checks versus an always-on service, ALB/network/auth/rollout complexity. A serverless webhook-only MVP may defer the gRPC server while retaining Protobuf schemas.
 **Review:** Decide whether the gRPC endpoint is in the MVP before implementing deployment infrastructure.
 
+## D-017 — Functional core / imperative shell
+**Status:** Recommended engineering pattern, pending review. Keep domain policy/evidence transformations pure where practical, isolate infrastructure/clock/random/model effects at explicit boundaries, use stable ordering and make external operations idempotent.  
+**Rationale:** Reproducible tests, safe replay and reduced hidden coupling without forcing a functional runtime or custom monad abstractions.
+
 ## Change control
 Record date, owner, rationale, alternatives, consequences and links to OpenSpec/ADR when status changes. Do not silently turn recommendations into constraints.

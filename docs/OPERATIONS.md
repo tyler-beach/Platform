@@ -56,3 +56,8 @@ High-impact, ambiguous or low-evidence findings require review. Store reviewer, 
 - Runbooks for gRPC service rollout/health, provider failure, DB connectivity and schema incompatibility.
 
 Start in advisory/shadow mode. Enable enforcement only after quality has been measured and policy approved.
+
+
+## Functional and replay safety
+
+Pure transformations may be retried safely when their explicit inputs/policy versions are unchanged. Effectful operations (job creation, workflow start, model invocation, persistence and publication) need operation identity, budgets and idempotency semantics. Do not promise exactly-once execution. Stable-sort evidence and finding collections before hashing or serializing. Preserve attempts as audit metadata without mutating source artifacts used by previous attempts.

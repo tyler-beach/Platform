@@ -40,6 +40,17 @@ This is the living design notebook and engineering baseline. It separates confir
 
 These are recommendations, not proof that infrastructure exists. The gRPC API hosting choice and several product/runtime details remain open.
 
+## AI / LLM tooling and functional design
+
+- [AI technology selection](docs/AI_TECHNOLOGY_SELECTION.md)
+- [AI technology decision matrix](docs/AI_TECHNOLOGY_DECISION_MATRIX.md)
+- [AI evaluation and observability](docs/AI_EVALUATION_OBSERVABILITY.md)
+- [Functional core / imperative shell review](docs/FUNCTIONAL_CORE.md)
+- [Proposed AI runtime tooling change](openspec/changes/ai-runtime-tooling/proposal.md)
+- [Proposed functional-core change](openspec/changes/functional-core-design/proposal.md)
+
+Current recommendation: official Anthropic Go SDK behind a small typed harness; Step Functions for distributed workflows; OpenTelemetry for traces; Promptfoo plus Go tests for AI regression; PostgreSQL for versioned architecture knowledge. Use functional-core/imperative-shell: pure Go domain transforms and explicit effect boundaries. Agent frameworks, conversational-memory services and hosted observability products remain conditional.
+
 ## Core comparisons
 1. **Implementation ↔ ADR:** does a change or code behavior conflict with an applicable accepted decision?
 2. **Specification ↔ ADR:** does a technical spec conflict with or omit an architecture constraint?

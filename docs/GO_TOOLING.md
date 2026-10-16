@@ -85,3 +85,8 @@ Use fixtures/mocks for deterministic unit tests; do not require live Anthropic c
 
 ## Code analysis caution
 Go parser tooling does not solve multi-language analysis. Tree-sitter gives syntax; semantic resolution may require compiler APIs, language servers, build metadata or static-analysis systems. A parse is not proof of runtime behavior.
+
+
+## Functional style in idiomatic Go
+
+Use functional-core / imperative-shell, not a functional runtime framework. Domain functions consume explicit values and return new values/errors; keep network, clock, random IDs, DB, AWS, model calls and publishing at adapter/use-case edges. Go structs/slices/maps are mutable: establish ownership, avoid mutation after stage handoff, copy containers at ownership transfer, and use immutable source/version references for large payloads. Sort map-derived collections that affect prompts, hashing, or test results. Model outcomes as enums/tagged structures with validators; use idiomatic error wrapping and typed classifications rather than custom monads. Test that domain rules run without real infrastructure and are deterministic for identical explicit inputs.

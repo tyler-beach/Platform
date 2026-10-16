@@ -69,3 +69,8 @@ Set limits for evidence count, excerpt size, input/output tokens, calls, wall-cl
 
 ## Avoid at first
 No free-form repository-agent loop, multi-agent debate on every finding, dedicated memory product for architectural knowledge, vector DB as sole source, or model-controlled ADR/code/infrastructure changes. Start with a small, versioned, observable harness rather than an AI framework for its own sake.
+
+
+## Functional boundary
+
+The LLM call is always an explicit effect. Keep prompt selection, evidence packaging, request budget calculation, and result validation as separately testable steps. Treat the evidence package as immutable once handed to the assessor; canonicalize evidence order so identical inputs produce stable requests. Capture model/prompt/schema versions, evidence IDs, and output metadata. Use domain outcomes such as inconclusive rather than mapping provider failures to no-deviation. Keep model nondeterminism outside deterministic unit tests; inject a fake ModelAssessor for application tests and use labeled evaluations for real model quality. See docs/FUNCTIONAL_CORE.md and docs/AI_TECHNOLOGY_SELECTION.md.

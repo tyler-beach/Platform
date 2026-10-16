@@ -28,3 +28,13 @@ Prefer small changes, explicit types and readable Go. Keep cloud/provider types 
 
 ## Required completion report
 Summarize changed files, behavior, checks actually run, security implications, limitations and open decisions. Never claim deployment or validation that did not happen.
+
+## Functional programming guardrails
+- Prefer functional-core / imperative-shell: pure deterministic domain functions over explicit inputs; infrastructure/model/clock/randomness effects in adapters or use cases.
+- Don't hide DB/network/model calls behind pure-sounding domain functions.
+- Treat stage outputs as immutable after handoff. Document/copy slice/map ownership where required; don't use shared mutable global job state.
+- Canonically sort evidence and output collections whenever order affects prompts, fingerprints or evals.
+- Keep domain outcomes distinct from infrastructure errors. Use idiomatic Go errors, not custom monads/effect frameworks.
+- Make side effects safe for replay with idempotency keys, constraints and publication reconciliation.
+- Unit-test deterministic core without live DB/AWS/Anthropic; separately run labeled LLM evaluations.
+- See docs/FUNCTIONAL_CORE.md for the adversarial checklist.

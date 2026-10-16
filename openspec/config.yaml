@@ -40,3 +40,10 @@ operations:
       - Verify acceptance scenarios and relevant tests before archiving.
       - Run OpenSpec and relevant Buf validation; report skipped checks accurately.
       - Ensure specs reflect what shipped and record material deviations from plan.
+
+# Additional project guardrails. Keep the functional-core / imperative-shell boundary.
+# - Keep DB/network/time/random/workflow/model effects at explicit boundaries.
+# - Preserve stage-value ownership and canonical evidence ordering.
+# - Separate domain outcomes from execution errors; make retries/idempotency explicit.
+# - Do not impose functional frameworks or custom monads on idiomatic Go.
+# - AI/model/retrieval behavior changes update the labeled evaluation set.

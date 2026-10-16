@@ -147,3 +147,18 @@ stateDiagram-v2
   Cancelled --> [*]
   Expired --> [*]
 ~~~
+
+
+## 8. Functional core / imperative shell
+
+~~~mermaid
+flowchart LR
+  EFFECTS["Imperative shell: RPC, DB, AWS, clock, IDs"] --> INPUT["Explicit immutable input values"]
+  INPUT --> CORE["Pure Go core: applicability, rules, evidence selection"]
+  CORE --> CANDIDATE["Candidate finding / deterministic result"]
+  CANDIDATE --> EFFECTS2["Effect boundary: Anthropic call / persistence / publication"]
+  EFFECTS2 --> VALIDATE["Pure validation against evidence snapshot"]
+  VALIDATE --> STORE["Persist validated result + audit metadata"]
+~~~
+
+Model calls are nondeterministic effects; capture request configuration and response metadata. Keep evidence packages version-bound and stable-ordered. Go does not enforce deep immutability, so document ownership and avoid mutating data after handoff.

@@ -37,5 +37,12 @@ Resolve these when their answers affect security, behavior, data model, cost or 
 - Which CI, lint and security scanners are mandatory?
 - Should the stock spec-driven OpenSpec schema remain, or is a custom schema warranted later?
 
+## Functional design questions
+- Which packages/functions mix domain policy with repository or network I/O?
+- What ownership rule governs slices, maps and pointers crossing worker/stage boundaries?
+- Which outputs must be canonicalized for stable prompts, fingerprints and evaluations?
+- Where are idempotency keys/unique constraints required for side effects?
+- Which policy rules should be moved out of prompts into deterministic Go code?
+
 ## How to close a question
 Record the answer, alternatives, trade-offs, owner and date. Behavior changes require a focused OpenSpec change. Cross-cutting or security-sensitive decisions should also be captured in a formal ADR.
