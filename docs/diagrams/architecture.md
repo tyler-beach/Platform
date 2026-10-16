@@ -1,3 +1,9 @@
+---
+hide:
+  - navigation
+  - toc
+---
+
 # Architecture diagrams
 
 <span class="page-eyebrow">SYSTEM MODELS</span>
