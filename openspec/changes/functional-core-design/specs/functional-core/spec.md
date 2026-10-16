@@ -3,7 +3,7 @@
 ## Purpose
 Make domain analysis deterministic and composable while isolating infrastructure and model side effects.
 
-## Requirements
+## ADDED Requirements
 
 ### Requirement: Domain policy uses explicit inputs
 Domain policy MUST be implemented as deterministic functions of explicit values and policy versions whenever feasible.

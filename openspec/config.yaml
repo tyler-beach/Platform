@@ -14,7 +14,7 @@ rules:
     - Keep each change bounded and identify impacted comparison modes/contracts.
   specs:
     - Describe observable behavior, not implementation preference unless needed to guarantee behavior.
-    - Include success and relevant failure scenarios: insufficient/stale evidence, authorization, duplicates, timeout, cancellation, partial branches, budget exhaustion and adversarial content.
+    - "Include success and relevant failure scenarios: insufficient/stale evidence, authorization, duplicates, timeout, cancellation, partial branches, budget exhaustion and adversarial content."
     - Define provenance, evidence references, uncertainty, retry/idempotency and review disposition where relevant.
     - Every requirement must have observable Given/When/Then scenarios.
   design:

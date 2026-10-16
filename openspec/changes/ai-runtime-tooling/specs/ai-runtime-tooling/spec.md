@@ -3,7 +3,7 @@
 ## Purpose
 Run AI-assisted deviation analysis through a bounded, testable harness whose source data, findings and model execution are observable and reviewable.
 
-## Requirements
+## ADDED Requirements
 
 ### Requirement: AI requests are bounded and versioned
 The system MUST issue model requests through a defined operation contract with explicit limits and version metadata.

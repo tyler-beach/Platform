@@ -3,7 +3,7 @@
 ## Purpose
 Expose typed control-plane operations for asynchronous analysis jobs and evidence-backed findings.
 
-## Requirements
+## ADDED Requirements
 
 ### Requirement: Analysis creation is asynchronous and idempotent
 The platform API MUST create or resolve a job using an idempotency key and return a job identifier without holding the RPC open for the full analysis.
