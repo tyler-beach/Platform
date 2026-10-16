@@ -1,0 +1,39 @@
+schema: spec-driven
+
+context: |
+  Project: ADR Deviation Platform. It detects inconsistencies among architectural decisions (ADRs), plain-English technical specifications, and implementation changes.
+  Primary language is Go. AI provider is the direct Anthropic API, not Bedrock. Recommended top-level distributed workflow owner is AWS Step Functions coordinating reusable Lambda workers.
+  Principles: deterministic evidence collection first; bounded schema-constrained model assessment; validate references against immutable source versions; preserve provenance; treat imported artifacts and model output as untrusted; require human review for ambiguous/high-impact findings; do not automatically mutate ADRs or block merges from AI-only findings.
+  Distinguish accepted decisions from recommendations and open questions. Read docs/ for design rationale; keep each artifact focused.
+
+rules:
+  proposal:
+    - Define outcome, scope, non-goals, acceptance criteria, risks and choices requiring human approval.
+    - Keep each change bounded and identify impacted comparison mode(s).
+  specs:
+    - Describe observable behavior, not implementation preferences, unless implementation is necessary to guarantee behavior.
+    - Include scenarios for success, insufficient/stale evidence, authorization failure, duplicate input and adversarial content where relevant.
+    - Define provenance, evidence references, uncertainty and review disposition.
+  design:
+    - For cross-cutting changes, compare alternatives and explain security, failure handling, cost/latency, migration and rollback.
+    - Keep Step Functions as top-level distributed workflow owner unless an approved decision changes it.
+    - Prefer Go and deterministic processing; justify each new dependency, service or runtime.
+  tasks:
+    - Break work into small independently verifiable units.
+    - Add tests and update evaluation fixtures for analysis, retrieval, prompt, schema or finding-semantics changes.
+    - Include OpenSpec validation, observability and security tests when relevant.
+    - Do not mark checks complete unless they actually ran.
+
+operations:
+  apply:
+    guidance:
+      - Inspect source, current specs and tests before editing; do not assume docs match current code.
+      - Preserve immutable artifact versions and evidence provenance.
+      - Validate AI output in application code; syntactically valid JSON is not proof of truth.
+      - Use bounded retries and explicit timeouts; avoid unbounded reasoning loops.
+      - Update tests and documentation alongside behavior.
+  archive:
+    guidance:
+      - Verify acceptance scenarios and relevant tests before archiving.
+      - Run OpenSpec validation and report skipped checks accurately.
+      - Ensure the main specs reflect what shipped and document material changes from plan.
