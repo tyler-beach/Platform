@@ -1,111 +1,101 @@
 # Architecture diagrams
 
-## 1. System context
+## 1. System context with gRPC control plane
 
 ~~~mermaid
 flowchart TB
-  subgraph Sources["Source systems"]
-    GH["Git repository / pull request"]
+  subgraph Inputs["Sources and clients"]
+    GH["GitHub webhook / repository"]
     SPEC["Technical specification"]
     ADR["ADRs / decision records"]
+    CLIENT["Go clients / internal services"]
   end
-  IN["Ingress API / event adapter"]
-  SF["AWS Step Functions\nTop-level job state"]
-  NORM["Go normalization workers"]
-  RET["Go context retrieval"]
-  STATIC["Go deterministic analysis\nDiff / AST / rules"]
-  PACK["Evidence package builder"]
-  AI["Go Anthropic adapter\nDirect Anthropic API"]
-  VERIFY["Go validation + selective verifier"]
-  DB[("Aurora PostgreSQL\nmetadata, jobs, findings")]
-  S3[("S3\nsource snapshots / large artifacts")]
-  OUT["API / review queue / repository result"]
-  OBS["Logs, metrics, traces, audit"]
-  GH --> IN
-  SPEC --> IN
-  ADR --> IN
-  IN --> SF
-  SF --> NORM
-  NORM --> RET
-  NORM --> STATIC
-  RET --> PACK
-  STATIC --> PACK
-  GH -. immutable source .-> S3
-  SPEC -. immutable source .-> S3
-  ADR -. immutable source .-> S3
-  PACK --> AI
-  AI --> VERIFY
-  VERIFY --> DB
-  SF <--> DB
-  VERIFY --> OUT
-  NORM -. telemetry .-> OBS
-  RET -. telemetry .-> OBS
-  STATIC -. telemetry .-> OBS
-  AI -. telemetry .-> OBS
-  VERIFY -. telemetry .-> OBS
+  ALB["HTTPS ALB\nHTTP/2 + gRPC"]
+  API["Go gRPC API\nECS/Fargate if selected"]
+  AUTH["AuthN/AuthZ\nvalidation + idempotency"]
+  DB[("Aurora PostgreSQL\njobs, findings, metadata")]
+  SF["Step Functions\nasync job lifecycle"]
+  L1["Go Lambda\nnormalize"]
+  L2["Go Lambda\ncontext retrieval"]
+  L3["Go Lambda\ndeterministic analysis"]
+  L4["Go Lambda\nAnthropic assessment"]
+  L5["Go Lambda\nverification + persistence"]
+  A["Anthropic API direct"]
+  S3[("S3\nimmutable artifact snapshots")]
+  GH --> AUTH
+  SPEC --> AUTH
+  ADR --> AUTH
+  CLIENT --> ALB --> API --> AUTH
+  AUTH --> DB
+  AUTH --> SF
+  SF --> L1
+  SF --> L2
+  SF --> L3
+  SF --> L4
+  L4 --> A
+  SF --> L5
+  L1 --> DB
+  L2 --> DB
+  L3 --> S3
+  L5 --> DB
 ~~~
+
+Notes:
+- The gRPC API is a long-lived service; it is not a Lambda listener.
+- A webhook-only serverless MVP may replace the gRPC endpoint with HTTP/API Gateway + Lambda.
+- Step Functions invokes worker Lambdas directly; don't insert gRPC between workflow and Lambda tasks.
+- Protobuf schemas define the gRPC API; Step Functions data remains small JSON envelopes.
 
 ## 2. Analysis pipeline
 
 ~~~mermaid
 flowchart TD
-  A["Receive request / event"] --> B["Authorize + idempotency"]
-  B --> C["Create AnalysisJob"]
-  C --> D["Resolve immutable artifact versions"]
-  D --> E["Normalize inputs"]
-  E --> F1["Resolve candidate/applicable ADRs"]
-  E --> F2["Deterministic code/document analysis"]
-  F1 --> G["Build evidence package"]
-  F2 --> G
-  G --> H["Bounded Anthropic assessment"]
-  H --> I["Schema + semantic validation"]
-  I --> J{"Evidence and policy checks pass?"}
-  J -- No --> K["Inconclusive / bounded recovery"]
-  J -- Yes --> L{"Ambiguous or high-impact?"}
-  L -- Yes --> M["Independent verification"]
-  L -- No --> N["Persist findings/result"]
-  M --> O{"Evidence supported?"}
-  O -- Yes --> N
-  O -- No --> P["Needs human review"]
-  K --> N
-  P --> N
-  N --> Q["Publish advisory result"]
+  A["Client / webhook"] --> B["Authenticate + authorize"]
+  B --> C["Create idempotent AnalysisJob"]
+  C --> D["Start Step Functions; return job ID"]
+  D --> E["Resolve immutable artifact versions"]
+  E --> F["Normalize inputs"]
+  F --> G1["Resolve candidate/applicable ADRs"]
+  F --> G2["Deterministic code/document analysis"]
+  G1 --> H["Build evidence package"]
+  G2 --> H
+  H --> I["Bounded Anthropic assessment"]
+  I --> J["Schema + semantic validation"]
+  J --> K{"Evidence/policy checks pass?"}
+  K -- No --> L["Inconclusive or bounded recovery"]
+  K -- Yes --> M{"Ambiguous or high-impact?"}
+  M -- Yes --> N["Selective independent verification"]
+  M -- No --> O["Persist finding/result"]
+  N --> O
+  L --> O
+  O --> P["Publish advisory result / review"]
 ~~~
 
-## 3. Sequence
+## 3. Control-plane RPC and asynchronous workflow
 
 ~~~mermaid
 sequenceDiagram
   participant Client
-  participant API as Go Ingress
-  participant SF as Step Functions
-  participant W as Go Workers
+  participant API as Go gRPC API
   participant DB as PostgreSQL
+  participant SF as Step Functions
+  participant W as Go Lambda Worker
   participant A as Anthropic
-  Client->>API: Submit change + source version
-  API->>DB: Create job / idempotency check
+
+  Client->>API: CreateAnalysisJob(idempotency key, artifact refs)
+  API->>API: Authenticate + authorize
+  API->>DB: Create or resolve job idempotently
   API->>SF: Start execution(job_id)
-  SF->>W: Normalize artifacts
-  W->>DB: Persist metadata and evidence refs
-  par Context retrieval
-    SF->>W: Resolve applicable decisions
-    W->>DB: Query status/scope/relationships
-  and Deterministic analysis
-    SF->>W: Parse diff / symbols / rules
-    W-->>SF: Static evidence
-  end
-  SF->>W: Assemble bounded evidence package
-  W->>A: Structured assessment request
-  A-->>W: Candidate finding
-  W->>W: Validate schema, refs and source version
-  opt Verification required
-    SF->>W: Verify candidate
-    W->>A: Bounded challenge request
-    A-->>W: Verification result
-  end
-  SF->>DB: Persist result and audit events
-  SF-->>API: Job status / result reference
-  API-->>Client: Result or job URL
+  API-->>Client: job_id + status (prompt response)
+  SF->>W: Invoke worker via AWS integration
+  W->>DB: Read authoritative metadata / persist stage
+  W->>A: Structured request (assessment stage only)
+  A-->>W: Candidate result
+  W->>W: Validate schema/evidence references
+  SF->>DB: Persist final state via worker
+  Client->>API: GetAnalysisJob / ListFindings
+  API->>DB: Read job/findings
+  API-->>Client: Typed Protobuf response
 ~~~
 
 ## 4. Logical data model
@@ -131,7 +121,7 @@ erDiagram
 
 ~~~mermaid
 flowchart LR
-  CODE["Code change / implementation"] --- IADR["Implementation ↔ ADR"]
+  CODE["Implementation / code change"] --- IADR["Implementation ↔ ADR"]
   ADR1["Applicable decision"] --- IADR
   SPEC1["Technical specification"] --- SADR["Specification ↔ ADR"]
   ADR2["Applicable decision"] --- SADR
@@ -139,22 +129,21 @@ flowchart LR
   CODE2["Implementation evidence"] --- SIMP
 ~~~
 
-## 6. Failure handling
+## 6. Failure lifecycle
 
 ~~~mermaid
 stateDiagram-v2
   [*] --> Queued
   Queued --> Running
-  Running --> Running: bounded retry for transient error
+  Running --> Running: bounded retry for transient failure
   Running --> NeedsReview: ambiguous or evidence incomplete
-  Running --> Succeeded: valid result persisted
-  Running --> Failed: non-retryable error / retry budget exhausted
-  Running --> Cancelled: cancellation
-  NeedsReview --> Succeeded: disposition recorded
-  NeedsReview --> Failed: review expired by policy
+  Running --> Succeeded: validated result persisted
+  Running --> Failed: nonretryable / retries exhausted
+  Running --> Cancelled: cancellation request accepted
+  Running --> Expired: job deadline exceeded
+  NeedsReview --> Succeeded: review disposition recorded
   Succeeded --> [*]
   Failed --> [*]
   Cancelled --> [*]
+  Expired --> [*]
 ~~~
-
-The diagrams express the proposed architecture. Confirm service limits, IAM design, data flow and deployment specifics during implementation.

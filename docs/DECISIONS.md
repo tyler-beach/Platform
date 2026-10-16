@@ -1,40 +1,45 @@
 # Decision log
 
-These are interim choices from planning. **Recommended** means the proposed default for the first design. It is not an approved enterprise ADR. Record accepted choices formally when reviewed.
+These are interim planning choices. **Recommended** means a proposed default; it is not an accepted enterprise ADR. Review and record formal decisions when approved.
 
 ## D-001 — Go-first application
-**Status:** Recommended. Use Go for API, core, deterministic workers, persistence and AI adapter. Use another language only behind a boundary when a capability materially warrants it.  
-**Why:** The problem is largely backend/workflow engineering and Go is the project owner's stated preference.
+**Status:** Recommended. Use Go for API, deterministic workers, persistence, orchestration adapters and AI harness. Use another language only behind a boundary when a capability materially warrants it.
 
 ## D-002 — Direct Anthropic API
-**Status:** Confirmed direction. Use Anthropic directly, not Amazon Bedrock. Isolate provider-specific behavior behind an adapter. Model/account/data-handling requirements still need confirmation.
+**Status:** Confirmed direction. Call Anthropic directly, not Bedrock. Isolate provider-specific behavior behind an adapter. Model selection, data handling, limits and billing still need confirmation.
 
 ## D-003 — Step Functions owns distributed orchestration
-**Status:** Recommended. Use Step Functions for top-level lifecycle when the job is distributed across Lambda workers. Do not allow Step Functions and LangGraph to independently own the same lifecycle.
+**Status:** Recommended. Use Step Functions for the top-level asynchronous lifecycle when work is distributed across Lambda workers. Do not let a gRPC API or LangGraph take ownership of that same workflow.
 
 ## D-004 — Evidence-first hybrid analysis
-**Status:** Core design principle. Gather deterministic source evidence first, use bounded AI assessment second, validate in application code third.
+**Status:** Core design principle. Gather deterministic source evidence, use bounded AI assessment, validate in application code.
 
 ## D-005 — No mandatory agent framework
-**Status:** Recommended. No LangGraph/LangChain requirement for the first vertical slice. Reassess only if conditional reasoning loops/checkpointing become a real need.
+**Status:** Recommended. No LangGraph/LangChain requirement for the first vertical slice. Reconsider only if conditional reasoning/checkpointing becomes a demonstrated need.
 
 ## D-006 — No dedicated conversational-memory product initially
-**Status:** Recommended. Institutional knowledge should remain in source-versioned artifacts, relationships and derived retrieval indexes—not the model's remembered conversation.
+**Status:** Recommended. Architectural knowledge remains source-versioned artifacts, relationships and derived indexes.
 
-## D-007 — PostgreSQL first; vector search optional
-**Status:** Recommended. PostgreSQL/Aurora is authoritative. pgvector and a separate graph database are optional and must be justified by retrieval tests and query needs.
+## D-007 — PostgreSQL first; vector retrieval optional
+**Status:** Recommended. PostgreSQL/Aurora is authoritative. pgvector and a separate graph DB require measured justification.
 
 ## D-008 — Human review before enforcement
-**Status:** Recommended. Start in advisory/shadow mode; do not block merges from unvalidated model output.
+**Status:** Recommended. Start advisory/shadow; no AI-only merge blocking.
 
 ## D-009 — OpenSpec for behavior changes
-**Status:** Recommended. Plan and review behavior changes with proposal/spec/design/tasks, implementation verification and archive.
+**Status:** Recommended. Use proposal/spec/design/tasks, reviewed implementation, verification and archive.
 
 ## D-010 — Immutable provenance
-**Status:** Core design principle. Findings bind to exact source versions; indexes, summaries and embeddings are derived.
+**Status:** Core design principle. Findings bind to exact source versions; summaries and search indexes are derived.
 
-## D-011 — Reusable workers, not dynamic Lambda creation
-**Status:** Recommended. Deploy known narrow worker functions and invoke them when needed rather than creating functions at runtime.
+## D-011 — Reusable workers, not dynamically created Lambda
+**Status:** Recommended. Deploy known narrow workers and invoke them as needed.
+
+## D-012 — Contract-first Protobuf and a bounded gRPC boundary
+**Status:** Proposed in OpenSpec change grpc-protobuf-contracts; not yet implementation-approved.
+**Proposal:** Define the platform's typed control-plane contract in Protobuf and use gRPC for synchronous job-control APIs if a long-running API service is justified. Keep job execution in Step Functions and invoke Lambda workers directly. Do not put a gRPC listener in Lambda.
+**Trade-off:** strong typed contracts/generated clients and schema compatibility checks versus an always-on service, ALB/network/auth/rollout complexity. A serverless webhook-only MVP may defer the gRPC server while retaining Protobuf schemas.
+**Review:** Decide whether the gRPC endpoint is in the MVP before implementing deployment infrastructure.
 
 ## Change control
-For any status change, record date, owner, rationale, alternatives, consequences and links to the relevant OpenSpec change/ADR. Never turn an open question into a constraint by accident.
+Record date, owner, rationale, alternatives, consequences and links to OpenSpec/ADR when status changes. Do not silently turn recommendations into constraints.

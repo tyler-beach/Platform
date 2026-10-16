@@ -1,0 +1,29 @@
+name: Protobuf contracts
+
+on:
+  pull_request:
+    paths:
+      - "proto/**"
+      - "buf.yaml"
+      - "buf.gen.yaml"
+      - ".github/workflows/protobuf.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  lint-and-breaking:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Buf
+        uses: bufbuild/buf-setup-action@v1
+      - name: Lint Protobuf schema
+        run: buf lint
+      - name: Build Protobuf schema
+        run: buf build
+      - name: Check for breaking changes against main
+        run: buf breaking --against '.git#branch=main'

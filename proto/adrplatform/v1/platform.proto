@@ -1,0 +1,304 @@
+syntax = "proto3";
+
+package adrplatform.v1;
+
+option go_package = "github.com/tyler-beach/Platform/gen/go/adrplatform/v1;adrplatformv1";
+
+import "google/protobuf/timestamp.proto";
+
+// DeviationPlatformService is the synchronous RPC control-plane API.
+// Long-running analysis is asynchronous: CreateAnalysisJob returns a job ID;
+// Step Functions owns the lifecycle and invokes worker Lambdas directly.
+service DeviationPlatformService {
+  // Create a job and return promptly without waiting for analysis completion.
+  rpc CreateAnalysisJob(CreateAnalysisJobRequest) returns (CreateAnalysisJobResponse);
+  // Retrieve the current state of a job the caller is authorized to access.
+  rpc GetAnalysisJob(GetAnalysisJobRequest) returns (GetAnalysisJobResponse);
+  // Request cancellation of a job when its current state permits it.
+  rpc CancelAnalysisJob(CancelAnalysisJobRequest) returns (CancelAnalysisJobResponse);
+  // Return paginated findings for an authorized job.
+  rpc ListFindings(ListFindingsRequest) returns (ListFindingsResponse);
+  // Retrieve one finding and its evidence references.
+  rpc GetFinding(GetFindingRequest) returns (GetFindingResponse);
+}
+
+// ArtifactKind describes the category of a source artifact.
+enum ArtifactKind {
+  // Unspecified is invalid for requests that require an artifact kind.
+  ARTIFACT_KIND_UNSPECIFIED = 0;
+  // A source-code change, usually bound to base and head revisions.
+  ARTIFACT_KIND_CODE_CHANGE = 1;
+  // A plain-English or structured technical specification.
+  ARTIFACT_KIND_TECHNICAL_SPECIFICATION = 2;
+  // An architectural decision record.
+  ARTIFACT_KIND_ADR = 3;
+  // A source file at a specific repository revision.
+  ARTIFACT_KIND_SOURCE_FILE = 4;
+  // An API schema or contract such as OpenAPI or Protobuf.
+  ARTIFACT_KIND_API_CONTRACT = 5;
+  // Infrastructure or application configuration.
+  ARTIFACT_KIND_CONFIGURATION = 6;
+}
+
+// ComparisonMode identifies which pair of artifacts is being compared.
+enum ComparisonMode {
+  // Unspecified is invalid for a create-job request.
+  COMPARISON_MODE_UNSPECIFIED = 0;
+  // Compare an implementation or change with an applicable ADR.
+  COMPARISON_MODE_IMPLEMENTATION_TO_ADR = 1;
+  // Compare a technical specification with applicable ADRs.
+  COMPARISON_MODE_SPECIFICATION_TO_ADR = 2;
+  // Compare a technical specification with implementation evidence.
+  COMPARISON_MODE_SPECIFICATION_TO_IMPLEMENTATION = 3;
+}
+
+// AnalysisJobStatus describes the lifecycle of an asynchronous analysis job.
+enum AnalysisJobStatus {
+  // Status has not been set.
+  ANALYSIS_JOB_STATUS_UNSPECIFIED = 0;
+  // Accepted and awaiting execution.
+  ANALYSIS_JOB_STATUS_QUEUED = 1;
+  // One or more workflow stages are executing.
+  ANALYSIS_JOB_STATUS_RUNNING = 2;
+  // Analysis needs human review before its disposition is final.
+  ANALYSIS_JOB_STATUS_NEEDS_REVIEW = 3;
+  // Required processing finished and result was persisted.
+  ANALYSIS_JOB_STATUS_SUCCEEDED = 4;
+  // Processing failed according to the job failure policy.
+  ANALYSIS_JOB_STATUS_FAILED = 5;
+  // The job was cancelled.
+  ANALYSIS_JOB_STATUS_CANCELLED = 6;
+  // The job exceeded its permitted lifetime.
+  ANALYSIS_JOB_STATUS_EXPIRED = 7;
+}
+
+// FindingOutcome describes the evidence-supported conclusion, not severity.
+enum FindingOutcome {
+  // Outcome has not been set.
+  FINDING_OUTCOME_UNSPECIFIED = 0;
+  // Available evidence supports a deviation under the applicable decision.
+  FINDING_OUTCOME_DEVIATION_SUPPORTED = 1;
+  // Evidence suggests a possible deviation but does not establish it.
+  FINDING_OUTCOME_POTENTIAL_DEVIATION = 2;
+  // No deviation was identified in the reviewed evidence; this is not proof of universal compliance.
+  FINDING_OUTCOME_NO_DEVIATION_FOUND = 3;
+  // Evidence is insufficient or applicability cannot be resolved.
+  FINDING_OUTCOME_INCONCLUSIVE = 4;
+}
+
+// FindingSeverity describes impact and is independent from confidence/outcome.
+enum FindingSeverity {
+  // Severity has not been assigned.
+  FINDING_SEVERITY_UNSPECIFIED = 0;
+  // Informational observation with no known actionable impact.
+  FINDING_SEVERITY_INFO = 1;
+  // Low impact.
+  FINDING_SEVERITY_LOW = 2;
+  // Moderate impact.
+  FINDING_SEVERITY_MEDIUM = 3;
+  // High impact.
+  FINDING_SEVERITY_HIGH = 4;
+  // Critical impact under the product's reviewed severity policy.
+  FINDING_SEVERITY_CRITICAL = 5;
+}
+
+// ReviewStatus describes the human review lifecycle.
+enum ReviewStatus {
+  // Review status has not been set.
+  REVIEW_STATUS_UNSPECIFIED = 0;
+  // Human review is not required by policy.
+  REVIEW_STATUS_NOT_REQUIRED = 1;
+  // A reviewer needs to disposition the finding.
+  REVIEW_STATUS_PENDING = 2;
+  // Reviewer accepted the finding.
+  REVIEW_STATUS_ACCEPTED = 3;
+  // Reviewer dismissed the finding.
+  REVIEW_STATUS_DISMISSED = 4;
+  // Reviewer deferred disposition.
+  REVIEW_STATUS_DEFERRED = 5;
+  // Reviewer requests more supporting evidence.
+  REVIEW_STATUS_NEEDS_MORE_EVIDENCE = 6;
+}
+
+// ArtifactRef points to an immutable source version.
+// The server must authorize access to every reference; a URI alone grants no access.
+message ArtifactRef {
+  // Stable platform ID of the logical artifact, when already registered.
+  string artifact_id = 1;
+  // Immutable artifact-version ID, such as a commit or version record.
+  string artifact_version_id = 2;
+  // Category of artifact.
+  ArtifactKind kind = 3;
+  // Canonical source URI/path; never treat this as authorization.
+  string source_uri = 4;
+  // SHA-256 digest of immutable source content, when available.
+  string content_sha256 = 5;
+  // Source-specific revision, such as repository commit SHA.
+  string revision = 6;
+}
+
+// CreateAnalysisJobRequest asks the platform to start asynchronous analysis.
+message CreateAnalysisJobRequest {
+  // Workspace selector; caller access is verified server-side.
+  string workspace_id = 1;
+  // Client-generated idempotency key for safe retries after lost responses.
+  string idempotency_key = 2;
+  // The comparison mode to run.
+  ComparisonMode comparison_mode = 3;
+  // Immutable artifact references needed by the selected comparison.
+  repeated ArtifactRef input_artifacts = 4;
+  // Optional correlation ID supplied by the calling integration.
+  string correlation_id = 5;
+}
+
+// CreateAnalysisJobResponse contains the accepted or previously existing job.
+message CreateAnalysisJobResponse {
+  // Current job snapshot.
+  AnalysisJob job = 1;
+  // True when the request resolved to an existing idempotent job.
+  bool reused_existing_job = 2;
+}
+
+// GetAnalysisJobRequest identifies the job to retrieve.
+message GetAnalysisJobRequest {
+  // Workspace selector; authorization is performed server-side.
+  string workspace_id = 1;
+  // Platform job ID.
+  string job_id = 2;
+}
+
+// GetAnalysisJobResponse returns the authorized job snapshot.
+message GetAnalysisJobResponse {
+  // Current job snapshot.
+  AnalysisJob job = 1;
+}
+
+// CancelAnalysisJobRequest asks the workflow to stop if possible.
+message CancelAnalysisJobRequest {
+  // Workspace selector; authorization is performed server-side.
+  string workspace_id = 1;
+  // Platform job ID.
+  string job_id = 2;
+  // Optional human-readable cancellation reason for audit.
+  string reason = 3;
+}
+
+// CancelAnalysisJobResponse explains whether cancellation was requested.
+message CancelAnalysisJobResponse {
+  // Latest job snapshot.
+  AnalysisJob job = 1;
+  // True if cancellation was accepted; it does not roll back completed effects.
+  bool cancellation_requested = 2;
+}
+
+// AnalysisJob is the persistent identity and public state of an analysis run.
+message AnalysisJob {
+  // Platform-generated job ID.
+  string job_id = 1;
+  // Workspace that owns the job.
+  string workspace_id = 2;
+  // Selected comparison mode.
+  ComparisonMode comparison_mode = 3;
+  // Current lifecycle status.
+  AnalysisJobStatus status = 4;
+  // Source artifact versions used by the job.
+  repeated ArtifactRef input_artifacts = 5;
+  // Job creation timestamp.
+  google.protobuf.Timestamp created_at = 6;
+  // Last status/metadata update timestamp.
+  google.protobuf.Timestamp updated_at = 7;
+  // Version of the pipeline implementation used.
+  string pipeline_version = 8;
+  // Stable terminal failure category; avoid returning secrets/provider bodies.
+  string terminal_error_code = 9;
+  // Correlation ID carried through traces and logs.
+  string correlation_id = 10;
+}
+
+// EvidenceRef points to a source location used to support or challenge a finding.
+message EvidenceRef {
+  // Stable evidence ID scoped to this analysis evidence package.
+  string evidence_id = 1;
+  // Logical source artifact ID.
+  string artifact_id = 2;
+  // Exact immutable artifact version used.
+  string artifact_version_id = 3;
+  // Authorized canonical URI for the source version.
+  string source_uri = 4;
+  // Path within the artifact/repository, when applicable.
+  string path = 5;
+  // One-based first source line, when line-addressable; zero if not applicable.
+  int32 start_line = 6;
+  // Inclusive last source line, when line-addressable; zero if not applicable.
+  int32 end_line = 7;
+  // Symbol, heading, section or other stable location.
+  string symbol_or_section = 8;
+  // Digest of the excerpt or evidence payload, when available.
+  string excerpt_sha256 = 9;
+}
+
+// Finding is a validated assessment with evidence references and review state.
+message Finding {
+  // Stable finding ID.
+  string finding_id = 1;
+  // Analysis job that produced the finding.
+  string job_id = 2;
+  // Evidence-supported assessment outcome.
+  FindingOutcome outcome = 3;
+  // Impact severity, independent of confidence.
+  FindingSeverity severity = 4;
+  // Human review lifecycle state.
+  ReviewStatus review_status = 5;
+  // Concise claim being made.
+  string claim = 6;
+  // Explanation grounded in referenced evidence.
+  string rationale = 7;
+  // IDs of the applicable architectural decisions.
+  repeated string decision_ids = 8;
+  // IDs of relevant extracted requirements.
+  repeated string requirement_ids = 9;
+  // Exact source references used by the assessment.
+  repeated EvidenceRef evidence = 10;
+  // Whether policy requires human review before final disposition.
+  bool human_review_required = 11;
+  // Application validation status, not raw model confidence.
+  string validation_status = 12;
+  // Stable deduplication fingerprint for this target/policy/finding.
+  string finding_fingerprint = 13;
+  // Finding creation timestamp.
+  google.protobuf.Timestamp created_at = 14;
+}
+
+// ListFindingsRequest requests a page of findings for one authorized job.
+message ListFindingsRequest {
+  // Workspace selector; authorization is performed server-side.
+  string workspace_id = 1;
+  // Parent job ID.
+  string job_id = 2;
+  // Desired page size; server clamps to a documented maximum.
+  uint32 page_size = 3;
+  // Opaque pagination token from the previous response.
+  string page_token = 4;
+}
+
+// ListFindingsResponse returns a page of findings.
+message ListFindingsResponse {
+  // Findings in this page.
+  repeated Finding findings = 1;
+  // Opaque token for the next page; empty when there are no more results.
+  string next_page_token = 2;
+}
+
+// GetFindingRequest identifies one finding.
+message GetFindingRequest {
+  // Workspace selector; authorization is performed server-side.
+  string workspace_id = 1;
+  // Platform finding ID.
+  string finding_id = 2;
+}
+
+// GetFindingResponse returns one authorized finding.
+message GetFindingResponse {
+  // Finding with source-version-bound evidence references.
+  Finding finding = 1;
+}

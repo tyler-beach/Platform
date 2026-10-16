@@ -1,48 +1,58 @@
 # Workflow operations and reliability
 
-## Orchestration ownership
-AWS Step Functions is the recommended top-level distributed workflow owner. It coordinates reusable Go Lambda workers and manages state transitions, branches, retries, deadlines and approval waits. The database is the authoritative domain/audit store; workflow history is operational evidence, not the only persistent record.
+## Ownership boundaries
+- **gRPC API service (if deployed):** synchronous job-control operations, request validation, authentication/authorization, idempotent job creation and read endpoints.
+- **Step Functions:** overall async job state, branches, retries, catch paths, deadlines and approval waits.
+- **Go Lambda workers:** bounded operations such as normalization, retrieval, deterministic checks, assessment, verification and persistence.
+- **Database:** authoritative job/result/audit state; workflow execution history is operational context, not the only long-term audit record.
+
+Do not have the gRPC API execute the entire analysis inline. Create a job, start the workflow, return its ID, then expose status/results. Do not make each Lambda a gRPC server.
 
 ## Suggested workflow
-1. Authorize request and validate payload.
-2. Create job with idempotency key and immutable source-version references.
+1. Authenticate/authorize and validate request.
+2. Create job with an idempotency key and immutable source version references.
 3. Normalize artifact metadata.
-4. Run independent work in parallel where useful: deterministic code/document analysis and contextual decision retrieval.
-5. Aggregate/deduplicate candidates into an evidence package.
+4. Run independent retrieval and deterministic analysis branches in parallel where useful.
+5. Aggregate evidence and deduplicate candidate findings.
 6. Call Anthropic for a bounded structured assessment.
-7. Validate output, source references, applicability and deterministic rules.
+7. Validate schema, evidence refs, versions, applicability and deterministic rules.
 8. Conditionally verify ambiguous/high-impact findings.
-9. Persist result and provenance.
-10. Publish advisory result or route for review; record terminal state.
+9. Persist result/provenance.
+10. Publish advisory result or route for human review; record terminal status.
 
-Do not create a Lambda for every file or model thought. Use bounded batches and measured concurrency.
+Use bounded batches; do not create a Lambda per file or model thought.
 
-## Idempotency
-Events may be delivered more than once. Derive idempotency identity from event ID plus immutable source versions and policy/pipeline version. Replays should reuse or safely recompute jobs, not create duplicate findings or repeated pull-request comments.
+## RPC reliability
+- Propagate caller deadlines and cancellation; set server-side maximums.
+- Set maximum inbound/outbound message sizes and page sizes.
+- Use TLS and enforce authenticated identity plus repository/workspace authorization.
+- Return documented standard gRPC status codes.
+- Health-check the server; implement graceful shutdown and safe rolling deploys.
+- Add request, trace and job IDs to logs/metrics; do not log source code, tokens or raw secrets.
+- Require an idempotency key for CreateAnalysisJob. A client retry after lost response must not launch duplicate workflows.
+- Don't assume deadline cancellation rolls back an already-completed side effect.
+- A gRPC API hosted on ECS/Fargate behind an ALB adds always-on cost, scaling/network configuration and deployment operations. Review whether actual consumers justify it.
 
-A finding dedupe key may include workspace, comparison mode, decision/rule ID, target artifact version and normalized finding category. Do not merge solely because two explanations sound similar.
+## Step Functions and worker reliability
+Events may be delivered more than once. Derive idempotency identity from event ID plus immutable source versions and pipeline/policy version. Replays should not create duplicate findings/comments.
 
-## Retries and timeouts
-Use bounded retries with jitter for transient connectivity/5xx and throttling; honor provider guidance. Do not blindly retry authorization errors, invalid requests, unsupported formats, stale evidence requiring resubmission, or deterministic validation failure. Set both per-stage timeouts and an overall deadline. Retries must not reset total token/cost/call budget.
+Use bounded retries with jitter for transient connectivity/5xx and throttling, honoring downstream retry hints. Don't blindly retry authorization failures, invalid requests, unsupported inputs, stale evidence, or deterministic validation failures. Retry budgets must not reset token/cost/job deadlines. Persist typed failure and diagnostic correlation ID after exhaustion.
 
-On retry exhaustion, persist a typed failure and diagnostic correlation ID. Avoid putting source snippets or provider response bodies into generic notifications.
+Limit model concurrency globally and by workspace. Avoid exhausting PostgreSQL with Lambda-created pools; size connection behavior for expected concurrency. Add SQS/EventBridge when buffering/distribution is needed, not by default.
 
-## Concurrency/backpressure
-Limit concurrent model calls globally and per workspace. Add SQS/EventBridge when queueing, buffering or event routing is needed, not by default. Avoid exhausting PostgreSQL with Lambda-created connection pools; model expected concurrency and use an appropriate managed connection approach.
-
-## Human review
-High-impact, ambiguous, low-evidence or policy-selected findings require review. Store reviewer, timestamp, exact finding version, disposition and rationale. Approval waits need expiration/timeout behavior, and should recheck source freshness if source changes during review.
+## Human review and freshness
+High-impact, ambiguous or low-evidence findings require review. Store reviewer, timestamp, exact finding version, disposition and rationale. Recheck source freshness before publishing if source changed during analysis/review.
 
 ## Reliability checklist
 - Duplicate-event and idempotency tests.
-- Error classification and bounded retries.
-- Failed-job handling and safe operator replay.
-- Job and stage deadlines.
-- Stable job/trace IDs.
-- Partial parallel-branch failure policy.
-- Source freshness check before publishing.
-- Concurrency/token/cost budget enforcement.
-- Alerts for provider outage, validation spikes, backlog, failure and unusual spend.
-- Runbooks for provider failures, DB/connectivity issues, failed executions and regressions.
+- RPC auth, deadline, status and message-size tests if RPC is deployed.
+- Bounded retries and explicit terminal failures.
+- Safe operator replay.
+- Parallel-branch partial failure policy.
+- Source freshness before publication.
+- Model concurrency/token/cost budget enforcement.
+- Trace IDs across RPC, workflow, workers and provider calls.
+- Alerts for API availability, workflow failures, provider errors, validation spikes, backlog and unexpected spend.
+- Runbooks for gRPC service rollout/health, provider failure, DB connectivity and schema incompatibility.
 
-Start in advisory/shadow mode. Enable enforcement only after quality has been measured and policy has been approved.
+Start in advisory/shadow mode. Enable enforcement only after quality has been measured and policy approved.
