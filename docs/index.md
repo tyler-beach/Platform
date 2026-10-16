@@ -1,3 +1,9 @@
+---
+hide:
+  - navigation
+  - toc
+---
+
 <div class="home-hero" markdown>
 <div class="home-hero__main" markdown>
 <span class="home-eyebrow"><span class="home-eyebrow__dot"></span> ARCHITECTURE · EVIDENCE · GOVERNANCE</span>
