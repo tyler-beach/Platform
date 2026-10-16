@@ -1,32 +1,38 @@
 # Architecture diagram catalog
 
-This page links to the scalable SVG diagrams and provides the state/data models. Each diagram is versioned beside the documentation and represents the **proposed target**, not deployed components.
+<span class="page-eyebrow">REFERENCE LIBRARY / SYSTEM MODELS</span>
 
-## System architecture
+The SVGs below are maintained with the design contracts. They are intentionally displayed at a readable engineering-diagram scale inside horizontally scrollable frames. They represent target architecture, not resources currently deployed.
 
-![Layered reference architecture.](../assets/diagrams/system-architecture.svg)
+## 01 / System architecture
 
-The architecture separates authenticated ingress, durable asynchronous orchestration, bounded Go workers, persistent business data and external model access. One owner controls job lifecycle; model output is validated by application policy before durable publication.
+<figure class="diagram-figure">
+  <div class="diagram-viewport"><img src="../../assets/diagrams/system-architecture.svg" alt="Reference system architecture showing source systems, trusted ingress, Step Functions, Go workers, persistence and external services." /></div>
+  <figcaption>Component boundaries, trust zones, data ownership and provider integration.</figcaption>
+</figure>
 
-## End-to-end analysis workflow
+## 02 / Analysis workflow
 
-![Analysis workflow and control gates.](../assets/diagrams/analysis-workflow.svg)
+<figure class="diagram-figure">
+  <div class="diagram-viewport"><img src="../../assets/diagrams/analysis-workflow.svg" alt="Analysis workflow from authorized job creation to evidence collection, bounded assessment, validation, persistence and review." /></div>
+  <figcaption>Admission, completeness, budget, validation and publication gates.</figcaption>
+</figure>
 
-The most important control gates are durable dispatch intent, immutable input pinning, evidence-branch completeness, preflight budget admission, application validation, atomic result persistence and freshness-safe publication.
+## 03 / Engineering loop
 
-## OpenSpec and test-driven engineering
+<figure class="diagram-figure">
+  <div class="diagram-viewport"><img src="../../assets/diagrams/engineering-loop.svg" alt="OpenSpec-first delivery cycle including behavior scenarios, RED-GREEN-REFACTOR, layered tests, adversarial review and archive." /></div>
+  <figcaption>Traceability from requirements through executable acceptance evidence.</figcaption>
+</figure>
 
-![OpenSpec-first engineering lifecycle.](../assets/diagrams/engineering-loop.svg)
+## 04 / Token budget
 
-Requirement-to-scenario-to-test traceability is part of the acceptance record. Specs validate structure; tests and evaluations validate behavior.
+<figure class="diagram-figure">
+  <div class="diagram-viewport"><img src="../../assets/diagrams/token-budget.svg" alt="Token and spend control flow including preflight, output reservation, job caps, usage reconciliation and stop conditions." /></div>
+  <figcaption>Cumulative model budget enforcement across concurrent calls and retries.</figcaption>
+</figure>
 
-## AI token budget and usage accounting
-
-![Token and spend budget flow.](../assets/diagrams/token-budget.svg)
-
-The job's total budget includes all attempts, retries, repair requests and optional verification. Output tokens are reserved before each call.
-
-## Logical data relationships
+## Logical domain relationships
 
 ~~~mermaid
 erDiagram
@@ -44,7 +50,7 @@ erDiagram
   ANALYSIS_JOB ||--o{ BUDGET_RESERVATION : accounts_for
 ~~~
 
-This is logical only. It does not dictate physical table layout. Production DDL must include tenant-scoped keys, unique/idempotency constraints, migration strategy, retention and query/index validation.
+This logical view does not dictate the physical table layout. Production DDL still needs tenant-scoped keys, unique/idempotency constraints, migrations, retention and query/index validation.
 
 ## Job execution states
 
@@ -61,10 +67,10 @@ stateDiagram-v2
   Running --> Failed: non-retryable or exhausted
   Running --> CancelRequested
   CancelRequested --> Cancelled: no further effects allowed
-  CancelRequested --> Succeeded: effect already committed; reconcile truth
+  CancelRequested --> Succeeded: effect committed; reconcile truth
   Running --> Expired: deadline exhausted
   NeedsReview --> Succeeded: disposition recorded
   NeedsReview --> Failed: reviewer rejects/terminates
 ~~~
 
-The actual allowed transitions and cancellation race semantics must be implemented with durable state checks/fencing. A late external side effect cannot be pretended away; it remains auditable.
+The actual transitions and cancellation-race semantics must be implemented with durable checks/fencing. A late external side effect cannot be hidden; it remains auditable.

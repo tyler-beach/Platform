@@ -1,26 +1,34 @@
 site_name: ADR Deviation Platform
-site_description: Contract-first engineering and operations documentation for the ADR Deviation Platform
+site_description: Evidence-first architecture analysis — design, contracts and engineering practice
 site_url: https://tyler-beach.github.io/Platform/
 repo_url: https://github.com/tyler-beach/Platform
 repo_name: tyler-beach/Platform
 edit_uri: edit/main/docs/
 docs_dir: docs
 site_dir: site
+copyright: 'ADR Deviation Platform · Engineering design reference'
 use_directory_urls: true
 
 theme:
   name: material
   language: en
+  logo: assets/brand-mark.svg
+  favicon: assets/brand-mark.svg
   features:
     - navigation.instant
+    - navigation.instant.progress
     - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
     - navigation.top
     - navigation.footer
-    - toc.integrate
+    - toc.follow
     - search.suggest
     - search.highlight
+    - search.share
     - content.code.copy
     - content.action.edit
+    - content.tabs.link
   palette:
     - scheme: default
       primary: indigo
@@ -73,12 +81,16 @@ extra:
       link: https://github.com/tyler-beach/Platform
 
 nav:
-  - Home: index.md
-  - Getting started: getting-started.md
+  - Overview:
+      - Platform overview: index.md
+      - Getting started: getting-started.md
+      - Roadmap: ROADMAP.md
+      - Decision log: DECISIONS.md
+      - Open questions: OPEN_QUESTIONS.md
   - Architecture:
       - System architecture and workflows: architecture.md
       - Architecture overview: ARCHITECTURE.md
-      - Detailed diagrams: diagrams/architecture.md
+      - Diagram catalog: diagrams/architecture.md
       - RPC and Protobuf: RPC_AND_PROTOBUF.md
       - AI pipeline and token budgets: AI_PIPELINE.md
       - Functional core: FUNCTIONAL_CORE.md
@@ -94,6 +106,7 @@ nav:
       - Existing data model: DATA_MODEL.md
   - Engineering:
       - Engineering playbook: ENGINEERING_PLAYBOOK.md
+      - OpenSpec workflow: OPEN_SPEC_WORKFLOW.md
       - Adversarial design review: ADVERSARIAL_DESIGN_REVIEW.md
       - AI technology selection: AI_TECHNOLOGY_SELECTION.md
       - AI decision matrix: AI_TECHNOLOGY_DECISION_MATRIX.md
@@ -101,9 +114,5 @@ nav:
       - Security: SECURITY.md
       - Operations: OPERATIONS.md
       - Evaluation: EVALUATION.md
-      - OpenSpec workflow: OPEN_SPEC_WORKFLOW.md
-      - Roadmap: ROADMAP.md
-      - Decisions: DECISIONS.md
-      - Open questions: OPEN_QUESTIONS.md
       - Tools and references: TOOLS_AND_REFERENCES.md
       - Contributing: CONTRIBUTING.md

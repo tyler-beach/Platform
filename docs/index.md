@@ -1,103 +1,116 @@
-<div class="platform-hero" markdown>
-<span class="platform-eyebrow">EVIDENCE-FIRST · VERSIONED · REVIEWABLE</span>
+<div class="home-hero" markdown>
+<div class="home-hero__main" markdown>
+<span class="home-eyebrow"><span class="home-eyebrow__dot"></span> ARCHITECTURE · EVIDENCE · GOVERNANCE</span>
 
-# ADR Deviation Platform
+# Make architectural drift <em>visible.</em>
 
-Compare architectural decisions, technical specifications, and implementation changes—with traceable evidence and reviewable explanations when they diverge.
+<p class="home-hero__lede">Connect architectural decisions, plain-English technical specifications, and implementation changes. Surface potential divergence with traceable evidence—not unsupported AI opinions.</p>
 
-<div class="platform-hero-actions" markdown>
-[Get started](getting-started.md){ .md-button .md-button--primary }
-[Explore architecture](architecture.md){ .md-button }
+<div class="home-hero__actions" markdown>
+[Explore the architecture](architecture.md){ .md-button .md-button--primary }
 [Engineering playbook](ENGINEERING_PLAYBOOK.md){ .md-button }
-[API reference](api/index.md){ .md-button }
+</div>
+
+<div class="home-hero__signals">
+  <div class="home-hero__signal"><strong>Three comparison modes</strong><span>Code, decisions and specifications</span></div>
+  <div class="home-hero__signal"><strong>Evidence by design</strong><span>Version-bound, reviewable findings</span></div>
+  <div class="home-hero__signal"><strong>Human-governed</strong><span>Bounded model use, explicit review</span></div>
 </div>
 </div>
 
-## Explore the platform
-
-<div class="grid cards" markdown>
-
--   :material-graph-outline: **Architecture and workflows**
-
-    ---
-
-    Detailed reference architecture, analysis lifecycle, token-budget gates and deployment profiles.
-
-    [:octicons-arrow-right-24: Explore diagrams](architecture.md)
-
--   :material-api: **API reference**
-
-    ---
-
-    Explore the proposed OpenAPI contract in Swagger UI. The API is a design contract, not a deployed service.
-
-    [:octicons-arrow-right-24: Explore API](api/index.md)
-
--   :material-database-check: **Data contracts**
-
-    ---
-
-    Understand invariants for artifacts, jobs, findings, evidence, reviews and audit records.
-
-    [:octicons-arrow-right-24: Read contracts](contracts/CONTRACTS.md)
-
--   :material-file-document-check: **Evidence and provenance**
-
-    ---
-
-    See how findings tie back to exact, immutable source versions and locations.
-
-    [:octicons-arrow-right-24: Evidence rules](contracts/EVIDENCE.md)
-
--   :material-test-tube: **Engineering playbook**
-
-    ---
-
-    OpenSpec-driven behavior design, functional core practices, red-green-refactor and test traceability.
-
-    [:octicons-arrow-right-24: Start engineering](ENGINEERING_PLAYBOOK.md)
-
--   :material-shield-check: **Adversarial design review**
-
-    ---
-
-    Distributed reliability, token economics, trust boundaries and unresolved production decisions.
-
-    [:octicons-arrow-right-24: Review the risks](ADVERSARIAL_DESIGN_REVIEW.md)
-
+<div class="home-hero__visual">
+  <div class="pipeline-preview">
+    <div class="pipeline-preview__head"><span>Analysis pipeline</span><span class="pipeline-preview__status">Reference design</span></div>
+    <div class="pipeline-step"><span class="pipeline-step__icon">01</span><span class="pipeline-step__text"><strong>Source snapshot</strong><span>ADR · specification · code revision</span></span><span class="pipeline-step__tag">Pinned</span></div>
+    <div class="pipeline-connector"></div>
+    <div class="pipeline-step"><span class="pipeline-step__icon">02</span><span class="pipeline-step__text"><strong>Evidence assembly</strong><span>Scope, diff, rules and retrieval</span></span><span class="pipeline-step__tag">Deterministic</span></div>
+    <div class="pipeline-connector"></div>
+    <div class="pipeline-step"><span class="pipeline-step__icon">03</span><span class="pipeline-step__text"><strong>Bounded assessment</strong><span>Versioned prompt · token and cost limits</span></span><span class="pipeline-step__tag">Constrained</span></div>
+    <div class="pipeline-connector"></div>
+    <div class="pipeline-step"><span class="pipeline-step__icon">04</span><span class="pipeline-step__text"><strong>Validate and review</strong><span>Evidence checks, freshness and disposition</span></span><span class="pipeline-step__tag">Auditable</span></div>
+    <div class="pipeline-preview__foot">Target architecture only. The production service and workflow have not yet been implemented.</div>
+  </div>
+</div>
 </div>
 
-## Core comparison modes
+<div class="home-section">
+  <div class="home-section__head">
+    <div>
+      <span class="home-section__eyebrow">Explore the platform</span>
+      <h2>Designed for engineering rigor.</h2>
+    </div>
+    <p class="home-section__intro">Start with the system shape, then go deeper into the contracts and practices that make the proposed platform safe to build and operate.</p>
+  </div>
 
-~~~mermaid
-flowchart LR
-  ADR[Architectural decisions] --> IA[Implementation ↔ ADR]
-  SPEC[Technical specification] --> SA[Specification ↔ ADR]
-  SPEC --> SI[Specification ↔ implementation]
-  CODE[Code change / source snapshot] --> IA
-  CODE --> SI
-  IA --> E[Versioned evidence package]
-  SA --> E
-  SI --> E
-  E --> V[Deterministic validation]
-  V --> A[Bounded structured assessment]
-  A --> R[Validated finding]
-  R --> H[Human review when required]
-~~~
+  <div class="home-feature-grid">
+    <article class="home-feature">
+      <span class="home-feature__index">01</span>
+      <h3>System architecture</h3>
+      <p>Understand component ownership, trust boundaries, asynchronous orchestration, storage and model-provider integration.</p>
+      <a href="./architecture/">Explore architecture →</a>
+    </article>
+    <article class="home-feature">
+      <span class="home-feature__index">02</span>
+      <h3>API and data contracts</h3>
+      <p>Review proposed operations, lifecycle semantics, compatibility rules and invariants for jobs, findings and evidence.</p>
+      <a href="./contracts/API_CONTRACT/">Explore contracts →</a>
+    </article>
+    <article class="home-feature">
+      <span class="home-feature__index">03</span>
+      <h3>Evidence and provenance</h3>
+      <p>Follow a claim back to immutable source versions, precise locators, hashes and the supporting or contradicting evidence.</p>
+      <a href="./contracts/EVIDENCE/">Explore evidence →</a>
+    </article>
+    <article class="home-feature">
+      <span class="home-feature__index">04</span>
+      <h3>AI runtime controls</h3>
+      <p>See how token budgets, spend limits, prompt versions, output validation and redacted telemetry fit into the harness.</p>
+      <a href="./contracts/AI_RUNTIME/">Explore AI controls →</a>
+    </article>
+    <article class="home-feature">
+      <span class="home-feature__index">05</span>
+      <h3>OpenSpec engineering</h3>
+      <p>Connect behavior requirements to regression tests, contract tests, implementation, evaluations and verified changes.</p>
+      <a href="./ENGINEERING_PLAYBOOK/">Explore the playbook →</a>
+    </article>
+    <article class="home-feature">
+      <span class="home-feature__index">06</span>
+      <h3>Adversarial review</h3>
+      <p>Examine the highest-risk distributed-system failures, concurrency gaps, security boundaries and unresolved decisions.</p>
+      <a href="./ADVERSARIAL_DESIGN_REVIEW/">Explore the review →</a>
+    </article>
+  </div>
+</div>
 
-## Design status
+<div class="home-comparison">
+  <div class="home-comparison__intro">
+    <span class="home-section__eyebrow">What it compares</span>
+    <h2>Three paths to architectural confidence.</h2>
+    <p>Each comparison has a defined evidence set and an explicit outcome. Similarity alone does not make an ADR applicable, and missing evidence never proves compliance.</p>
+  </div>
+  <div class="home-comparison__list">
+    <div class="home-comparison__item"><span class="home-comparison__letter">A</span><div><strong>Implementation ↔ ADR</strong><span>Does a code change conflict with an accepted, applicable architectural decision?</span></div></div>
+    <div class="home-comparison__item"><span class="home-comparison__letter">B</span><div><strong>Specification ↔ ADR</strong><span>Does the technical design align with architectural constraints and decision scope?</span></div></div>
+    <div class="home-comparison__item"><span class="home-comparison__letter">C</span><div><strong>Specification ↔ implementation</strong><span>Does observed implementation behavior satisfy the stated technical requirements?</span></div></div>
+  </div>
+</div>
 
-This repository is an architecture and contract baseline. The production API, generated service code, state-machine implementation, persistence layer and model harness are not yet claimed to exist. The diagrams describe intended boundaries and controls, not deployed resources.
+<div class="home-section">
+  <div class="home-section__head">
+    <div>
+      <span class="home-section__eyebrow">Engineering principles</span>
+      <h2>Make the guarantees testable.</h2>
+    </div>
+  </div>
+  <div class="home-principles">
+    <div class="home-principle"><strong>Evidence before inference</strong><span>Every actionable claim resolves to a versioned source.</span></div>
+    <div class="home-principle"><strong>One workflow owner</strong><span>Distributed state and retries have clear authority.</span></div>
+    <div class="home-principle"><strong>Bounded model calls</strong><span>Context, spend, concurrency and time are controlled.</span></div>
+    <div class="home-principle"><strong>Specs are not proof</strong><span>Acceptance scenarios and tests verify shipped behavior.</span></div>
+  </div>
+</div>
 
-**No finding without evidence, no constraint without applicability, and no model output without application validation.**
-
-## Start here
-
-- [Getting started](getting-started.md)
-- [System architecture and detailed workflows](architecture.md)
-- [OpenSpec and test-driven engineering](ENGINEERING_PLAYBOOK.md)
-- [Adversarial design review](ADVERSARIAL_DESIGN_REVIEW.md)
-- [API reference](api/index.md)
-- [Data contracts](contracts/CONTRACTS.md)
-- [Logging and audit](contracts/LOGGING_AND_AUDIT.md)
-- [Repository README](https://github.com/tyler-beach/Platform/blob/main/README.md)
+<div class="home-status">
+  <span class="home-status__mark">i</span>
+  <div><strong>Current status: architecture and contract baseline</strong><p>This site documents the proposed design. The production API, worker implementations, database, state machine and model harness are not claimed to exist yet. Follow the <a href="./ROADMAP/">roadmap</a> and <a href="./OPEN_QUESTIONS/">open questions</a> for outstanding implementation and approval decisions.</p></div>
+</div>
