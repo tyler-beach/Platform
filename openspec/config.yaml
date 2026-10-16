@@ -5,43 +5,50 @@ context: |
   Primary language is Go. AI provider is direct Anthropic API, not Bedrock. Step Functions is the recommended top-level owner of asynchronous workflows with reusable Lambda workers.
   Protobuf is the proposed contract-first schema for the platform API. gRPC is for synchronous requests to a long-lived server if approved; do not host gRPC listeners in ordinary Lambda workers.
   Core principles: deterministic evidence first; bounded schema-constrained model assessment; validate evidence against immutable source versions; preserve provenance; treat source artifacts and model outputs as untrusted; human review for ambiguous/high-impact findings; no automatic ADR mutation or AI-only merge blocking.
+  Distributed effects are at-least-once and must be idempotent; DB/workflow dual-write gaps need durable dispatch and reconciliation. Model-call token/spend/call/time budgets span retries.
   Distinguish accepted decisions from recommendations and open questions. Read docs/ for design rationale.
 
 rules:
   proposal:
-    - Define outcome, scope, non-goals, acceptance criteria, risks and choices requiring human approval.
-    - Keep each change bounded and identify impacted comparison modes.
+    - Define outcome, scope, non-goals, acceptance criteria, risks, rollback, and choices requiring human approval.
+    - Keep each change bounded and identify impacted comparison modes/contracts.
   specs:
     - Describe observable behavior, not implementation preference unless needed to guarantee behavior.
-    - Include scenarios for success, insufficient/stale evidence, authorization failure, duplicate input and adversarial content where relevant.
-    - Define provenance, evidence references, uncertainty and review disposition.
+    - Include success and relevant failure scenarios: insufficient/stale evidence, authorization, duplicates, timeout, cancellation, partial branches, budget exhaustion and adversarial content.
+    - Define provenance, evidence references, uncertainty, retry/idempotency and review disposition where relevant.
+    - Every requirement must have observable Given/When/Then scenarios.
   design:
     - For cross-cutting changes, compare alternatives and explain security, failure handling, cost/latency, migration and rollback.
     - Keep Step Functions as top-level async workflow owner unless an approved decision changes it.
     - Prefer Go and deterministic processing; justify new dependencies/services/runtimes.
-    - For Protobuf APIs, define versioning/compatibility policy and distinguish transport DTOs from domain models.
+    - For Protobuf APIs, define compatibility policy and distinguish transport DTOs from domain models.
+    - Define durable dispatch recovery, idempotent effects, cancellation races, budget enforcement and observability for distributed/model operations.
   tasks:
-    - Break work into small independently verifiable units.
+    - Break work into small independently verifiable checkbox tasks.
+    - Map important requirements/scenarios to unit, property/fuzz, contract, integration, resilience, security or AI-evaluation proof.
     - Add unit/integration tests and update evaluation fixtures for changes to analysis, retrieval, prompts, schemas or finding semantics.
-    - Include OpenSpec, Buf, observability and security tests when relevant.
+    - Include OpenSpec, Buf, observability and security checks when relevant.
     - Do not mark checks complete unless they actually ran.
 
 operations:
   apply:
     guidance:
-      - Inspect source, current specs and tests before editing; do not assume docs match current code.
+      - Inspect source, current specs and tests before editing; do not assume docs match code.
       - Preserve immutable versions and evidence provenance.
       - Validate model output in application code; schema validity is not proof of correctness.
       - Use bounded retries and explicit timeouts; avoid unbounded reasoning loops.
+      - All model retries/repairs/verifications consume cumulative job budget.
       - Update tests and docs alongside behavior.
       - Never host a gRPC server in ordinary Lambda workers; use native workflow integrations for Step Functions to Lambda.
+      - Keep deterministic domain policy/evidence transformations pure over explicit inputs.
   archive:
     guidance:
       - Verify acceptance scenarios and relevant tests before archiving.
       - Run OpenSpec and relevant Buf validation; report skipped checks accurately.
-      - Ensure specs reflect what shipped and record material deviations from plan.
+      - Ensure specs reflect what shipped and record deviations from plan.
+      - Do not archive a change whose required tests/evaluations were skipped without explicit reviewed exception.
 
-# Additional project guardrails. Keep the functional-core / imperative-shell boundary.
+# Functional-core guardrails
 # - Keep DB/network/time/random/workflow/model effects at explicit boundaries.
 # - Preserve stage-value ownership and canonical evidence ordering.
 # - Separate domain outcomes from execution errors; make retries/idempotency explicit.

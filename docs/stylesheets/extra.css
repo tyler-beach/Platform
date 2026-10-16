@@ -1,10 +1,10 @@
-/* Wider content column and more usable space on desktop. */
+/* Responsive documentation width and predictable wrapping. */
 .md-grid {
-  max-width: 1440px;
+  max-width: 1500px;
 }
 
 .md-typeset {
-  overflow-wrap: break-word;
+  overflow-wrap: anywhere;
 }
 
 .md-typeset .grid.cards > ul > li {
@@ -23,7 +23,7 @@
   overflow-wrap: anywhere;
 }
 
-/* Landing-page hero. The colors adapt to the active light/dark palette. */
+/* Landing-page hero adapts to light and dark mode. */
 .platform-hero {
   margin: 0 0 2rem;
   padding: clamp(1.4rem, 4vw, 3rem);
@@ -50,6 +50,7 @@
   font-weight: 750;
   letter-spacing: -0.035em;
   line-height: 1.08;
+  overflow-wrap: normal;
 }
 
 .platform-hero p {
@@ -68,6 +69,33 @@
 
 .platform-hero-actions .md-button {
   margin: 0;
+}
+
+/* Architecture SVGs remain crisp, scalable and readable on narrow screens. */
+.md-typeset img[src$=".svg"] {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 1.25rem auto 1.75rem;
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 0.85rem;
+  background: #f4f7fc;
+}
+
+.md-typeset figure {
+  margin: 1.5rem 0;
+}
+
+.md-typeset figcaption {
+  color: var(--md-default-fg-color--light);
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.md-typeset table:not([class]) {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
 }
 
 @media screen and (max-width: 600px) {

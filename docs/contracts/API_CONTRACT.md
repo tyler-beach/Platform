@@ -1,91 +1,82 @@
 # API contract: first pass
 
-**Status:** Proposed v1 design. The service and REST gateway are not implemented yet. This page defines intended behavior for server, worker, CLI and integrations.
+**Status:** Proposed v1 design. The service and REST gateway are not implemented. Routes in the OpenAPI file are a design mapping, not a running endpoint.
 
 ## Sources of truth
 
-- The Protobuf file at proto/adrplatform/v1/platform.proto is authoritative for typed gRPC control-plane contracts.
-- openapi.yaml is the proposed REST/JSON façade for Swagger UI and future HTTP adapters. JSON property naming follows protobuf JSON mapping.
-- CONTRACTS.md, EVIDENCE.md, and LOGGING_AND_AUDIT.md define semantic invariants beyond schema.
-- Generate transport types from checked-in schemas; do not hand-maintain parallel DTOs. Internal persistence types may be richer than public messages; do not expose DB rows wholesale.
+- proto/adrplatform/v1/platform.proto is the authoritative schema for typed gRPC control-plane contracts.
+- docs/openapi.yaml is the proposed REST/JSON façade.
+- Data, evidence, logging/audit and lifecycle contracts specify semantic invariants beyond schema.
+- Generate transport types from schemas; do not hand-maintain parallel DTOs or expose DB rows wholesale.
 
-## v1 operations
+## Proposed v1 operations
 
 | HTTP operation | Purpose | Protobuf operation |
 |---|---|---|
-| POST /v1/workspaces/{workspaceId}/analysis-jobs | Idempotently create/accept async job | CreateAnalysisJob |
-| GET /v1/workspaces/{workspaceId}/analysis-jobs/{jobId} | Get authorized job state | GetAnalysisJob |
-| POST /v1/workspaces/{workspaceId}/analysis-jobs/{jobId}:cancel | Request cancellation | CancelAnalysisJob |
-| GET /v1/workspaces/{workspaceId}/analysis-jobs/{jobId}/findings | List findings with opaque pagination | ListFindings |
-| GET /v1/workspaces/{workspaceId}/findings/{findingId} | Get finding and evidence references | GetFinding |
+| POST /v1/workspaces/{workspaceId}/analysis-jobs | Idempotently create/accept job | CreateAnalysisJob |
+| GET /v1/workspaces/{workspaceId}/analysis-jobs/{jobId} | Read job state | GetAnalysisJob |
+| POST /v1/workspaces/{workspaceId}/analysis-jobs/{jobId}:cancel | Request best-effort cancellation | CancelAnalysisJob |
+| GET /v1/workspaces/{workspaceId}/analysis-jobs/{jobId}/findings | List findings | ListFindings |
+| GET /v1/workspaces/{workspaceId}/findings/{findingId} | Read finding/evidence refs | GetFinding |
 
-Routes are proposed mappings, not proof of a running REST endpoint. Do not publish a real server URL until ingress and authentication are implemented.
+## Acceptance and idempotency
 
-## Create job semantics
+The request includes authorized workspace, idempotency key, comparison mode and immutable artifact references. The server authenticates/authorizes, validates sizes/versions/cardinality, creates a canonical request fingerprint, and transactionally writes the job, idempotency record and durable dispatch intent before returning 202.
 
-A request provides workspace, idempotency key, comparison mode and immutable artifact references. The server authenticates and authorizes; validates input source versions/cardinality; canonicalizes the request; persists job plus idempotency state; safely starts or schedules the workflow; then returns 202 Accepted with a job ID.
+- Same workspace + key + same canonical request returns the original logical job.
+- Same workspace + key + different request returns 409 IDEMPOTENCY_KEY_REUSED.
+- Dispatch intent survives process death and workflow-start failure. A dispatcher/reconciler retries start without duplicate logical work and uses fencing/claim ownership to prevent stale updates.
+- Idempotency retention must exceed the supported client retry window; exact retention must be chosen before production.
 
-Same workspace + idempotency key + same canonical request returns the original job with reusedExistingJob=true. Same key with different canonical request returns 409 IDEMPOTENCY_KEY_REUSED. Retain idempotency records at least as long as the supported client retry window; ratify exact retention before production.
+## Async lifecycle and cancellation
 
-## Asynchronous lifecycle
+Creation does not wait for analysis. Clients poll state or use a future notification mechanism. Terminal execution states include SUCCEEDED, FAILED, CANCELLED and EXPIRED; NEEDS_REVIEW requires explicit orchestration semantics. Domain finding outcome is separate from job execution status.
 
-Creation does not wait for analysis. Clients poll GetAnalysisJob or use a future notification mechanism. Acceptance does not imply findings exist.
-
-Terminal execution states: SUCCEEDED, FAILED, CANCELLED, EXPIRED. NEEDS_REVIEW indicates policy-controlled human review. Implementation must explicitly define orchestration completion semantics for NEEDS_REVIEW without masking technical failure.
-
-Cancellation is best-effort: accepted means the request was accepted, not that completed model calls, writes or publication were rolled back.
+Cancellation is best-effort. Acceptance means the cancellation request was stored, not that provider work, completed writes or publication were rolled back. Workers must check current state/fencing before effectful commits and publication. A late side effect remains auditable.
 
 ## Pagination
 
-- pageSize zero or omitted selects server default; reject invalid negative values and clamp oversized values to the maximum.
-- pageToken is opaque, integrity-protected, bounded, and scoped to workspace/job/query filters.
-- Tokens are not authorization. Authorize each request independently.
-- Stable ordering should use createdAt then findingId over a fixed result snapshot where feasible.
-- Return empty nextPageToken when no next page exists.
-- Invalid/expired token produces stable invalid-argument error; client restarts pagination rather than parsing tokens.
+- Omitted/zero page size selects server default; negative values are invalid and oversized values are clamped/rejected according to documented API policy.
+- Page token is opaque, bounded, integrity-protected and scoped to workspace/job/query filters. It is never authorization.
+- Reauthorize every page request.
+- Stable ordering uses createdAt + finding ID over a stable result view where feasible.
+- Invalid/expired token yields a stable invalid-argument error.
 
-## Error/status mapping
+## Error policy
 
-| HTTP | Stable code / meaning | gRPC analogue | Retry guidance |
+| HTTP | Stable meaning | gRPC analogue | Retry guidance |
 |---:|---|---|---|
-| 400 | INVALID_ARGUMENT | INVALID_ARGUMENT | Fix request; do not retry unchanged |
-| 401 | UNAUTHENTICATED | UNAUTHENTICATED | Refresh credentials, then retry once |
-| 403 | PERMISSION_DENIED | PERMISSION_DENIED | No, unless access policy changes |
-| 404 | NOT_FOUND; may conceal unauthorized resource | NOT_FOUND | No |
-| 409 | CONFLICT / IDEMPOTENCY_KEY_REUSED / invalid state | ALREADY_EXISTS or FAILED_PRECONDITION | Resolve conflict first |
-| 429 | RATE_LIMITED / budget exceeded | RESOURCE_EXHAUSTED | Bounded retry; honor server guidance |
-| 500 | INTERNAL | INTERNAL | Retry only if operation is safe |
-| 503 | DEPENDENCY_UNAVAILABLE | UNAVAILABLE | Bounded retry with jitter/deadline |
-| 504 | DEADLINE_EXCEEDED | DEADLINE_EXCEEDED | Retry only with safe idempotency |
+| 400 | INVALID_ARGUMENT | INVALID_ARGUMENT | Fix request |
+| 401 | UNAUTHENTICATED | UNAUTHENTICATED | Refresh credentials; bounded retry |
+| 403 | PERMISSION_DENIED | PERMISSION_DENIED | No retry until access changes |
+| 404 | NOT_FOUND; may conceal unauthorized resource | NOT_FOUND | No retry |
+| 409 | CONFLICT / reused idempotency key / invalid state | ALREADY_EXISTS or FAILED_PRECONDITION | Resolve conflict |
+| 429 | RATE_LIMITED / quota or budget exceeded | RESOURCE_EXHAUSTED | Honor retry hints and shared deadline |
+| 500 | INTERNAL | INTERNAL | Retry only if safe |
+| 503 | DEPENDENCY_UNAVAILABLE | UNAVAILABLE | Bounded retry with jitter |
+| 504 | DEADLINE_EXCEEDED | DEADLINE_EXCEEDED | Retry only with idempotency |
 
-HTTP errors use RFC 9457 Problem Details plus stable code, requestId, retryable and bounded violations. Never disclose whether hidden resources exist in another workspace.
+HTTP errors should use RFC 9457 Problem Details with stable code, requestId, retryability and bounded violations. Do not reveal the existence of hidden resources in another tenant.
 
-## Authentication and authorization
+## Authorization and input trust
 
-The API requires authenticated identity and server-side workspace authorization. Workspace IDs, artifact IDs, source URIs, repository names and pagination tokens are selectors, not access grants. TLS is required outside local development. Every read, cancellation, listing, evidence dereference and publication checks authorization at point of use. Choose a concrete auth design before production: user OIDC/service identity, token audience, roles/scopes, rotation, and audit actor mapping. Configure request/message sizes, quotas, deadlines and rate limits at ingress and server boundaries.
+Workspace IDs, repository names, source URIs, artifact IDs and page tokens are selectors, not access grants. Reauthorize every read, cancel, list, evidence dereference and publication. Use TLS outside local development, bounded payload sizes, rate/usage quotas and server-side deadlines. Decide production identity model, token audience/roles, rotation, tenant isolation, actor mapping and retention before production.
 
-## Compatibility and versioning
+Source artifact text and model output are untrusted. The model is not an authorization principal and cannot select unrestricted tools or write endpoints.
 
-- Public HTTP prefix is /v1; Protobuf package is adrplatform.v1.
-- Prefer additive fields/RPCs. Never renumber/reuse Protobuf field numbers or enum numbers; reserve removed names and numbers.
-- Do not change enum meaning in place. Add values and define behavior for old clients.
-- Unknown outcome/status must not silently map to a safe-looking value.
-- Review OpenAPI and Proto together. CI should run buf lint, buf build, buf breaking, OpenAPI lint and validation that REST DTOs map to intended protobuf messages.
-- Schema files are authoritative; generated code is derived. Keep contracts, migration compatibility and docs aligned to a release.
-- Compatibility break requires a new version/package or explicit migration plan.
+## Token/cost quota responses
+
+Differentiate request-rate throttling from analysis budget exhaustion. Budget exhaustion should be a stable response/state, not retried automatically without a changed budget/policy. If an asynchronous job reaches its budget ceiling, stop further model calls and persist a typed reason plus usage accounting. A caller must not reset a job budget by retrying the HTTP operation.
+
+## Compatibility
+
+- HTTP prefix is /v1; Protobuf package is adrplatform.v1.
+- Prefer additive schema changes. Never reuse removed Protobuf field numbers/names; reserve removed values.
+- Unknown enum/outcome values must not silently map to no-deviation/success.
+- CI should run Buf lint/build/breaking checks, OpenAPI validation/lint and mapping tests for the two contracts.
+- Use expand/contract database migrations, with old/new-reader compatibility during rollout.
+- Compatibility break requires a new API/protobuf version or reviewed migration plan.
 
 ## Out of initial v1
 
-Artifact upload/ingestion, decision/requirement CRUD, source registration, review submission, evidence excerpt retrieval, webhook subscriptions, streaming progress, and publication/check-comment endpoints are not part of the initial API. ModelRun, AuditEvent, Requirement, Decision and Relationship are internal domain/persistence contracts until access patterns and authorization rules are reviewed.
-
-## Implementation checklist
-
-- [ ] Confirm whether HTTP façade or gRPC is the first deployed boundary.
-- [ ] Authenticate and authorize every operation.
-- [ ] Validate idempotency and workflow-start failure recovery.
-- [ ] Define deadlines, quotas, size limits and state transitions in code.
-- [ ] Generate server/client types.
-- [ ] Validate evidence IDs/versions before persistence/publication.
-- [ ] Test enums, pagination, error codes and authorization.
-- [ ] Run Proto lint/build/breaking and OpenAPI validation in CI.
-- [ ] Publish docs from same commit as schema changes.
+Artifact ingestion/registration, decision CRUD, review submission, evidence excerpt retrieval, webhook subscriptions, streaming progress, and publication/check-comment endpoints are not part of initial v1. ModelRun, AuditEvent, Requirement, Decision and Relationship remain internal until access and authorization needs are reviewed.

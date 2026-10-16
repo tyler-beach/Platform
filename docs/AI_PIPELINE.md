@@ -1,76 +1,99 @@
 # AI pipeline and harness
 
 ## Principle
-The model is one bounded stage in an auditable process, not the whole platform. Build the evidence package first, use the model for a defined judgment, then validate the result in application code.
+
+The model is one bounded, auditable stage, not the system orchestrator or source of truth. Build deterministic evidence first, use a named model operation for a specific judgment, and validate the output in application code.
 
 ## Pipeline
-1. Accept request/event and create an idempotent job.
-2. Resolve immutable input versions (base/head commit, spec version, ADR versions).
-3. Normalize artifacts and extract deterministic metadata.
-4. Resolve applicable decision/requirement candidates using status, scope, owner, relationships, identifiers and search.
-5. Run deterministic analysis: diffs, AST/symbol inspection, document parsing and explicit rules.
-6. Assemble a budgeted evidence package with stable evidence IDs.
-7. Call Anthropic for structured assessment.
-8. Validate schema, evidence references, source versions and domain invariants.
-9. For selected findings, run an independent challenge/verification pass with bounded input and output.
-10. Persist finding, verification, source/version provenance, prompt/schema/model metadata and cost/latency telemetry.
-11. Publish advisory results or route for human review.
 
-## Model operations
-Start with a minimal number of prompts/calls; split operations only when separate context, permissions, output contracts or evaluation show it helps.
-- **Requirement extraction:** atomic, traceable requirements from plain English; preserve modality (MUST/SHOULD/MAY) and ambiguity.
-- **ADR interpretation:** decision statement, status, rationale, consequences, scope, constraints, exceptions, effective date, supersession links.
-- **Applicability assessment:** identify whether the decision applies to a service/repo/change/version; allow unknown.
-- **Deviation assessment:** compare relevant source facts and decisions, returning supported deviation, no deviation found, or inconclusive.
-- **Verification:** deterministic validation first; optional independent model challenge for selected results.
-- **Explanation:** summarize verified claims and link to evidence, not unrestricted context.
+1. Authenticate, authorize, validate and canonicalize the request.
+2. Commit a job, idempotency record and durable workflow-dispatch intent.
+3. Resolve immutable source versions and pin parser/pipeline/policy versions.
+4. Normalize artifacts and extract deterministic metadata.
+5. Resolve candidates through status, scope, relationships, identifiers, changed symbols and lexical retrieval.
+6. Run applicable deterministic diff/AST/document/config rules and record branch completeness.
+7. Assemble an immutable, stable-ordered evidence package with IDs tied to source versions.
+8. Preflight token, call, concurrency, cost and deadline budgets.
+9. Call Anthropic for one bounded structured assessment.
+10. Validate schema, evidence references, source versions, applicability, counter-evidence and domain invariants.
+11. Run optional independent verification only for policy-selected cases and within remaining budget.
+12. Persist finding, evidence, model-run, usage and audit data; publish idempotently only after freshness and review policy.
 
-## Go harness interface (illustrative)
+## Operations
+
+Start with few named operations, splitting only when evaluation proves value or distinct permissions, context, output contract or budget require it:
+- **Requirement extraction:** atomic traceable requirements from plain English; preserve MUST/SHOULD/MAY and ambiguity.
+- **ADR interpretation:** decision, status, scope, constraints, consequences, exceptions, effective date and supersession.
+- **Applicability:** whether the decision governs this component/revision; unknown is a valid result.
+- **Deviation assessment:** compare source-backed facts and requirements; return a domain outcome, not unsupported prose.
+- **Verification:** deterministic checks first; selective independent challenge only where justified.
+- **Explanation:** summarize validated claims and cite evidence; don't let unrestricted model knowledge add new factual assertions.
+
+## Typed Go boundary
+
 ~~~go
 type ModelAssessor interface {
     Assess(ctx context.Context, req AssessmentRequest) (AssessmentResult, error)
 }
 ~~~
-Define concrete request/result structs; keep provider-specific message types out of domain packages. Adapter responsibilities: request construction, deadlines, provider errors, bounded retry, token/cost attribution, response parsing and version metadata. Configure model name; don't scatter model identifiers throughout the code.
+
+This is illustrative. Keep provider-specific SDK request/response types in the adapter. The harness owns operation allowlists, prompt/schema selection, token/cost budgets, deadlines, cancellation, response parsing, provider error classification, usage metadata and validation integration.
+
+## Token and cost management
+
+Token controls are enforced **before and during** each call. A per-call context-window limit alone does not cap cumulative spend.
+
+1. Resolve configured model, request options, prompt/schema version and effective-dated price configuration.
+2. Build the exact candidate request, including system prompt, evidence, output schema/tool definitions and supported content blocks.
+3. Count request tokens using the Anthropic token-count endpoint where supported for that request shape; otherwise use a conservative model-aware estimator and retain the estimation method/version.
+4. Reserve the configured maximum output tokens and conservative overhead before admitting the call.
+5. Enforce per-operation input/output caps, cumulative per-job token/spend/call/retry caps, one end-to-end deadline, and per-tenant/global concurrency ceilings.
+6. Compact by deterministic relevance and record which evidence IDs were removed and why. If the package still does not fit, reject/route/review rather than silently dropping required evidence.
+7. Account for failed/retried calls as potentially billable unless provider usage proves otherwise. Retry, repair and optional verification consume the same job budget.
+8. Reconcile estimates to provider-reported usage after each call. Persist actual/estimated status, request ID, price version, latency and attempts.
+9. Stop or skip optional verifier calls when there is not enough remaining reserve.
+
+Use price/model settings as versioned configuration, not constants embedded in domain code. Prompt caching is optional and measured; it is not a result cache. Any result-cache key includes immutable input/evidence versions, operation, prompt/schema/pipeline/policy versions and model configuration; authorization and freshness are still rechecked.
+
+See the [token budget diagram](assets/diagrams/token-budget.svg) and [adversarial review](ADVERSARIAL_DESIGN_REVIEW.md). Anthropic's [token-counting documentation](https://platform.claude.com/docs/en/build-with-claude/token-counting) describes preflight estimation and request-shape support; the harness still needs a cumulative spend ledger.
 
 ## Structured output is not truth
-Prefer schema-constrained output where supported, then validate again in Go:
-- required fields and enum membership;
-- max lengths and collection sizes;
-- evidence IDs are in the job's provided evidence package;
-- source version matches the job;
-- applicable decision status/scope is valid or applicability is explicitly unknown;
-- finding doesn't contradict itself or duplicate an existing result;
-- rationale includes support from supplied evidence.
-If output is invalid, allow at most one controlled repair attempt where safe, then return an invalid/inconclusive result. Never loop indefinitely.
 
-## Evidence package
-Each item should contain stable evidence ID, artifact/version or hash, source type, location (path/line, symbol, section or immutable URL), excerpt, retrieval method, source integrity metadata and relevance rationale. Store authoritative source separately; send only necessary excerpts. Preserve line/symbol/section mappings across normalization.
+Use constrained structured output where supported, then validate in Go:
+- required fields/enums, length and collection bounds;
+- every evidence ID belongs to this exact job package;
+- artifact version and source locator match the immutable snapshot;
+- decision status/scope and applicability are valid or explicitly uncertain;
+- supporting and contradicting evidence are both considered;
+- no contradiction, duplicate finding or unsupported factual assertion;
+- outcome, severity, evidence quality/confidence and review requirement stay distinct.
 
-## Retrieval order
-1. Exact artifact/ADR/requirement IDs and explicit relationships.
-2. Metadata filters (status, service, repository, environment, owner, dates).
-3. Changed file paths, symbols, imports, API names, infrastructure resource types and config keys.
+Schema-valid but unsupported output is rejected or downgraded according to explicit policy. Permit at most one controlled repair attempt only where safe and budgeted; otherwise produce a typed failure/inconclusive result. Never turn timeout, refusal, invalid output or missing evidence into “no deviation found.”
+
+## Evidence package and retrieval
+
+Each evidence item carries stable ID, artifact/version/hash, source type, precise path/line/symbol/section, locator precision, excerpt digest, retrieval method/version, integrity, collection timestamp and relevance rationale. Keep source truth outside model context; send only minimum necessary excerpts.
+
+Retrieval precedence:
+1. Exact IDs and authoritative relationships.
+2. Status/scope/owner/service/environment/time filters.
+3. Changed paths, symbols, imports, API names and config/resource identifiers.
 4. Full-text search.
-5. Embedding search for semantic candidates missed by exact/lexical retrieval.
-6. Optional reranking only after retrieval evaluation.
-Vector similarity must not determine normative applicability. Source docs and metadata remain authoritative.
+5. Embedding search for evaluated semantic recall gaps.
+6. Reranking only where a labeled benchmark proves benefit.
 
-## Budgeting, caching, versioning
-Set limits for evidence count, excerpt size, input/output tokens, calls, wall-clock time and cost per job. Record prompt/schema version/hash, operation, requested/returned model IDs when available, relevant request settings, source evidence IDs, provider response ID, token usage, latency, attempts, validation status and estimated cost. Cache only when keys include immutable source versions, operation, prompt/schema version and model settings.
+Vector similarity must never decide normative applicability. Required branch failures and missing source mappings remain explicit.
 
-## Error classification
-- network/timeout/5xx: bounded retry with jitter;
-- throttling: respect retry guidance and cap concurrency;
-- auth/permission error: fail fast and alert;
-- invalid request/unsupported input: fail fast;
-- invalid response: one bounded recovery attempt, then typed failure/inconclusive;
-- missing/stale evidence: inconclusive/review required, not guessed.
+## Failure classification
 
-## Avoid at first
-No free-form repository-agent loop, multi-agent debate on every finding, dedicated memory product for architectural knowledge, vector DB as sole source, or model-controlled ADR/code/infrastructure changes. Start with a small, versioned, observable harness rather than an AI framework for its own sake.
+- Network/timeout/5xx: bounded retry with jitter if the operation is safe.
+- Rate limit: honor provider retry guidance; keep the original deadline and budget.
+- Auth/permission: fail fast, alert without logging secret payloads.
+- Invalid request/unsupported content: fail fast or route to a supported parser.
+- Invalid model response: bounded repair at most once, then typed failure/inconclusive.
+- Stale or insufficient evidence: report incompleteness; do not guess.
+- Budget exhausted: stop or route for review; never reset the cap on retry.
 
+## Avoid initially
 
-## Functional boundary
-
-The LLM call is always an explicit effect. Keep prompt selection, evidence packaging, request budget calculation, and result validation as separately testable steps. Treat the evidence package as immutable once handed to the assessor; canonicalize evidence order so identical inputs produce stable requests. Capture model/prompt/schema versions, evidence IDs, and output metadata. Use domain outcomes such as inconclusive rather than mapping provider failures to no-deviation. Keep model nondeterminism outside deterministic unit tests; inject a fake ModelAssessor for application tests and use labeled evaluations for real model quality. See docs/FUNCTIONAL_CORE.md and docs/AI_TECHNOLOGY_SELECTION.md.
+No free-form repository-agent loop, multi-agent debate on every finding, conversational memory product for ADR facts, vector DB as the sole source, or model-controlled source/infra writes. Start with a small, versioned and observable harness.

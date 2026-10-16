@@ -133,6 +133,19 @@ Internal record for one provider/model operation: run/job/attempt ID, provider, 
 - Provider failure, timeout, malformed output, refusal and validated assessment are distinct results.
 - ModelRun is provenance, not the source of truth for job/finding state.
 
+### BudgetReservation / Usage ledger
+
+A durable reservation for one planned model operation and its eventual usage reconciliation. Suggested fields: reservation ID, workspace/job ID, operation and attempt identity, budget-policy version, model/configuration version, reserved input/output allowance, maximum estimated cost/currency, price catalog version, state, lease/expiry, provider request ID, observed token usage/cost and reconciliation timestamp.
+
+- Budget reservation must be concurrency-safe across independently running workers.
+- States should distinguish reserved, settled, released and reconciliation-required/usage-unknown.
+- A timeout after a request might have reached the provider must not release the full reservation until safe reconciliation.
+- Retry, repair and verifier attempts consume the job's cumulative budget; API retries cannot reset it.
+- Actual usage is recorded alongside (not over) preflight estimate. Price/version and estimation method are auditable.
+- This ledger is operational accounting metadata, not a calibrated quality/confidence score.
+
+See [AI runtime and token budget contract](AI_RUNTIME.md) for preflight, usage reconciliation, cache semantics and minimum tests.
+
 ### Review
 
 Append-only human disposition over a specific finding version: review ID, finding ID/version, workspace, actor, disposition, rationale, timestamp, and optional supporting evidence.
@@ -172,6 +185,5 @@ Public error has stable machine-readable code, safe human-readable message, requ
 
 Reject missing or ambiguous required inputs at ingress. Retrieval may discover other candidates, but record the exact versions actually considered.
 
-## Data lifecycle
-
+See also the [AI runtime contract](AI_RUNTIME.md) for model-call budget reservations and usage provenance.\n\n## Data lifecycle\n
 Source artifacts/versions are authoritative; extracted decisions, requirements, relationships, embeddings and indexes are versioned derivatives. Job inputs and evidence are immutable snapshots. Findings, ModelRun provenance, reviews and audit events preserve history. Define separate retention/deletion policies for snapshots, transcripts, ordinary logs, audit records, and embeddings before production.

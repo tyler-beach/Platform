@@ -37,6 +37,16 @@ Resolve these when their answers affect security, behavior, data model, cost or 
 - Which CI, lint and security scanners are mandatory?
 - Should the stock spec-driven OpenSpec schema remain, or is a custom schema warranted later?
 
+## Distributed execution and token accounting questions
+- Should durable dispatch use a transactional outbox or a DB-backed dispatch table with leases and reconciliation?
+- Should the first workflow use Step Functions Standard or Express, given execution duration, delivery semantics, visibility and cost?
+- What atomic reservation/usage ledger pattern fits the first database and parallel worker load?
+- What effective-dated price source, fallback estimator and policy versioning should be authoritative?
+- Which Anthropic request shapes in the first input format set support accurate token preflight; what conservative fallback is safe?
+- What are initial per-operation and per-job token/cost/call/deadline limits, and who approves changes?
+- What are tenant/global concurrency, queue-age and denial-of-wallet guardrails?
+- What retention applies to usage ledger, model metadata, cached results and unknown-usage reservations?
+
 ## Functional design questions
 - Which packages/functions mix domain policy with repository or network I/O?
 - What ownership rule governs slices, maps and pointers crossing worker/stage boundaries?

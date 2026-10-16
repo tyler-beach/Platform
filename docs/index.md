@@ -8,6 +8,7 @@ Compare architectural decisions, technical specifications, and implementation ch
 <div class="platform-hero-actions" markdown>
 [Get started](getting-started.md){ .md-button .md-button--primary }
 [Explore architecture](architecture.md){ .md-button }
+[Engineering playbook](ENGINEERING_PLAYBOOK.md){ .md-button }
 [API reference](api/index.md){ .md-button }
 </div>
 </div>
@@ -16,11 +17,19 @@ Compare architectural decisions, technical specifications, and implementation ch
 
 <div class="grid cards" markdown>
 
+-   :material-graph-outline: **Architecture and workflows**
+
+    ---
+
+    Detailed reference architecture, analysis lifecycle, token-budget gates and deployment profiles.
+
+    [:octicons-arrow-right-24: Explore diagrams](architecture.md)
+
 -   :material-api: **API reference**
 
     ---
 
-    Explore the proposed OpenAPI contract in the interactive Swagger UI.
+    Explore the proposed OpenAPI contract in Swagger UI. The API is a design contract, not a deployed service.
 
     [:octicons-arrow-right-24: Explore API](api/index.md)
 
@@ -28,7 +37,7 @@ Compare architectural decisions, technical specifications, and implementation ch
 
     ---
 
-    Understand the invariants for artifacts, jobs, findings, evidence, reviews, and audit records.
+    Understand invariants for artifacts, jobs, findings, evidence, reviews and audit records.
 
     [:octicons-arrow-right-24: Read contracts](contracts/CONTRACTS.md)
 
@@ -40,62 +49,55 @@ Compare architectural decisions, technical specifications, and implementation ch
 
     [:octicons-arrow-right-24: Evidence rules](contracts/EVIDENCE.md)
 
--   :material-route: **Architecture**
+-   :material-test-tube: **Engineering playbook**
 
     ---
 
-    Follow the system context, asynchronous workflow, and trust boundaries.
+    OpenSpec-driven behavior design, functional core practices, red-green-refactor and test traceability.
 
-    [:octicons-arrow-right-24: View architecture](architecture.md)
+    [:octicons-arrow-right-24: Start engineering](ENGINEERING_PLAYBOOK.md)
 
--   :material-school: **How-to guides**
-
-    ---
-
-    Learn how to add an input source, comparison mode, or Go worker safely.
-
-    [:octicons-arrow-right-24: Start building](how-to/index.md)
-
--   :material-monitor-dashboard: **Operations**
+-   :material-shield-check: **Adversarial design review**
 
     ---
 
-    Review logging, tracing, failure handling, idempotency, and reliability guidance.
+    Distributed reliability, token economics, trust boundaries and unresolved production decisions.
 
-    [:octicons-arrow-right-24: Operational contracts](contracts/LOGGING_AND_AUDIT.md)
+    [:octicons-arrow-right-24: Review the risks](ADVERSARIAL_DESIGN_REVIEW.md)
 
 </div>
 
-## Core comparisons
+## Core comparison modes
 
 ~~~mermaid
 flowchart LR
-  ADR[Architectural Decisions] --> IA[Implementation ↔ ADR]
-  SPEC[Technical Specification] --> SA[Specification ↔ ADR]
-  SPEC --> SI[Specification ↔ Implementation]
-  CODE[Code Change / Source Snapshot] --> IA
+  ADR[Architectural decisions] --> IA[Implementation ↔ ADR]
+  SPEC[Technical specification] --> SA[Specification ↔ ADR]
+  SPEC --> SI[Specification ↔ implementation]
+  CODE[Code change / source snapshot] --> IA
   CODE --> SI
-  IA --> E[Versioned Evidence Package]
+  IA --> E[Versioned evidence package]
   SA --> E
   SI --> E
-  E --> V[Deterministic Validation]
-  V --> A[Bounded Structured Assessment]
-  A --> R[Validated Finding]
-  R --> H[Human Review when required]
+  E --> V[Deterministic validation]
+  V --> A[Bounded structured assessment]
+  A --> R[Validated finding]
+  R --> H[Human review when required]
 ~~~
 
 ## Design status
 
-This repository is the architecture and contract baseline. The API implementation, generated code, workflow, persistence layer, and production service are not yet claimed to exist. Published docs evolve with reviewed OpenSpec changes and schema versions.
+This repository is an architecture and contract baseline. The production API, generated service code, state-machine implementation, persistence layer and model harness are not yet claimed to exist. The diagrams describe intended boundaries and controls, not deployed resources.
 
 **No finding without evidence, no constraint without applicability, and no model output without application validation.**
 
 ## Start here
 
 - [Getting started](getting-started.md)
-- [Architecture and diagrams](architecture.md)
+- [System architecture and detailed workflows](architecture.md)
+- [OpenSpec and test-driven engineering](ENGINEERING_PLAYBOOK.md)
+- [Adversarial design review](ADVERSARIAL_DESIGN_REVIEW.md)
 - [API reference](api/index.md)
 - [Data contracts](contracts/CONTRACTS.md)
 - [Logging and audit](contracts/LOGGING_AND_AUDIT.md)
-- [How-to guides](how-to/index.md)
 - [Repository README](https://github.com/tyler-beach/Platform/blob/main/README.md)

@@ -1,85 +1,47 @@
-# Architecture and system diagrams
+# Architecture and engineering diagrams
 
-This describes the recommended target, not a claim that components are deployed.
+The diagrams are **reference designs**, not claims about deployed infrastructure. Their SVG source is checked into the repository so changes can be reviewed with the architecture and contracts.
 
-## System context
+## Reference architecture
 
-~~~mermaid
-flowchart TB
-  C[Engineer / CI / Integration] --> I[Authenticated API boundary]
-  I --> J[(PostgreSQL: Jobs and Idempotency)]
-  I --> O[Workflow start / outbox]
-  O --> SF[Step Functions]
-  SF --> N[Normalize source]
-  SF --> D[Deterministic checks]
-  SF --> R[Retrieve ADRs and requirements]
-  N --> E[Evidence package]
-  D --> E
-  R --> E
-  E --> H[Go assessment harness]
-  H --> A[Anthropic API]
-  A --> V[Application schema + semantic validation]
-  V --> F[(PostgreSQL: Findings and provenance)]
-  F --> API[Job / finding query API]
-  V --> HR[Human review when required]
-  HR --> AU[(Review and audit records)]
-  SF -. large immutable artifacts .-> S3[(S3, optional)]
-  I -. request/trace context .-> OT[OpenTelemetry]
-  SF -. execution telemetry .-> OT
-  H -. usage and validation metrics .-> OT
-~~~
+![Layered reference architecture with source systems, ingress, durable orchestration, Go workers, persistence, model provider, secrets, and observability.](assets/diagrams/system-architecture.svg)
 
-## Asynchronous job sequence
+The ingress validates identity, authorization and budget policy. Step Functions is the sole owner of distributed job lifecycle. Workers perform bounded steps. PostgreSQL is the authoritative store for jobs, findings, reviews, audit and usage accounting; S3 is optional for large immutable source snapshots. Model output is a candidate, never policy.
 
-~~~mermaid
-sequenceDiagram
-  autonumber
-  participant Client
-  participant API
-  participant DB as PostgreSQL
-  participant SF as Step Functions
-  participant W as Go Lambda workers
-  participant LLM as Anthropic API
-  Client->>API: Create job + idempotency key
-  API->>DB: Authorize, validate, insert job + idempotency
-  API->>SF: Start or enqueue workflow idempotently
-  API-->>Client: 202 Accepted + job ID
-  SF->>W: Normalize / retrieve / deterministic checks
-  W->>DB: Read authorized immutable versions
-  W-->>SF: Evidence package references
-  SF->>W: Bounded assessment
-  W->>LLM: Structured assessment request
-  LLM-->>W: Candidate structured output
-  W->>W: Validate schema, versions, IDs and policy
-  W->>DB: Persist finding + model run + audit events
-  Client->>API: Get job / list findings
-  API->>DB: Authorize and read snapshot
-  API-->>Client: Status / findings / references
-~~~
+### Runtime profiles
 
-## Trust boundaries
+| Profile | Use when | Trade-off |
+|---|---|---|
+| Serverless-first: API Gateway/HTTP + Go Lambda + Step Functions + worker Lambdas | Initial webhook and asynchronous API consumers | Keep ingress thin; manage cold starts and database connection scaling |
+| Long-lived gRPC control plane: HTTPS ALB + Go gRPC on ECS/Fargate | A real client requires long-lived gRPC semantics | Adds always-on cost, health/rollout, scaling and network operations |
+| Shared data plane: PostgreSQL/Aurora, S3 as needed, Secrets Manager, OpenTelemetry | Shared by either runtime profile | Define tenancy, retention, schema migrations and connection strategy before production |
 
-~~~mermaid
-flowchart LR
-  U[Untrusted ADRs / code / specs] --> P[Bounded parsers and source adapters]
-  P --> E[Evidence package with provenance]
-  E --> M[Model: source is data, not instructions]
-  M --> V[Schema and semantic validator]
-  V --> S[Authorized persistence]
-  S --> PUB[Optional publication after freshness and policy checks]
-  AUTH[Authenticated identity + workspace policy] --> P
-  AUTH --> S
-  GUARD[No model-controlled shell, secrets, or writes] -. constrains .-> M
-~~~
+Protobuf can remain contract-first even if the first public endpoint is HTTP/JSON. Do not host a gRPC server in ordinary Lambda. The provider direction is direct Anthropic API behind a typed Go harness.
 
-## State ownership
+## End-to-end analysis workflow
 
-- **API service:** authentication/authorization, request validation, idempotent job creation and queries.
-- **Step Functions:** distributed stages, retries, catch paths, deadlines and execution flow.
-- **Go Lambda workers:** reusable bounded operations; no gRPC listener inside ordinary Lambda.
-- **PostgreSQL:** authoritative job/result/review/audit records.
-- **S3 (optional):** large immutable artifacts subject to retention.
-- **OpenTelemetry:** operational correlation, not authoritative audit.
-- **Anthropic:** external model operation behind a typed Go harness; model output is untrusted candidate data.
+![Workflow from authenticated acceptance through pinned inputs, deterministic evidence, token-budget gate, assessment, application validation, durable result, review, and publication.](assets/diagrams/analysis-workflow.svg)
 
-A webhook-only/serverless HTTP boundary can come before a long-lived gRPC server if consumers do not yet justify ECS/Fargate. See [RPC and Protobuf design](RPC_AND_PROTOBUF.md).
+Key invariants: (1) commit a job and durable dispatch intent before returning acceptance; (2) reconcile workflow-start failures instead of leaving accepted jobs stranded; (3) source versions, parser, pipeline and policy are pinned; (4) every branch reports completeness; (5) retries use the same overall deadline and cumulative cost/call budgets; (6) findings are committed with evidence and provenance before publication; and (7) publication rechecks freshness and is idempotent.
+
+## Functional, behavioral, and test-driven delivery
+
+![OpenSpec-first delivery cycle linking proposal, observable scenarios, tests, pure-core implementation, integration checks, adversarial review and archive.](assets/diagrams/engineering-loop.svg)
+
+## Token and cost controls
+
+![Budget flow showing evidence compaction, input token counting, output reservation, cumulative job caps, usage reconciliation, and stop conditions.](assets/diagrams/token-budget.svg)
+
+## Authority by concern
+
+| Concern | Authoritative owner | What must not happen |
+|---|---|---|
+| Identity and tenant scope | Ingress and server-side authorization | Model output never grants access |
+| Async job lifecycle | Step Functions plus durable job/dispatch state | No competing agent graph or hidden orchestrator |
+| Domain policy | Pure Go functions over explicit, versioned inputs | No policy implemented only in prompts or workflow expressions |
+| Model requests | Typed harness: budget, versions, deadlines, retries | No unbounded tool loop or unbounded context |
+| Provenance | Immutable artifact versions, stable locators and digest checks | Never silently fall back to latest source |
+| Audit | Durable AuditEvent and ModelRun records | Traces are not a substitute for business audit |
+| Quality | Unit/property/contract/integration tests plus labeled AI evaluations | A successful build or schema check is not behavioral proof |
+
+See the [adversarial design review](ADVERSARIAL_DESIGN_REVIEW.md), [engineering playbook](ENGINEERING_PLAYBOOK.md), [AI pipeline](AI_PIPELINE.md), [functional-core review](FUNCTIONAL_CORE.md), [operations](OPERATIONS.md), and [OpenSpec workflow](OPEN_SPEC_WORKFLOW.md).
