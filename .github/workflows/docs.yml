@@ -92,6 +92,41 @@ jobs:
           assert len(parser.nodes.get("home-principles", [])) == 1, "Expected one principles grid."
           print("Homepage markup verified: hero, feature grid, comparison, principles and status are separate blocks.")
           PY
+      - name: Validate architecture diagrams
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from xml.etree import ElementTree as ET
+
+          diagram_dir = Path("docs/assets/diagrams")
+          icon_dir = Path("docs/assets/aws-icons")
+          diagrams = sorted(diagram_dir.glob("*.svg"))
+          expected = {
+              "system-architecture.svg",
+              "trust-boundaries.svg",
+              "analysis-workflow.svg",
+              "token-budget.svg",
+              "engineering-loop.svg",
+          }
+          present = {path.name for path in diagrams}
+          missing = expected - present
+          assert not missing, f"Missing architecture diagrams: {sorted(missing)}"
+
+          for path in diagrams:
+              root = ET.parse(path).getroot()
+              assert root.attrib.get("viewBox"), f"{path} must have a viewBox so it scales to the page."
+              for node in root.iter():
+                  href = node.attrib.get("href") or node.attrib.get("{http://www.w3.org/1999/xlink}href")
+                  if href and href.startswith("../aws-icons/"):
+                      icon = (path.parent / href).resolve()
+                      assert icon.is_file(), f"{path} references missing icon {href}"
+          styles = Path("docs/stylesheets/extra.css").read_text(encoding="utf-8")
+          diagram_css = styles.split("/* Architecture diagrams scale", 1)[1].split("/* Swagger UI", 1)[0]
+          assert "width: 100% !important" in diagram_css
+          assert "overflow-x: auto" not in diagram_css
+          assert "width: 1240px" not in diagram_css
+          print(f"Validated {len(diagrams)} SVGs, all relative AWS icon references, and page-fit diagram styling.")
+          PY
       - name: Upload Pages artifact
         if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v3
