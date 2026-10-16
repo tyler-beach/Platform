@@ -21,7 +21,7 @@ The documentation source is in the docs folder and is built with MkDocs Material
 - [Pre-implementation readiness](https://tyler-beach.github.io/Platform/PRE_IMPLEMENTATION_READINESS/)
 - [MVP decision packet](https://tyler-beach.github.io/Platform/MVP_DECISION_PACKET/)
 - [Requirements-to-proof matrix](https://tyler-beach.github.io/Platform/REQUIREMENT_TO_PROOF_MATRIX/)
-- [Synthetic evaluation corpus](https://tyler-beach.github.io/Platform/evaluation/)
+- [Synthetic evaluation corpus](https://tyler-beach.github.io/Platform/evaluation/STARTER_CORPUS/)
 
 
 The Pages URL is expected but will not be live until GitHub Actions deploys the site and repository Pages settings allow workflow-based deployment. The REST/OpenAPI document is a proposed façade, not a claim of a deployed HTTP server.
