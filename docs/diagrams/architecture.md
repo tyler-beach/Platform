@@ -1,35 +1,42 @@
-# Architecture diagram catalog
+# Architecture diagrams
 
-<span class="page-eyebrow">REFERENCE LIBRARY / SYSTEM MODELS</span>
+<span class="page-eyebrow">SYSTEM MODELS</span>
 
-The SVGs below are maintained with the design contracts. They are intentionally displayed at a readable engineering-diagram scale inside horizontally scrollable frames. They represent target architecture, not resources currently deployed.
+These diagrams use the AWS Architecture Icons and scale to the available page width. Use the architecture page for the design rationale and component ownership.
 
-## 01 / System architecture
+## 01 · AWS deployment architecture
 
 <figure class="diagram-figure">
-  <div class="diagram-viewport"><img src="../../assets/diagrams/system-architecture.svg" alt="Reference system architecture showing source systems, trusted ingress, Step Functions, Go workers, persistence and external services." /></div>
-  <figcaption>Component boundaries, trust zones, data ownership and provider integration.</figcaption>
+  <div class="diagram-viewport"><img src="../../assets/diagrams/system-architecture.svg" alt="AWS target deployment with account and VPC boundaries, service icons, worker stages, Aurora, optional S3, security controls, and direct Anthropic API egress." /></div>
+  <figcaption>Service placement, network zones, data stores, security controls and provider egress.</figcaption>
 </figure>
 
-## 02 / Analysis workflow
+## 02 · Trust boundaries
 
 <figure class="diagram-figure">
-  <div class="diagram-viewport"><img src="../../assets/diagrams/analysis-workflow.svg" alt="Analysis workflow from authorized job creation to evidence collection, bounded assessment, validation, persistence and review." /></div>
-  <figcaption>Admission, completeness, budget, validation and publication gates.</figcaption>
+  <div class="diagram-viewport"><img src="../../assets/diagrams/trust-boundaries.svg" alt="Trust boundaries from untrusted source inputs through authorization, scoped AWS execution, evidence validation, Anthropic processing and publication." /></div>
+  <figcaption>Trust changes and the controls required at each crossing.</figcaption>
 </figure>
 
-## 03 / Engineering loop
+## 03 · Analysis workflow
 
 <figure class="diagram-figure">
-  <div class="diagram-viewport"><img src="../../assets/diagrams/engineering-loop.svg" alt="OpenSpec-first delivery cycle including behavior scenarios, RED-GREEN-REFACTOR, layered tests, adversarial review and archive." /></div>
-  <figcaption>Traceability from requirements through executable acceptance evidence.</figcaption>
+  <div class="diagram-viewport"><img src="../../assets/diagrams/analysis-workflow.svg" alt="Bounded analysis stages from admission and immutable source pinning through evidence collection, budget gate, assessment, validation, persistence and publication." /></div>
+  <figcaption>Workflow state, evidence completeness, budgets and review gates.</figcaption>
 </figure>
 
-## 04 / Token budget
+## 04 · Token and spend budget
 
 <figure class="diagram-figure">
-  <div class="diagram-viewport"><img src="../../assets/diagrams/token-budget.svg" alt="Token and spend control flow including preflight, output reservation, job caps, usage reconciliation and stop conditions." /></div>
-  <figcaption>Cumulative model budget enforcement across concurrent calls and retries.</figcaption>
+  <div class="diagram-viewport"><img src="../../assets/diagrams/token-budget.svg" alt="Cumulative token, spend, call, retry, concurrency and deadline controls with atomic reservations and per-attempt usage reconciliation." /></div>
+  <figcaption>One shared ledger is used by parallel calls, retries, repairs and verification.</figcaption>
+</figure>
+
+## 05 · Engineering lifecycle
+
+<figure class="diagram-figure">
+  <div class="diagram-viewport"><img src="../../assets/diagrams/engineering-loop.svg" alt="OpenSpec delivery process from approved scope and behavior scenarios through test-first implementation, verification, adversarial review and archive." /></div>
+  <figcaption>Requirements trace to tests, evaluation evidence and review decisions.</figcaption>
 </figure>
 
 ## Logical domain relationships
@@ -50,9 +57,9 @@ erDiagram
   ANALYSIS_JOB ||--o{ BUDGET_RESERVATION : accounts_for
 ~~~
 
-This logical view does not dictate the physical table layout. Production DDL still needs tenant-scoped keys, unique/idempotency constraints, migrations, retention and query/index validation.
+The logical relationships guide contract and persistence design. Tenant-scoped keys, uniqueness and idempotency constraints, migrations, retention and query/index behavior still need verification during implementation.
 
-## Job execution states
+## Job lifecycle
 
 ~~~mermaid
 stateDiagram-v2
@@ -73,4 +80,4 @@ stateDiagram-v2
   NeedsReview --> Failed: reviewer rejects/terminates
 ~~~
 
-The actual transitions and cancellation-race semantics must be implemented with durable checks/fencing. A late external side effect cannot be hidden; it remains auditable.
+Cancellation is best-effort. Record late effects and fence late worker commits; never describe cancellation as rollback of work already completed.

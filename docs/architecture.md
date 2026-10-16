@@ -1,80 +1,76 @@
 # Architecture and system design
 
-<span class="page-eyebrow">SYSTEM DESIGN / REFERENCE</span>
+<span class="page-eyebrow">SYSTEM DESIGN</span>
 
-The platform separates evidence collection, asynchronous orchestration, model assessment and authoritative result storage. The diagrams below are target designs: they show boundaries the implementation should preserve, not deployed infrastructure.
+The platform compares implementation and technical specifications with architectural decisions. Its design separates request admission, durable orchestration, deterministic evidence collection, model assessment, validation and review.
 
-## System architecture
+## AWS deployment architecture
 
 <figure class="diagram-figure">
-  <div class="diagram-viewport">
-    <img src="../assets/diagrams/system-architecture.svg" alt="Layered architecture: source systems flow through an authenticated API and durable dispatch into Step Functions, bounded Go workers, validated model assessment, PostgreSQL and optional S3, secrets and observability." />
-  </div>
-  <figcaption>01 · Component boundaries, data ownership and external-service integrations. Scroll horizontally to read the full diagram at presentation scale.</figcaption>
+  <div class="diagram-viewport"><img src="../assets/diagrams/system-architecture.svg" alt="AWS deployment architecture with service icons, account and VPC boundaries, API Gateway, Step Functions, Go Lambda stages, Aurora PostgreSQL, optional S3, IAM, KMS, Secrets Manager, CloudWatch, CloudTrail, controlled egress and Anthropic API." /></div>
+  <figcaption>Service placement, request and data flow, network boundaries, and the direct provider integration.</figcaption>
 </figure>
 
-### Runtime profiles
+## Trust boundaries and data handling
 
-| Profile | Appropriate when | Cost / operational trade-off |
+<figure class="diagram-figure">
+  <div class="diagram-viewport"><img src="../assets/diagrams/trust-boundaries.svg" alt="Trust-boundary diagram for untrusted code and ADR sources, authenticated API admission, Step Functions and scoped worker roles, durable evidence validation, direct Anthropic processing and publication controls." /></div>
+  <figcaption>Authorization stays in the application. Source text is untrusted, model output is a candidate, and validated findings retain exact source provenance.</figcaption>
+</figure>
+
+## Runtime profiles
+
+| Profile | Use when | Main trade-off |
 |---|---|---|
-| Serverless-first: API Gateway/HTTP + Go Lambda + Step Functions + worker Lambdas | Initial webhook and asynchronous API consumers | Thin ingress, but plan for cold starts and database connection scaling |
-| Long-lived gRPC control plane: HTTPS ALB + Go gRPC on ECS/Fargate | A real client needs long-lived gRPC semantics | Adds service deployment, health/rollout, scaling and always-on cost |
-| Shared data plane: PostgreSQL/Aurora, S3 as needed, Secrets Manager, OpenTelemetry | Shared by either profile | Define tenancy, retention, migrations and connection strategy before production |
+| HTTP/API Gateway with Go Lambda and Step Functions | Webhooks and asynchronous API consumers are sufficient for the first slice | Simple ingress; manage Lambda concurrency and database connections |
+| gRPC control plane on ECS/Fargate behind an HTTPS ALB | A named client needs long-lived gRPC semantics | Adds service rollout, health management and always-on cost |
+| Shared data plane | Either profile | Aurora owns job and result metadata; S3 holds large immutable artifacts where needed |
 
-Protobuf can remain contract-first even if the first public endpoint is HTTP/JSON. Do not host a gRPC listener in ordinary Lambda workers. The current provider direction is direct Anthropic API behind a typed Go harness.
+Protobuf can remain the contract source even when the first API is HTTP/JSON. Lambda workers execute tasks; they do not host gRPC listeners. The model provider is the direct Anthropic API, behind a typed Go adapter.
 
-## End-to-end analysis workflow
+The deployment choice between HTTP/Lambda and a long-lived gRPC service, along with the egress route used for provider calls, should be settled before those boundaries are implemented.
 
-<figure class="diagram-figure">
-  <div class="diagram-viewport">
-    <img src="../assets/diagrams/analysis-workflow.svg" alt="Analysis workflow with admission, immutable input pinning, deterministic evidence branches, budget preflight, structured assessment, application validation, persistence, review and publication gates." />
-  </div>
-  <figcaption>02 · Execution path and the controls that prevent partial evidence, invalid model output or exhausted budgets from becoming false success.</figcaption>
-</figure>
-
-The important production invariants are:
-
-1. **Durable acceptance.** Commit the job, idempotency record and durable dispatch intent before acknowledging. Reconcile workflow-start failures rather than leaving accepted jobs stranded.
-2. **Pinned evidence.** Pin source versions, parser, pipeline and policy. A moving branch name is not immutable evidence.
-3. **Visible completeness.** Each evidence branch reports success, failure and completeness. Required evidence that is missing or stale forces a bounded recovery path or an inconclusive result.
-4. **Shared budget.** Retries, repairs and optional verification use the same cumulative cost/call allowances and end-to-end deadline.
-5. **Validated persistence.** Validate evidence references, versions, applicability, contradictions and state transitions in Go before committing findings.
-6. **Fresh publication.** Persist findings and provenance before publishing. Recheck source freshness and use separate idempotency for publication.
-
-## OpenSpec-driven delivery
+## Analysis workflow
 
 <figure class="diagram-figure">
-  <div class="diagram-viewport">
-    <img src="../assets/diagrams/engineering-loop.svg" alt="Engineering lifecycle from OpenSpec proposal and behavioral scenarios through failing tests, implementation, layered verification, adversarial review and archive." />
-  </div>
-  <figcaption>03 · Requirements and scenarios map to tests and evaluation evidence; archive follows verification, not just code completion.</figcaption>
+  <div class="diagram-viewport"><img src="../assets/diagrams/analysis-workflow.svg" alt="Six-stage workflow: admit and authorize, pin source versions, gather deterministic evidence, reserve cumulative budget, run a bounded assessment, validate and persist the outcome, then apply freshness and review gates." /></div>
+  <figcaption>One workflow owns stage ordering, retries, deadlines and cancellation. Required-evidence gaps remain visible in the outcome.</figcaption>
 </figure>
 
-## Token and cost controls
+Key invariants:
+
+1. **Durable acceptance.** Commit the job, idempotency record and dispatch intent before acknowledging. Reconcile workflow-start failures so accepted jobs do not become stranded.
+2. **Pinned evidence.** Preserve source revisions, content hashes and the parser, pipeline and policy versions used.
+3. **Visible completeness.** Every evidence branch reports status and completeness. Missing required evidence triggers bounded recovery or an inconclusive result.
+4. **Shared budget.** Retries, repairs and verification consume the same token, spend, call and deadline allowances.
+5. **Validated persistence.** Go code validates source versions, evidence IDs, applicability and domain rules before committing findings.
+6. **Fresh publication.** Persist the result first, then recheck source freshness and review policy before any external effect.
+
+## Budget and usage accounting
 
 <figure class="diagram-figure">
-  <div class="diagram-viewport">
-    <img src="../assets/diagrams/token-budget.svg" alt="Token-budget flow with request counting, deterministic compaction, reserved output budget, per-job spend and call ceilings, provider-usage reconciliation and stop conditions." />
-  </div>
-  <figcaption>04 · Input/output token limits alone are insufficient: spend, retries, concurrency and deadlines must also be bounded.</figcaption>
+  <div class="diagram-viewport"><img src="../assets/diagrams/token-budget.svg" alt="Budget flow from request construction and token estimation through concurrency-safe reservation, bounded provider execution, usage reconciliation and stop conditions across a shared job ledger." /></div>
+  <figcaption>Per-call limits are combined with a cumulative per-job ledger shared across parallel work, retries and optional verification.</figcaption>
 </figure>
 
-## Authority by concern
+The price/model settings and prompt/schema versions are recorded as configuration, not embedded as domain constants. Ambiguous provider usage remains accounted for conservatively until reconciled.
 
-| Concern | Authoritative owner | Explicit non-goal |
+## Engineering delivery
+
+<figure class="diagram-figure">
+  <div class="diagram-viewport"><img src="../assets/diagrams/engineering-loop.svg" alt="OpenSpec lifecycle from proposal and behavioral scenarios through regression proof, implementation, layered verification, adversarial review and archive." /></div>
+  <figcaption>Archive follows verification evidence and review—not code completion alone.</figcaption>
+</figure>
+
+## Ownership by concern
+
+| Concern | Owner | Rule |
 |---|---|---|
-| Identity and tenant scope | Ingress and server-side authorization | The model never grants access |
-| Async job lifecycle | Step Functions plus durable job/dispatch state | No competing agent graph as a second orchestrator |
-| Domain policy | Pure Go functions over explicit, versioned inputs | No policy solely in prompts or workflow expressions |
-| Model requests | Typed harness: budgets, versions, deadlines and retries | No unbounded context or tool loop |
-| Provenance | Immutable artifact versions, stable locators and digest checks | Never silently fall back to latest source |
-| Audit | Durable AuditEvent and ModelRun records | Traces are not the audit system of record |
-| Quality | Unit/property/contract/integration tests plus labeled AI evaluations | A successful build is not behavioral proof |
+| Identity and workspace scope | Ingress and server-side authorization | A caller-supplied workspace ID is only a selector |
+| Asynchronous job lifecycle | Step Functions plus durable job/dispatch state | No competing orchestrator |
+| Domain policy | Pure Go functions over explicit, versioned inputs | Prompts and workflow expressions do not own policy |
+| Model calls | Typed harness | Enforce budgets, deadlines, schema and retry rules |
+| Provenance | Immutable artifact versions and evidence locators | Findings point to the exact inputs analyzed |
+| Business audit | Durable job/review/audit records | Tracing is operational telemetry, not the business record |
+| Publication | Validated application path | Freshness, authorization, review policy and idempotency must hold |
 
-## Further reading
-
-- [Adversarial design review](ADVERSARIAL_DESIGN_REVIEW.md)
-- [Engineering playbook](ENGINEERING_PLAYBOOK.md)
-- [AI pipeline and token budgets](AI_PIPELINE.md)
-- [Functional core / imperative shell](FUNCTIONAL_CORE.md)
-- [Operations and recovery](OPERATIONS.md)
