@@ -1,0 +1,98 @@
+/* Wider content column and more usable space on desktop. */
+.md-grid {
+  max-width: 1440px;
+}
+
+.md-typeset {
+  overflow-wrap: break-word;
+}
+
+.md-typeset .grid.cards > ul > li {
+  min-width: 0;
+  border-radius: 0.8rem;
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.md-typeset .grid.cards > ul > li:hover {
+  border-color: var(--md-accent-fg-color);
+  box-shadow: var(--md-shadow-z2);
+  transform: translateY(-2px);
+}
+
+.md-typeset .grid.cards > ul > li a {
+  overflow-wrap: anywhere;
+}
+
+/* Landing-page hero. The colors adapt to the active light/dark palette. */
+.platform-hero {
+  margin: 0 0 2rem;
+  padding: clamp(1.4rem, 4vw, 3rem);
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 1.2rem;
+  background:
+    radial-gradient(circle at 92% 8%, color-mix(in srgb, var(--md-accent-fg-color) 15%, transparent), transparent 38%),
+    linear-gradient(135deg, color-mix(in srgb, var(--md-primary-fg-color) 8%, var(--md-default-bg-color)), var(--md-default-bg-color));
+}
+
+.platform-hero .platform-eyebrow {
+  display: block;
+  margin-bottom: 0.9rem;
+  color: var(--md-accent-fg-color);
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0.12em;
+  line-height: 1.5;
+}
+
+.platform-hero h1 {
+  margin: 0 0 1rem;
+  font-size: clamp(2rem, 4vw, 3.15rem);
+  font-weight: 750;
+  letter-spacing: -0.035em;
+  line-height: 1.08;
+}
+
+.platform-hero p {
+  max-width: 52rem;
+  font-size: clamp(1rem, 1.5vw, 1.2rem);
+  line-height: 1.7;
+}
+
+.platform-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem;
+  margin-top: 1.5rem;
+}
+
+.platform-hero-actions .md-button {
+  margin: 0;
+}
+
+@media screen and (max-width: 600px) {
+  .platform-hero {
+    padding: 1.25rem;
+    border-radius: 0.9rem;
+  }
+
+  .platform-hero-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .platform-hero-actions .md-button {
+    width: 100%;
+    text-align: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .md-typeset .grid.cards > ul > li {
+    transition: none;
+  }
+
+  .md-typeset .grid.cards > ul > li:hover {
+    transform: none;
+  }
+}

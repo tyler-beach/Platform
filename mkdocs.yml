@@ -13,12 +13,14 @@ theme:
   language: en
   features:
     - navigation.instant
-    - navigation.sections
+    - navigation.tabs
     - navigation.top
     - navigation.footer
+    - toc.integrate
+    - search.suggest
+    - search.highlight
     - content.code.copy
     - content.action.edit
-    - toc.follow
   palette:
     - scheme: default
       primary: indigo
@@ -46,6 +48,9 @@ markdown_extensions:
   - tables
   - toc:
       permalink: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
   - pymdownx.details
   - pymdownx.highlight:
       anchor_linenums: true
@@ -54,6 +59,9 @@ markdown_extensions:
         - name: mermaid
           class: mermaid
           format: !!python/name:pymdownx.superfences.fence_code_format
+
+extra_css:
+  - stylesheets/extra.css
 
 extra_javascript:
   - https://unpkg.com/mermaid@10.9.1/dist/mermaid.min.js
