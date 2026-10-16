@@ -1086,3 +1086,104 @@
     padding: 1.2rem;
   }
 }
+
+
+/* The landing page is a standalone composition, not a three-column docs article. */
+.md-main__inner:has(.home-hero) {
+  display: block;
+  max-width: none;
+  margin-top: 0;
+}
+
+.md-main__inner:has(.home-hero) > .md-content,
+.md-content:has(.home-hero) {
+  display: block;
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  flex: 1 1 auto;
+  margin: 0;
+}
+
+.md-grid:has(.home-hero) {
+  max-width: 1480px;
+}
+
+.md-content:has(.home-hero) .md-content__inner {
+  display: block;
+  width: 100%;
+  max-width: 1380px;
+  box-sizing: border-box;
+  margin: 0 auto 3rem;
+  padding: clamp(1rem, 2.5vw, 2rem);
+}
+
+/* Keep each homepage area in normal document flow. Grid behavior is local to its cards. */
+.md-typeset .home-hero,
+.md-typeset .home-section,
+.md-typeset .home-comparison,
+.md-typeset .home-status {
+  position: relative;
+  clear: both;
+}
+
+.md-typeset .home-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  align-items: center;
+  gap: clamp(1.5rem, 3vw, 3rem);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.md-typeset .home-section {
+  display: block;
+  width: 100%;
+  margin: 2.75rem 0;
+}
+
+.md-typeset .home-feature-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: 100%;
+  gap: 1rem;
+}
+
+.md-typeset .home-comparison {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  width: 100%;
+  gap: 1rem;
+}
+
+.md-typeset .home-principles {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  width: 100%;
+  gap: 0.75rem;
+}
+
+.md-typeset .home-hero h1 {
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
+}
+
+@media screen and (max-width: 1000px) {
+  .md-typeset .home-hero {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .md-typeset .home-feature-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .md-typeset .home-comparison {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media screen and (max-width: 600px) {
+  .md-typeset .home-feature-grid,
+  .md-typeset .home-principles {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
