@@ -92,6 +92,52 @@ jobs:
           assert len(parser.nodes.get("home-principles", [])) == 1, "Expected one principles grid."
           print("Homepage markup verified: hero, feature grid, comparison, principles and status are separate blocks.")
           PY
+      - name: Validate architecture diagrams
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from xml.etree import ElementTree as ET
+
+          diagram_dir = Path("docs/assets/diagrams")
+          icon_dir = Path("docs/assets/aws-icons")
+          diagrams = sorted(diagram_dir.glob("*.svg"))
+          expected = {
+              "system-architecture.svg",
+              "trust-boundaries.svg",
+              "analysis-workflow.svg",
+              "token-budget.svg",
+              "engineering-loop.svg",
+          }
+          present = {path.name for path in diagrams}
+          missing = expected - present
+          assert not missing, f"Missing architecture diagrams: {sorted(missing)}"
+
+          minimum_text_nodes = {
+              "system-architecture.svg": 65,
+              "trust-boundaries.svg": 70,
+              "analysis-workflow.svg": 45,
+              "token-budget.svg": 40,
+              "engineering-loop.svg": 30,
+          }
+          for path in diagrams:
+              root = ET.parse(path).getroot()
+              assert root.attrib.get("viewBox"), f"{path} must have a viewBox so it scales to the page."
+              text_nodes = root.findall(".//{http://www.w3.org/2000/svg}text")
+              assert len(text_nodes) >= minimum_text_nodes.get(path.name, 1), (
+                  f"{path} appears incomplete: found only {len(text_nodes)} text elements."
+              )
+              for node in root.iter():
+                  href = node.attrib.get("href") or node.attrib.get("{http://www.w3.org/1999/xlink}href")
+                  assert not (href and href.startswith("../aws-icons/")), (
+                      f"{path} must inline its AWS icons; SVG-in-img external icon references are unreliable."
+                  )
+          styles = Path("docs/stylesheets/extra.css").read_text(encoding="utf-8")
+          diagram_css = styles.split("/* Architecture diagrams scale", 1)[1].split("/* Swagger UI", 1)[0]
+          assert "width: 100% !important" in diagram_css
+          assert "overflow-x: auto" not in diagram_css
+          assert "width: 1240px" not in diagram_css
+          print(f"Validated {len(diagrams)} SVGs, all relative AWS icon references, and page-fit diagram styling.")
+          PY
       - name: Upload Pages artifact
         if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v3

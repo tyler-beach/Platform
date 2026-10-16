@@ -806,39 +806,40 @@
   line-height: 1.7;
 }
 
-/* Diagrams stay crisp. Constrain large architecture canvases without squashing them. */
+/* Architecture diagrams scale to the page width; no horizontal scrolling. */
 .diagram-figure {
-  margin: 1.5rem 0 2.25rem;
+  width: 100%;
+  min-width: 0;
+  margin: 1.35rem 0 2rem;
 }
 
 .diagram-viewport {
+  width: 100%;
   max-width: 100%;
-  overflow-x: auto;
-  padding: 0.55rem;
+  box-sizing: border-box;
+  overflow: hidden;
+  padding: 0.35rem;
   border: 1px solid var(--platform-line);
   border-radius: 11px;
-  background: #f2f6fc;
-  box-shadow: 0 7px 22px rgba(19, 35, 61, 0.045);
-  scrollbar-color: #a9b8ca transparent;
-  scrollbar-width: thin;
+  background: #f4f7fb;
 }
 
 .diagram-viewport img {
   display: block;
-  width: 1240px !important;
-  max-width: none !important;
-  height: auto;
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto !important;
   margin: 0 !important;
   border: 0 !important;
-  border-radius: 4px !important;
+  border-radius: 5px !important;
   background: transparent !important;
   box-shadow: none !important;
 }
 
 .diagram-figure figcaption {
-  margin-top: 0.55rem;
+  margin-top: 0.5rem;
   color: var(--md-default-fg-color--light);
-  font-size: 0.67rem;
+  font-size: 0.7rem;
   line-height: 1.55;
 }
 
