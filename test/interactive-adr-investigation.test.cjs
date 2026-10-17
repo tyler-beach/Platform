@@ -39,6 +39,9 @@ test("interactive workspace connects decision, evidence, stage trace, and local 
   assert.match(component, /AST observation/);
   assert.match(component, /artifactVersionId/);
   assert.match(component, /sourceIntegrity/);
+  assert.match(component, /run_events\.csv/);
+  assert.match(component, /details_json/);
+  assert.match(component, /assessment_evidence_links/);
   assert.match(component, /does not claim type resolution or runtime behavior/);
   assert.match(component, /aria-pressed=\{activeEvidence === item\.id\}/);
   assert.match(styles, /@media \(max-width: 600px\)/);
