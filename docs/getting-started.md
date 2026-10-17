@@ -1,6 +1,6 @@
 # Getting started
 
-This repository currently contains design, contracts, Protobuf schema and documentation configuration—not a runnable deployed application. Treat these steps as the bootstrap for the first vertical slice.
+This repository contains a design baseline and a runnable GitHub Actions proof of concept. It is not a deployed production application. To run the current PoC, follow [Executable PoC](EXECUTABLE_POC.md) and explore the [interactive demo](demo/index.md). The steps below cover local documentation and contract checks while production implementation remains on the roadmap.
 
 ## Prerequisites
 

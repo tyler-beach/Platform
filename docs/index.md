@@ -29,7 +29,7 @@ hide:
 <div class="pipeline-step"><span class="pipeline-step__icon">03</span><span class="pipeline-step__text"><strong>Bounded assessment</strong><span>Versioned prompt · token and cost limits</span></span><span class="pipeline-step__tag">Constrained</span></div>
 <div class="pipeline-connector"></div>
 <div class="pipeline-step"><span class="pipeline-step__icon">04</span><span class="pipeline-step__text"><strong>Validate and review</strong><span>Evidence checks, freshness and disposition</span></span><span class="pipeline-step__tag">Auditable</span></div>
-<div class="pipeline-preview__foot">Target architecture only. The production service and workflow have not yet been implemented.</div>
+<div class="pipeline-preview__foot">Target architecture. The GitHub Actions PoC is runnable; the production service and Step Functions workflow remain proposed.</div>
 </div>
 </div>
 </div>
