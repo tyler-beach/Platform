@@ -57,9 +57,16 @@ class ConfidenceScoringTests(unittest.TestCase):
         graph,syntax,ev,artifacts=self.fixture()
         graph["edges"][1]["resolution_status"]="resolved_approximate"
         graph["reachable_edges"][1]["resolution_status"]="resolved_approximate"
-        score=confidence.score_assessment(graph=graph,syntax=syntax,evidence=ev,artifact_rows=artifacts,cited_ids=["EV-REQ","EV-CALL"],proposed_outcome="supported_deviation")
+        score=confidence.score_assessment(graph=graph,syntax=syntax,evidence=ev,artifact_rows=artifacts,cited_ids=["EV-REQ","EV-CALL"],evidence_links=valid_link(),proposed_outcome="supported_deviation")
         self.assertLess(score["components"][1]["score"],1.0)
         self.assertIn("resolved_approximate",score["components"][1]["details"]["cited_paths"][0]["edge_statuses"])
+
+    def test_supported_outcome_without_explicit_contradiction_link_is_downgraded(self):
+        graph,syntax,ev,artifacts=self.fixture()
+        score=confidence.score_assessment(graph=graph,syntax=syntax,evidence=ev,artifact_rows=artifacts,
+                                          cited_ids=["EV-REQ","EV-CALL"],evidence_links=[],proposed_outcome="supported_deviation")
+        self.assertEqual(score["accepted_outcome"],"potential_deviation")
+        self.assertTrue(any("relationship explicitly links" in x for x in score["guardrails"]))
 
 if __name__=="__main__":
     unittest.main()
