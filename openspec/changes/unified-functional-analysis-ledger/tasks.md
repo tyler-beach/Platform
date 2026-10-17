@@ -14,10 +14,12 @@
 - [x] 2.3 Add the allowlisted Pages projection behind the existing private/internal visibility gate.
 - [x] 2.4 Verify raw source, excerpts, provider payloads, and untrusted artifact fields do not enter the new Pages projection.
 - [x] 2.5 Add isolated tests for API retry exhaustion, Git non-fast-forward exhaustion, bounded scan saturation, and expired-artifact recovery reporting.
+- [x] 2.6 Retry unresolved ledger identities during scheduled reconciliation and test recovery when the final artifact becomes available later.
+- [x] 2.7 Keep unresolved ledger rows visible as incomplete after they age out of the automatic recovery scan.
 
 ## Verification and reconciliation
 
-- [ ] 3.1 Record RED then GREEN for each remaining behavioral scenario. The oversized-history case was observed RED (five API pages fetched) and is now GREEN (fails on the first response). Retry exhaustion and expired-artifact behavior were already green at baseline. Keep this task open until the hosted concurrency queue overflow/recovery path is demonstrated in the private PoC repository.
+- [ ] 3.1 Record RED then GREEN for each remaining behavioral scenario. The oversized-history, artifact-lag recovery, and out-of-window reporting cases were observed RED and are now GREEN. Retry exhaustion and expired-artifact behavior were already green at baseline. Keep this task open until the hosted concurrency queue overflow/recovery path is demonstrated in the private PoC repository.
 - [x] 3.2 Run pure-domain tests, workflow contract/security checks, CSV replay tests, Pages projection tests, strict documentation build, and OpenSpec validation.
 - [ ] 3.3 Run the writer against a real GitHub Actions artifact in a private PoC repository and inspect the resulting ledger and Pages projection.
 - [x] 3.4 Document permissions, retention, rollback, and deployment status. GitHub Pages was deployed successfully with synthetic history; the real writer against an Actions artifact has not been run. Keep this change open until remaining acceptance checks pass.

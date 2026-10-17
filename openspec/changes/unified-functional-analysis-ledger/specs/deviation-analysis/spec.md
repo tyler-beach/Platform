@@ -89,3 +89,15 @@ Only successful Functional Analysis runs from the repository default branch may 
 - **WHEN** reconciliation processes the attempt
 - **THEN** it records execution metadata as unreconciled without a domain outcome
 - **AND** it reports reconciliation incomplete and does not attempt to download the expired artifact.
+
+#### Scenario: A previously unreconciled run becomes recoverable
+- **GIVEN** a successful run was recorded as unreconciled because its final artifact was temporarily unavailable
+- **WHEN** a later scheduled reconciliation finds the artifact within the recovery horizon
+- **THEN** it validates the artifact and appends a new validated record revision
+- **AND** the prior unreconciled revision remains in the audit history.
+
+#### Scenario: An unresolved run falls outside the automatic recovery window
+- **GIVEN** the ledger contains a latest unreconciled revision older than the automatic scan horizon
+- **WHEN** the scheduled reconciliation completes its bounded recent-run scan
+- **THEN** its summary still reports outstanding unreconciled records
+- **AND** it does not claim that reconciliation is complete.
