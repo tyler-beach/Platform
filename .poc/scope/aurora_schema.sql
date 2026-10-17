@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS adr_chunks (
     effective_from        timestamptz,
     effective_until        timestamptz,
     embedding_model_id    text NOT NULL,
+    embedding_input_sha256 char(64) NOT NULL,
     embedding_dimensions  integer NOT NULL DEFAULT 1024 CHECK (embedding_dimensions = 1024),
     embedding             vector(1024) NOT NULL,
     created_at            timestamptz NOT NULL DEFAULT now(),
