@@ -20,14 +20,14 @@ INSERT INTO adr_chunks (
     chunk_id, adr_id, adr_version, title, chunk_text, normative_text, owner,
     status, review_state, repositories, services, domains, languages, tags,
     deviation_check, source_path, source_sha256, effective_from, effective_until,
-    embedding_model_id, embedding_dimensions, embedding
+    embedding_model_id, embedding_input_sha256, embedding_dimensions, embedding
 ) VALUES (
     %(chunk_id)s, %(adr_id)s, %(adr_version)s, %(title)s, %(chunk_text)s,
     %(normative_text)s, %(owner)s, %(status)s, %(review_state)s,
     %(repositories)s, %(services)s, %(domains)s, %(languages)s, %(tags)s,
     %(deviation_check)s::jsonb, %(source_path)s, %(source_sha256)s,
     %(effective_from)s, %(effective_until)s, %(embedding_model_id)s,
-    %(embedding_dimensions)s, %(embedding)s::vector
+    %(embedding_input_sha256)s, %(embedding_dimensions)s, %(embedding)s::vector
 )
 ON CONFLICT (chunk_id) DO UPDATE SET
     adr_id = EXCLUDED.adr_id,
@@ -49,6 +49,7 @@ ON CONFLICT (chunk_id) DO UPDATE SET
     effective_from = EXCLUDED.effective_from,
     effective_until = EXCLUDED.effective_until,
     embedding_model_id = EXCLUDED.embedding_model_id,
+    embedding_input_sha256 = EXCLUDED.embedding_input_sha256,
     embedding_dimensions = EXCLUDED.embedding_dimensions,
     embedding = EXCLUDED.embedding
 """
@@ -130,15 +131,16 @@ def index_catalog(catalog: list[dict[str, Any]], root: Path, *, dry_run: bool = 
 
             for row in catalog:
                 chunk_text = build_embedding_text(row)
+                embedding_input_sha256 = hashlib.sha256(chunk_text.encode("utf-8")).hexdigest()
                 cursor.execute(
-                    "SELECT source_sha256, embedding_model_id, embedding::text AS embedding_text "
+                    "SELECT source_sha256, embedding_input_sha256, embedding_model_id, embedding::text AS embedding_text "
                     "FROM adr_chunks WHERE chunk_id = %s",
                     (row["chunk_id"],),
                 )
                 existing = cursor.fetchone()
                 if (
                     existing
-                    and str(existing["source_sha256"]).strip() == row["source_sha256"]
+                    and str(existing["embedding_input_sha256"]).strip() == embedding_input_sha256
                     and existing["embedding_model_id"] == configured_model
                     and existing["embedding_text"]
                 ):
@@ -174,6 +176,7 @@ def index_catalog(catalog: list[dict[str, Any]], root: Path, *, dry_run: bool = 
                     "deviation_check": json.dumps(row.get("deviation_check", {})),
                     "source_path": str(row["source_path"]),
                     "source_sha256": row["source_sha256"],
+                    "embedding_input_sha256": embedding_input_sha256,
                     "effective_from": row.get("effective_from"),
                     "effective_until": row.get("effective_until"),
                     "embedding_model_id": model_id,
