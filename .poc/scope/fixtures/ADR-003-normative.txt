@@ -1,0 +1,1 @@
+Event consumers must tolerate at-least-once delivery. External effects need a stable idempotency key, and database state plus outbound events must use an outbox or reconciliation strategy.

@@ -1,11 +1,14 @@
 site_name: ADR Deviation Platform
 site_description: Evidence-first architecture analysis — design, contracts and engineering practice
-site_url: https://tyler-beach.github.io/Platform/
-repo_url: https://github.com/tyler-beach/Platform
-repo_name: tyler-beach/Platform
+site_url: !ENV [ADR_SITE_URL, "https://tyler-beach.github.io/Platform/"]
+repo_url: !ENV [ADR_REPO_URL, "https://github.com/tyler-beach/Platform"]
+repo_name: !ENV [ADR_REPO_NAME, "tyler-beach/Platform"]
 edit_uri: edit/main/docs/
 docs_dir: docs
 site_dir: site
+exclude_docs: |
+  /ARCHITECTURE.md
+  /architecture.md
 copyright: 'ADR Deviation Platform · Engineering design reference'
 use_directory_urls: true
 
@@ -74,11 +77,12 @@ extra_css:
 extra_javascript:
   - https://unpkg.com/mermaid@10.9.1/dist/mermaid.min.js
   - javascripts/mermaid-init.js
+  - javascripts/demo-explorer.js
 
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/tyler-beach/Platform
+      link: !ENV [ADR_REPO_URL, "https://github.com/tyler-beach/Platform"]
 
 nav:
   - Overview:
@@ -90,8 +94,8 @@ nav:
       - Decision log: DECISIONS.md
       - Open questions: OPEN_QUESTIONS.md
   - Architecture:
-      - System architecture and workflows: architecture.md
-      - Architecture overview: ARCHITECTURE.md
+      - System architecture and workflows: system-architecture.md
+      - Architecture overview: architecture-overview.md
       - Diagram catalog: diagrams/architecture.md
       - RPC and Protobuf: RPC_AND_PROTOBUF.md
       - AI pipeline and token budgets: AI_PIPELINE.md
@@ -107,6 +111,11 @@ nav:
       - AI runtime and token budgets: contracts/AI_RUNTIME.md
       - Existing data model: DATA_MODEL.md
   - Engineering:
+      - Interactive PoC demo: demo/index.md
+      - Functional analysis demo: functional-analysis-demo.md
+      - Executable semantic-analysis PoC: EXECUTABLE_POC.md
+      - Enable the internal Pages run explorer: how-to/enable-private-pages-demo.md
+      - ADR scope retrieval: ADR_SCOPE_RETRIEVAL.md
       - Engineering playbook: ENGINEERING_PLAYBOOK.md
       - OpenSpec workflow: OPEN_SPEC_WORKFLOW.md
       - Adversarial design review: ADVERSARIAL_DESIGN_REVIEW.md

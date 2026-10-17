@@ -1,0 +1,1 @@
+Legacy provider calls may be made synchronously from legacy-gateway request handlers.

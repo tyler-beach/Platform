@@ -1,0 +1,213 @@
+name: Functional Analysis Demo
+run-name: Functional Analysis Demo / ${{ inputs.comparison }} / ${{ inputs.language }} / ${{ inputs.sample_case }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      comparison:
+        description: "Choose the comparison path to visualize"
+        required: true
+        type: choice
+        default: code-diff
+        options:
+          - code-diff
+          - technical-spec
+          - spec-vs-implementation
+      language:
+        description: "Choose the source language for code comparisons"
+        required: true
+        type: choice
+        default: go
+        options:
+          - go
+          - python
+          - javascript
+          - typescript
+          - java
+      sample_case:
+        description: "Choose the synthetic outcome to exercise"
+        required: true
+        type: choice
+        default: deviation
+        options:
+          - deviation
+          - aligned
+          - insufficient-evidence
+
+permissions:
+  contents: read
+
+concurrency:
+  group: functional-analysis-demo-${{ github.run_id }}-${{ github.run_attempt }}
+  cancel-in-progress: false
+
+jobs:
+  admit:
+    name: "1 · Admit and pin inputs"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Prepare selected scenario
+        run: |
+          python .github/demo/pipeline.py prepare \
+            --comparison "${{ inputs.comparison }}" \
+            --sample-case "${{ inputs.sample_case }}" \
+            --language "${{ inputs.language }}" \
+            --run-id "${{ github.run_id }}" \
+            --output run-data
+      - name: Upload pinned input bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo-inputs-${{ github.run_id }}-${{ github.run_attempt }}
+          path: run-data/
+          retention-days: 7
+
+  deterministic-analysis:
+    name: "2 · Tree-sitter and document analysis"
+    needs: admit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Download pinned input bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: demo-inputs-${{ github.run_id }}-${{ github.run_attempt }}
+          path: run-data/
+      - name: Set up Python for Tree-sitter
+        if: ${{ inputs.comparison != 'technical-spec' }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Tree-sitter language pack
+        if: ${{ inputs.comparison != 'technical-spec' }}
+        run: python -m pip install -r .github/demo/requirements.txt
+      - name: Parse selected source with Tree-sitter
+        if: ${{ inputs.comparison != 'technical-spec' }}
+        run: |
+          SOURCE_PATH="$(python -c 'import json; m=json.load(open("run-data/input-manifest.json")); print(next(a["path"] for a in m["artifacts"] if a["role"] == "implementation"))')"
+          python .github/demo/ast_scan.py \
+            --language "${{ inputs.language }}" \
+            --source "run-data/$SOURCE_PATH" \
+            --out run-data/ast-analysis.json
+      - name: Explain why syntax parsing is not applicable
+        if: ${{ inputs.comparison == 'technical-spec' }}
+        run: |
+          echo "This path compares a Markdown technical specification with an ADR, so Tree-sitter parsing is not applicable." >> "$GITHUB_STEP_SUMMARY"
+          echo "The next step extracts requirement statements and classifies their explicit execution constraints." >> "$GITHUB_STEP_SUMMARY"
+      - name: Normalize deterministic observations
+        run: python .github/demo/pipeline.py analyze --output run-data
+      - name: Upload analysis outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo-analysis-${{ github.run_id }}-${{ github.run_attempt }}
+          path: run-data/
+          retention-days: 7
+
+  evidence-contract:
+    name: "3 · Assemble evidence contract"
+    needs: deterministic-analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Download analysis bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: demo-analysis-${{ github.run_id }}-${{ github.run_attempt }}
+          path: run-data/
+      - name: Build version-bound evidence package
+        run: python .github/demo/pipeline.py evidence --output run-data
+      - name: Upload evidence package
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: run-data/
+          retention-days: 7
+
+  budget-gate:
+    name: "4 · Budget preflight"
+    needs: evidence-contract
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Download evidence bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: demo-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: run-data/
+      - name: Estimate input and reserve demo budget
+        run: python .github/demo/pipeline.py budget --output run-data
+      - name: Upload budget decision
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo-budget-${{ github.run_id }}-${{ github.run_attempt }}
+          path: run-data/
+          retention-days: 7
+
+  mock-model-assessment:
+    name: "5 · Mock LLM assessment"
+    needs: budget-gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Download budget and evidence bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: demo-budget-${{ github.run_id }}-${{ github.run_attempt }}
+          path: run-data/
+      - name: Produce deterministic structured candidate
+        run: python .github/demo/pipeline.py mock-model --output run-data
+      - name: Upload mock response
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo-mock-response-${{ github.run_id }}-${{ github.run_attempt }}
+          path: run-data/
+          retention-days: 7
+
+  validate-result:
+    name: "6 · Validate citations and outcome"
+    needs: mock-model-assessment
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Download mock response and evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: demo-mock-response-${{ github.run_id }}-${{ github.run_attempt }}
+          path: run-data/
+      - name: Validate source versions and evidence references
+        run: python .github/demo/pipeline.py validate --output run-data
+      - name: Upload validation result
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo-validation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: run-data/
+          retention-days: 7
+
+  report:
+    name: "7 · Final report and evidence bundle"
+    needs: validate-result
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Download validated run bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: demo-validation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: run-data/
+      - name: Render final Markdown and JSON report
+        run: |
+          python .github/demo/pipeline.py report --output run-data
+          cat run-data/functional-analysis-report.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload complete end-to-end run
+        uses: actions/upload-artifact@v4
+        with:
+          name: functional-analysis-demo-${{ github.run_id }}-${{ github.run_attempt }}
+          path: run-data/
+          retention-days: 14

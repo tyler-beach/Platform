@@ -1,0 +1,1 @@
+Request handlers must enqueue provider assessment asynchronously and return without waiting for remote provider responses. Provider calls must execute in a queue worker, not inline on the request path.

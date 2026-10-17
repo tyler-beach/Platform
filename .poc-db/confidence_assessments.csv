@@ -1,0 +1,1 @@
+assessment_id,run_id,algorithm_version,proposed_outcome,accepted_outcome,score_0_to_100,score_0_to_1,score_band,calibrated_probability,model_self_reported_confidence,component_scores_json,caps_json,guardrails_json,principle,evidence_ids_json,created_at
