@@ -67,11 +67,11 @@ class ScopeRetrievalTests(unittest.TestCase):
                                           review_threshold=0.14, backend="local")
         findings = [x for x in result["adr_matches"] if x["adr_id"] == "ADR-001"]
         self.assertTrue(findings)
-        self.assertEqual(findings[0]["comparison_result"], "uncertain")
+        self.assertEqual(findings[0]["comparison_result"], "deviation")
         refs = findings[0]["source_observations"]
         self.assertEqual(refs[0]["evidence_id"], "RUN-123:evidence-0012")
         self.assertEqual(refs[0]["path"], "internal/handler/submit.go")
-        self.assertEqual(result["comparison"]["overall_result"], "uncertain")
+        self.assertEqual(result["comparison"]["overall_result"], "deviation")
 
     def test_direct_request_path_call_is_a_deviation_with_typed_evidence_link(self):
         event = self.by_id["SCOPE-01"]
