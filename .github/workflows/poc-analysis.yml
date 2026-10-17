@@ -111,6 +111,7 @@ jobs:
         run: |
           python -m pip install --disable-pip-version-check -r .poc/requirements.txt
           npm install --prefix .poc/analyzers/typescript --ignore-scripts --no-audit --no-fund
+          (cd .poc/analyzers/go && go mod tidy)
       - name: Load persistent CSV database tables
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
