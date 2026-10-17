@@ -6,10 +6,14 @@ const test = require("node:test");
 const demoIndex = fs.readFileSync(path.join(__dirname, "../docs/demo/index.md"), "utf8");
 const spec = fs.readFileSync(path.join(__dirname, "../docs/demo/realistic-session-service.md"), "utf8");
 const api = fs.readFileSync(path.join(__dirname, "../docs/demo/api-payload-examples.md"), "utf8");
+const component = fs.readFileSync(path.join(__dirname, "../src/components/DemoExplorer.jsx"), "utf8");
+const openapi = fs.readFileSync(path.join(__dirname, "../docs/openapi.yaml"), "utf8");
+const apiContract = fs.readFileSync(path.join(__dirname, "../docs/contracts/API_CONTRACT.md"), "utf8");
 
-test("demo index exposes the multi-requirement specification and API payload examples", () => {
+test("demo index exposes the multi-requirement specification and API response mockups", () => {
   assert.ok(demoIndex.includes("realistic-session-service.md"));
   assert.ok(demoIndex.includes("api-payload-examples.md"));
+  assert.ok(demoIndex.includes("production target"));
 });
 
 test("technical specification includes mixed outcomes and evidence limits", () => {
@@ -23,10 +27,36 @@ test("technical specification includes mixed outcomes and evidence limits", () =
   assert.ok(spec.includes("evidenceRefs"));
 });
 
-test("API examples show async acceptance, findings, inconclusive state, and stable errors", () => {
-  for (const phrase of ["HTTP 202", "JOB_STATE_QUEUED", "JOB_STATE_SUCCEEDED", "FINDING_OUTCOME_SUPPORTED_DEVIATION", "FINDING_OUTCOME_INCONCLUSIVE", "IDEMPOTENCY_KEY_REUSED", "requestId", "nextPageToken"]) {
-    assert.ok(api.includes(phrase), "missing API payload detail: " + phrase);
-  }
-  assert.ok(api.includes("no production HTTP service is deployed"));
+test("API mockups use the production-target contract enums and response shapes", () => {
+  for (const phrase of [
+    "HTTP 202 Accepted",
+    "ANALYSIS_JOB_STATUS_QUEUED",
+    "ANALYSIS_JOB_STATUS_SUCCEEDED",
+    "FINDING_OUTCOME_DEVIATION_SUPPORTED",
+    "FINDING_OUTCOME_INCONCLUSIVE",
+    "FINDING_SEVERITY_HIGH",
+    "REVIEW_STATUS_PENDING",
+    "IDEMPOTENCY_KEY_REUSED",
+    "nextPageToken",
+    "reusedExistingJob"
+  ]) assert.ok(api.includes(phrase), "missing API mock detail: " + phrase);
+  assert.ok(api.includes("Mock API responses"));
+  assert.ok(api.includes("not responses captured from a running service"));
   assert.ok(api.includes("proto/adrplatform/v1/platform.proto"));
+  assert.ok(!api.includes("JOB_STATE_QUEUED"));
+  assert.ok(!api.includes("FINDING_OUTCOME_SUPPORTED_DEVIATION"));
+});
+
+test("interactive demo labels and renders a contract-shaped mock API response", () => {
+  assert.ok(component.includes("MOCK RESPONSE · application/json"));
+  assert.ok(component.includes("HTTP 200"));
+  assert.ok(component.includes("FINDING_OUTCOME_DEVIATION_SUPPORTED"));
+  assert.ok(component.includes("production-target contract"));
+});
+
+test("API docs describe the production target without claiming the service is deployed", () => {
+  assert.ok(openapi.includes("version: 1.0.0"));
+  assert.ok(openapi.includes("Production-target REST/JSON mapping"));
+  assert.ok(apiContract.includes("Production-target v1 contract"));
+  assert.ok(apiContract.includes("not a deployed service"));
 });
