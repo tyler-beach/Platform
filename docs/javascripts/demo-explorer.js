@@ -96,6 +96,27 @@
       }));
   }
 
+  function evidenceForFinding(finding, evidence, supplementalLimit = 40) {
+    if (!Array.isArray(evidence)) throw new Error("Evidence list is malformed.");
+    if (!Number.isSafeInteger(supplementalLimit) || supplementalLimit < 0) throw new Error("Evidence display limit is invalid.");
+    const ids = finding && Array.isArray(finding.evidence_ids) ? finding.evidence_ids : [];
+    if (ids.some((id) => typeof id !== "string" || !id)) throw new Error("Finding evidence references are malformed.");
+    const byId = new Map();
+    evidence.forEach((item) => {
+      if (!item || typeof item.id !== "string" || !item.id || byId.has(item.id)) throw new Error("Evidence IDs are missing or ambiguous.");
+      byId.set(item.id, item);
+    });
+    const cited = ids.map((id) => {
+      const item = byId.get(id);
+      if (!item) throw new Error(`Cited evidence ${id} is missing from the run snapshot.`);
+      return { item, isCited: true };
+    });
+    const citedIds = new Set(ids);
+    const additional = evidence.filter((item) => !citedIds.has(item.id)).slice(0, supplementalLimit)
+      .map((item) => ({ item, isCited: false }));
+    return cited.concat(additional);
+  }
+
   async function requestJson(fetcher, url) {
     let response;
     try {
@@ -120,6 +141,33 @@
       return await response.json();
     } catch (_) {
       throw new Error("GitHub returned unreadable workflow history. The synthetic walkthrough still works.");
+    }
+  }
+
+  async function fetchSiteJson(fetcher, value, siteBase) {
+    let origin;
+    let url;
+    try {
+      origin = new URL(siteBase).origin;
+      url = new URL(value, siteBase);
+    } catch (_) {
+      throw new Error("Pages snapshot URL is invalid.");
+    }
+    if (url.origin !== origin) throw new Error("Pages snapshot URL points to another origin.");
+    let response;
+    try {
+      response = await fetcher(url.href, {
+        method: "GET", mode: "same-origin", credentials: "same-origin", redirect: "error",
+        referrerPolicy: "no-referrer", headers: { Accept: "application/json" },
+      });
+    } catch (_) {
+      throw new Error("The Pages snapshot is unavailable. The synthetic walkthrough may still be used.");
+    }
+    if (!response || !response.ok) throw new Error(`Pages snapshot request failed${response && response.status ? ` (${response.status})` : ""}.`);
+    try {
+      return await response.json();
+    } catch (_) {
+      throw new Error("Pages returned unreadable snapshot data.");
     }
   }
 
@@ -151,7 +199,7 @@
     return item.conclusion || item.status || "unknown";
   }
 
-  const core = { normalizeRuns, normalizeJobs, fetchWorkflowRuns, fetchRunJobs, safeRunUrl, formatDate, statusText, workflows: WORKFLOWS };
+  const core = { normalizeRuns, normalizeJobs, evidenceForFinding, fetchSiteJson, fetchWorkflowRuns, fetchRunJobs, safeRunUrl, formatDate, statusText, workflows: WORKFLOWS };
   root.ADRDemoCore = core;
 
   function init() {
@@ -229,16 +277,7 @@
       });
 
       const evidence = byId("demo-evidence-list");
-      evidence.replaceChildren();
-      snapshot.evidence.forEach((item) => {
-        const card = el("article", "demo-evidence-card");
-        card.appendChild(el("span", "demo-eyebrow", item.type.replaceAll("_", " ")));
-        card.appendChild(el("h4", "", item.claim));
-        card.appendChild(el("code", "demo-source-ref", `${item.path}:${item.line || "?"}`));
-        card.appendChild(el("pre", "demo-excerpt", item.excerpt || "No excerpt"));
-        card.appendChild(el("small", "", `Source SHA-256 ${item.source_sha256} · excerpt SHA-256 ${item.excerpt_sha256}`));
-        evidence.appendChild(card);
-      });
+      renderEvidenceCards(evidence, snapshot.finding, snapshot.evidence);
 
       const observations = byId("demo-observation-list");
       observations.replaceChildren();
@@ -295,6 +334,29 @@
         card.appendChild(el("time", "", formatDate(run.updated || run.created)));
         addLink(card, run.url, "Open workflow run and artifacts");
         historyNode.appendChild(card);
+      });
+    }
+
+    function renderEvidenceCards(container, finding, items) {
+      container.replaceChildren();
+      let selected;
+      try {
+        selected = evidenceForFinding(finding, items);
+      } catch (error) {
+        container.appendChild(el("p", "demo-warning", `Evidence integrity error: ${error.message}`));
+        return;
+      }
+      selected.forEach(({ item, isCited }) => {
+        const card = el("article", "demo-evidence-card");
+        const kind = isCited ? "Finding citation" : "Additional run evidence";
+        const redaction = item.redacted ? " · redacted" : "";
+        card.appendChild(el("span", "demo-eyebrow", `${kind} · ${String(item.type || "evidence").replaceAll("_", " ")}${redaction}`));
+        card.appendChild(el("h4", "", item.claim || "Evidence claim unavailable"));
+        card.appendChild(el("code", "demo-source-ref", `Evidence ID ${item.id} · ${item.path || item.source_path || "source path unavailable"}:${item.line || "?"}`));
+        card.appendChild(el("pre", "demo-excerpt", item.excerpt || JSON.stringify({ value: item.value, resolution: item.resolution, locator: item.locator }, null, 2) || "No excerpt"));
+        const excerptDigest = item.displayed_excerpt_sha256 || item.excerpt_sha256 || item.recorded_excerpt_sha256 || "unavailable";
+        card.appendChild(el("small", "", `Artifact SHA-256 ${item.source_sha256 || "unavailable"} · displayed excerpt SHA-256 ${excerptDigest}`));
+        container.appendChild(card);
       });
     }
 
@@ -356,15 +418,7 @@
       details.appendChild(stages);
       details.appendChild(el("h4", "", "Evidence"));
       const evidence = el("div", "demo-evidence-grid");
-      record.evidence.slice(0, 40).forEach((item) => {
-        const card = el("article", "demo-evidence-card");
-        card.appendChild(el("span", "demo-eyebrow", `${item.type.replaceAll("_", " ")}${item.redacted ? " · redacted" : ""}`));
-        card.appendChild(el("h4", "", item.claim));
-        card.appendChild(el("code", "demo-source-ref", `${item.path}:${item.line || "?"}`));
-        card.appendChild(el("pre", "demo-excerpt", item.excerpt || "No excerpt"));
-        card.appendChild(el("small", "", `Artifact SHA-256 ${item.source_sha256} · displayed excerpt SHA-256 ${item.displayed_excerpt_sha256 || item.recorded_excerpt_sha256}`));
-        evidence.appendChild(card);
-      });
+      renderEvidenceCards(evidence, record.finding, record.evidence);
       details.appendChild(evidence);
       details.appendChild(el("h4", "", "Collection coverage"));
       const coverage = el("ul", "demo-coverage-list");
@@ -379,11 +433,8 @@
       setText("demo-history-status", "Loading recent Actions runs…");
       historyNode.replaceChildren();
       try {
-        const response = await root.fetch(new URL("data/real-runs.json", doc.baseURI), { credentials: "omit", referrerPolicy: "no-referrer" });
-        if (response.ok) {
-          const data = await response.json();
-          if (data && data.schema_version === "adr-demo-history-v1") realHistory = data;
-        }
+        const data = await fetchSiteJson(root.fetch.bind(root), "data/real-runs.json", root.location.origin);
+        if (data && data.schema_version === "adr-demo-history-v1") realHistory = data;
       } catch (_) {
         realHistory = null;
       }
@@ -436,8 +487,7 @@
     byId("demo-guide-analysis").href = workflows[0].launch;
     byId("demo-guide-evaluation").href = workflows[1].launch;
 
-    root.fetch(new URL("data/sample-run.json", doc.baseURI), { credentials: "omit", referrerPolicy: "no-referrer" })
-      .then((response) => { if (!response.ok) throw new Error("The fixture walkthrough could not be loaded."); return response.json(); })
+    fetchSiteJson(root.fetch.bind(root), "data/sample-run.json", root.location.origin)
       .then((data) => { snapshot = data; renderSnapshot(); })
       .catch((error) => {
         setText("demo-sample-status", error.message + " Run the offline docs demo build to create it.");

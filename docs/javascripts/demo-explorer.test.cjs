@@ -24,6 +24,36 @@ test("normalizes jobs and orders steps by their numeric sequence", () => {
   assert.deepEqual(Array.from(jobs[0].steps, step => step.number), [1, 2]);
 });
 
+test("puts every cited evidence item first and caps only supplemental evidence", () => {
+  const evidence = Array.from({ length: 60 }, (_, index) => ({ id: `ev-${index}`, claim: `Claim ${index}` }));
+  const selected = core.evidenceForFinding({ evidence_ids: ["ev-59", "ev-2"] }, evidence, 40);
+  assert.deepEqual(Array.from(selected.slice(0, 2), item => item.item.id), ["ev-59", "ev-2"]);
+  assert.equal(selected[0].isCited, true);
+  assert.equal(selected[1].isCited, true);
+  assert.equal(selected.length, 42);
+  assert.equal(selected.slice(2).every(item => !item.isCited), true);
+});
+
+test("reports a missing cited evidence ID instead of returning a partial list", () => {
+  assert.throws(() => core.evidenceForFinding({ evidence_ids: ["ev-missing"] }, [{ id: "ev-1" }]), /missing from the run snapshot/);
+});
+
+test("loads static Pages snapshots with same-origin credentials and rejects another origin", async () => {
+  let captured;
+  const data = await core.fetchSiteJson(async (url, options) => {
+    captured = { url, options };
+    return { ok: true, json: async () => ({ schema_version: "adr-demo-history-v1" }) };
+  }, "data/real-runs.json", "https://internal.pages.github.io/project/demo/");
+  assert.equal(data.schema_version, "adr-demo-history-v1");
+  assert.equal(new URL(captured.url).origin, "https://internal.pages.github.io");
+  assert.equal(captured.options.credentials, "same-origin");
+  assert.equal(captured.options.mode, "same-origin");
+  assert.equal(captured.options.redirect, "error");
+  let requested = false;
+  await assert.rejects(core.fetchSiteJson(async () => { requested = true; }, "https://evil.example/data.json", "https://internal.pages.github.io/"), /another origin/);
+  assert.equal(requested, false);
+});
+
 test("uses bounded GitHub endpoints without browser credentials and exposes API failure", async () => {
   let captured;
   const fetcher = async (url, options) => {

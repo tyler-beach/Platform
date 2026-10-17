@@ -62,6 +62,9 @@ class PagesSnapshotTests(unittest.TestCase):
         self.assertTrue(snapshot["evidence"])
         self.assertTrue(snapshot["confidence"]["components"])
         self.assertIn("not a calibrated probability", snapshot["confidence"]["interpretation"].lower())
+        cited_ids = snapshot["finding"]["evidence_ids"]
+        self.assertTrue(cited_ids)
+        self.assertTrue(set(cited_ids).issubset({item["id"] for item in snapshot["evidence"]}))
         serialized = json.dumps(snapshot).lower()
         for forbidden in ("anthropic_api_key", "prompt_sha256", "model_candidate", "raw_source", "private key"):
             self.assertNotIn(forbidden, serialized)
@@ -99,6 +102,12 @@ class PagesSnapshotTests(unittest.TestCase):
         self.assertIn("prefers-reduced-motion: reduce", styles)
         self.assertIn("demo/index.md", config)
         self.assertIn('textContent', javascript)
+        self.assertIn("Finding citation", javascript)
+        self.assertIn("Additional run evidence", javascript)
+        self.assertIn("evidenceForFinding", javascript)
+        self.assertIn('fetchSiteJson(root.fetch.bind(root), "data/real-runs.json", root.location.origin)', javascript)
+        self.assertIn('fetchSiteJson(root.fetch.bind(root), "data/sample-run.json", root.location.origin)', javascript)
+        self.assertIn('credentials: "same-origin"', javascript)
         self.assertNotIn(".innerHTML", javascript)
         self.assertNotIn(".insertAdjacentHTML", javascript)
         self.assertNotIn("autoplay", page.lower())

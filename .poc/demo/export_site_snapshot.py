@@ -179,6 +179,14 @@ def build_snapshot(db_dir: str | Path, run_dir: str | Path, fixture_root: str | 
     }
 
     finding = findings[0]
+    finding_evidence_ids = _json(finding.get("evidence_ids_json", ""), default=[])
+    if not isinstance(finding_evidence_ids, list) or any(not isinstance(value, str) for value in finding_evidence_ids):
+        raise ValueError("fixture finding evidence references are malformed")
+    known_evidence_ids = {item.get("evidence_id", "") for item in evidence_rows}
+    if any(value not in known_evidence_ids for value in finding_evidence_ids):
+        raise ValueError("fixture finding evidence reference is missing from exported evidence")
+    if finding.get("outcome", "inconclusive") != "inconclusive" and not finding_evidence_ids:
+        raise ValueError("fixture finding evidence references are missing")
     snapshot = {
         "schema_version": SCHEMA_VERSION,
         "sample": {
@@ -190,6 +198,7 @@ def build_snapshot(db_dir: str | Path, run_dir: str | Path, fixture_root: str | 
         },
         "stages": stages,
         "finding": {"outcome": finding.get("outcome", "inconclusive"), "summary": finding.get("summary", "")[:800],
+                    "evidence_ids": finding_evidence_ids,
                     "validation_status": finding.get("validation_status", "")},
         "confidence": confidence_data,
         "coverage": collection_data,
