@@ -99,7 +99,7 @@ def main():
     run_id=re.sub(r"[^A-Za-z0-9_.-]","-",a.run_id)[:100];started=now()
     out=Path(a.out_dir).resolve()/run_id;out.mkdir(parents=True,exist_ok=True)
     store=CsvStore(a.db_dir);events=[]
-    provider_model=os.getenv("ANTHROPIC_MODEL","claude-sonnet-5") if a.provider=="anthropic" else "deterministic-rules-v1"
+    provider_model=(os.getenv("ANTHROPIC_MODEL") or "claude-sonnet-5-5") if a.provider=="anthropic" else "deterministic-rules-v1"
     def event(stage,kind,status,details=None):
         events.append(stage+":"+kind+":"+status)
         store.append("run_events",{"event_id":run_id+":event-%04d"%len(events),"run_id":run_id,"timestamp":now(),"stage":stage,"event_type":kind,"status":status,"details_json":details or {}})
