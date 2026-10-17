@@ -60,3 +60,32 @@ Only successful Functional Analysis runs from the repository default branch may 
 - **THEN** it persists a validated result when the matching unexpired artifact passes all checks, or an execution-only record when no result artifact exists
 - **AND** it reports an unrecoverable missing result when the necessary artifact has expired
 - **AND** it does not claim reconciliation is complete while an eligible attempt remains missing or rejected.
+
+#### Scenario: Retryable GitHub API failures exhaust their bounded retry policy
+- **GIVEN** the GitHub API repeatedly returns a transient transport failure
+- **WHEN** the writer performs a metadata request
+- **THEN** it makes no more than three calls, each with the configured request deadline
+- **AND** it reports a classified error without exposing the token or response URL.
+
+#### Scenario: Ledger write conflicts exhaust fresh-snapshot retries
+- **GIVEN** each ledger push is rejected as non-fast-forward
+- **WHEN** the writer retries persistence
+- **THEN** each attempt starts from a fresh ledger checkout
+- **AND** after three attempts it reports persistence failure without claiming success.
+
+#### Scenario: Recovery scan reaches its configured run bound
+- **GIVEN** recent workflow history contains more runs than the configured scan limit
+- **WHEN** the reconciler evaluates the API response
+- **THEN** it stops before processing a partial window and reports the bound explicitly.
+
+#### Scenario: A writer notification is lost when the concurrency queue is saturated
+- **GIVEN** an eligible workflow attempt completed but its writer event was not delivered
+- **WHEN** the scheduled reconciler scans recent workflow history
+- **THEN** it discovers the missing run-attempt identity and records its validated result or execution-only state
+- **AND** queue capacity is treated as a serialization limit, not as durable delivery.
+
+#### Scenario: A successful run's final artifact has expired
+- **GIVEN** an otherwise eligible successful workflow attempt whose expected final artifact is expired
+- **WHEN** reconciliation processes the attempt
+- **THEN** it records execution metadata as unreconciled without a domain outcome
+- **AND** it reports reconciliation incomplete and does not attempt to download the expired artifact.

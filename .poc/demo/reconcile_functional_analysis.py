@@ -197,11 +197,11 @@ def _list_recent_runs(api: GitHubAPI, workflow_id: int, max_runs: int = MAX_RUNS
         runs = payload.get("workflow_runs")
         if not isinstance(runs, list):
             raise ReconciliationError("GitHub workflow run listing is malformed")
-        found.extend(row for row in runs if isinstance(row, dict))
         total = payload.get("total_count")
+        if isinstance(total, int) and total > max_runs:
+            raise ReconciliationError(f"recent workflow history exceeds the {max_runs}-run reconciliation bound")
+        found.extend(row for row in runs if isinstance(row, dict))
         if len(found) >= max_runs or len(runs) < per_page:
-            if isinstance(total, int) and total > max_runs:
-                raise ReconciliationError(f"recent workflow history exceeds the {max_runs}-run reconciliation bound")
             return found[:max_runs]
     raise ReconciliationError("recent workflow history exceeds the reconciliation page bound")
 
