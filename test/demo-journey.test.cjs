@@ -28,6 +28,8 @@ test("guided ADR journey explains the investigation in five plain-language steps
 test("guided journey supports manual navigation, pause/resume, and accessible progress", () => {
   assert.ok(component.includes("setTimeout(() => setActiveStage(activeStage + 1), 7000)"));
   assert.ok(component.includes("Pause walkthrough"));
+  assert.ok(component.includes('id="journey-watch-button"'));
+  assert.ok(component.includes('document.getElementById("journey-watch-button")?.click()'));
   assert.ok(component.includes("aria-live=\"polite\""));
   assert.ok(component.includes("aria-current={index === activeStage ? 'step' : undefined}"));
   assert.ok(component.includes("onClick={() => goToStage(activeStage - 1)}"));
