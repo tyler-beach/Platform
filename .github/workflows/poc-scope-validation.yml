@@ -22,6 +22,8 @@ jobs:
           python-version: "3.12"
       - name: Test scope gates, candidate retrieval, and cue triage
         run: python -m unittest discover -s .poc/tests -p "test_scope.py" -v
+      - name: Validate catalog provenance manifest without AWS calls
+        run: python .poc/scope/index_catalog.py --dry-run
       - name: Run offline scope simulation
         run: python .poc/scope/run_scope.py --output-dir "$RUNNER_TEMP/adr-scope-report"
       - name: Publish scope and triage report
