@@ -516,17 +516,17 @@ def validate(args: argparse.Namespace) -> None:
     if candidate.get("outcome") == "supported_deviation":
         has_adr = any(evidence_by_id.get(eid, {}).get("evidence_type") == "architectural_constraint" for eid in cited)
         support_types = {evidence_by_id.get(eid, {}).get("evidence_type") for eid in cited}
-        has_support = bool({"ast_call_site", "technical_requirement"} & support_types)
+        has_support = bool({"syntax_call_site", "technical_requirement"} & support_types)
         check("Deviation cites a governing constraint and technical evidence", has_adr and has_support,
               "A deviation needs both the governing constraint and relevant source evidence.")
     elif candidate.get("outcome") == "no_deviation_found":
         support_types = {evidence_by_id.get(eid, {}).get("evidence_type") for eid in cited}
         if mode in {"code-diff", "technical-spec"}:
             has_constraint = "architectural_constraint" in support_types
-            has_source = bool({"ast_call_site", "technical_requirement"} & support_types)
+            has_source = bool({"syntax_call_site", "technical_requirement"} & support_types)
         else:
             has_constraint = "technical_requirement" in support_types
-            has_source = "ast_call_site" in support_types
+            has_source = "syntax_call_site" in support_types
         check("No-deviation result cites bounded comparison evidence", has_constraint and has_source,
               "The result must cite the decision/requirement and the source evidence compared.")
     else:
