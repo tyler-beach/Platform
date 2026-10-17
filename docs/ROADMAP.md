@@ -3,6 +3,9 @@
 This is a proposed sequence; it does not imply work has shipped.
 
 ## Phase 0 — Confirm design and bootstrap
+- Complete the [Pre-implementation readiness milestone](PRE_IMPLEMENTATION_READINESS.md).
+- Review and disposition the [MVP decision packet](MVP_DECISION_PACKET.md).
+- Review the [requirements-to-proof matrix](REQUIREMENT_TO_PROOF_MATRIX.md) and synthetic [evaluation corpus](evaluation/STARTER_CORPUS.md).
 - Review the baseline and mark choices accepted/rejected/open.
 - Decide whether the initial consumer requires a gRPC API or whether webhook-only HTTP/Lambda is enough for MVP.
 - Confirm API hosting profile (ECS/Fargate + ALB for gRPC, or serverless HTTP).

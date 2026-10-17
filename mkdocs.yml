@@ -89,6 +89,8 @@ nav:
       - Platform overview: index.md
       - Getting started: getting-started.md
       - Roadmap: ROADMAP.md
+      - Pre-implementation readiness: PRE_IMPLEMENTATION_READINESS.md
+      - MVP decision packet: MVP_DECISION_PACKET.md
       - Decision log: DECISIONS.md
       - Open questions: OPEN_QUESTIONS.md
   - Architecture:
@@ -123,5 +125,8 @@ nav:
       - Security: SECURITY.md
       - Operations: OPERATIONS.md
       - Evaluation: EVALUATION.md
+      - Requirements-to-proof matrix: REQUIREMENT_TO_PROOF_MATRIX.md
+      - Evaluation corpus guide: evaluation/README.md
+      - Starter evaluation corpus: evaluation/STARTER_CORPUS.md
       - Tools and references: TOOLS_AND_REFERENCES.md
       - Contributing: CONTRIBUTING.md
