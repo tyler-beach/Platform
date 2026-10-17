@@ -65,3 +65,16 @@ jobs:
           test -s "$report"
           grep -q "## Finding" "$report"
           grep -q "supported_deviation" "$report"
+          graph="$RUNNER_TEMP/poc-runs/validation-${LANGUAGE}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/callgraph.json"
+          python - "$graph" <<'PY'
+          import json, sys
+          graph = json.load(open(sys.argv[1], encoding="utf-8"))
+          assert graph.get("entry_resolution") == "resolved", "entry function was not resolved"
+          reachable = graph.get("reachable_functions", [])
+          edges = graph.get("reachable_edges", [])
+          assert len(reachable) >= 3, f"expected a transitive graph of at least 3 functions, got {len(reachable)}"
+          assert any("assess" in str(edge.get("callee_qualified_name", "")).lower() for edge in edges), "provider assessment edge missing from reachable graph"
+          assert any(edge.get("is_transitive") for edge in edges), "no multi-hop/transitive call edge was marked"
+          assert all(edge.get("resolution_status") and edge.get("resolution_basis") for edge in edges), "edge resolution metadata missing"
+          print(f"Graph assertion passed: {len(reachable)} reachable functions, {len(edges)} reachable edges")
+          PY
