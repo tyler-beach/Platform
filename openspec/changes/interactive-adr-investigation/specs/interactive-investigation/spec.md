@@ -25,3 +25,16 @@ The demo MUST allow a visitor to select an example ADR and inspect its required 
 The pod disruption budget ADR MUST require an effective budget aligned with an approved availability objective and workload topology. Resource existence alone MUST NOT establish compliance. Missing or conflicting scope evidence MUST lead to an inconclusive assessment.
 
 The session TTL ADR MUST define a 60-minute absolute maximum from session establishment. Activity MUST NOT extend the same session beyond that maximum. Assessment MUST consider renewal and server-side acceptance behavior rather than relying only on one configured timeout or token claim.
+
+#### Scenario: Assess the session expiration boundary
+- **GIVEN** a session has been established and the applicable policy sets a 60-minute maximum
+- **WHEN** the session reaches the maximum lifetime
+- **THEN** the system rejects the existing session for authenticated access
+- **AND** activity alone cannot extend that same session beyond the boundary
+- **AND** missing evidence about renewal or server-side acceptance is reported as inconclusive.
+
+#### Scenario: Assess an effective disruption budget
+- **GIVEN** an availability-sensitive workload has a declared availability objective and replica topology
+- **WHEN** the effective disruption budget is evaluated
+- **THEN** the assessment checks that the budget selects the intended workload and constrains voluntary disruption consistently with the objective
+- **AND** a missing or mismatched workload relationship is not treated as compliance.
