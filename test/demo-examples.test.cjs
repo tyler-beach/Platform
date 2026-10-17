@@ -7,6 +7,7 @@ const demoIndex = fs.readFileSync(path.join(__dirname, "../docs/demo/index.md"),
 const spec = fs.readFileSync(path.join(__dirname, "../docs/demo/realistic-session-service.md"), "utf8");
 const api = fs.readFileSync(path.join(__dirname, "../docs/demo/api-payload-examples.md"), "utf8");
 const review = fs.readFileSync(path.join(__dirname, "../docs/demo/finding-review-playbook.md"), "utf8");
+const lineage = fs.readFileSync(path.join(__dirname, "../docs/demo/evidence-lineage-example.md"), "utf8");
 const component = fs.readFileSync(path.join(__dirname, "../src/components/DemoExplorer.jsx"), "utf8");
 const openapi = fs.readFileSync(path.join(__dirname, "../docs/openapi.yaml"), "utf8");
 const apiContract = fs.readFileSync(path.join(__dirname, "../docs/contracts/API_CONTRACT.md"), "utf8");
@@ -15,6 +16,7 @@ test("demo index exposes the multi-requirement specification, API mockups, and r
   assert.ok(demoIndex.includes("realistic-session-service.md"));
   assert.ok(demoIndex.includes("api-payload-examples.md"));
   assert.ok(demoIndex.includes("finding-review-playbook.md"));
+  assert.ok(demoIndex.includes("evidence-lineage-example.md"));
   assert.ok(demoIndex.includes("production target"));
 });
 
@@ -61,6 +63,22 @@ test("finding review playbook separates evidence, inference, outcome, and human 
     "reviewer identity",
     "synthetic artifacts"
   ]) assert.ok(review.toLowerCase().includes(phrase.toLowerCase()), "missing review guidance: " + phrase);
+});
+
+test("evidence lineage walkthrough demonstrates pinned inputs and review audit separation", () => {
+  for (const phrase of [
+    "Synthetic fixture",
+    "artifactVersionId",
+    "locatorPrecision",
+    "relationToClaim",
+    "FINDING_OUTCOME_DEVIATION_SUPPORTED",
+    "evidence package",
+    "reviewer disposition",
+    "RUNTIME_CONTEXT_REQUIRED",
+    "Missing evidence means inconclusive"
+  ]) assert.ok(lineage.toLowerCase().includes(phrase.toLowerCase()), "missing lineage detail: " + phrase);
+  assert.ok(lineage.includes("../contracts/EVIDENCE.md"));
+  assert.ok(lineage.includes("../contracts/LOGGING_AND_AUDIT.md"));
 });
 
 test("interactive demo labels and renders a contract-shaped mock API response", () => {
