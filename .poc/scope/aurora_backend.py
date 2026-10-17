@@ -37,28 +37,6 @@ ORDER BY embedding <=> %(query_embedding)s::vector
 LIMIT %(top_k)s
 """
 
-INACTIVE_SEARCH_SQL = """
-SELECT
-    chunk_id, adr_id, adr_version, title, chunk_text, normative_text, owner, status, review_state,
-    effective_from, effective_until, repositories, services, domains, languages, tags, deviation_check,
-    source_path, source_sha256, embedding_model_id, embedding_input_sha256, embedding_dimensions,
-    1.0 - (embedding <=> %(query_embedding)s::vector) AS similarity
-FROM adr_chunks
-WHERE (
-       status NOT IN ('accepted', 'approved', 'active')
-    OR review_state NOT IN ('current', 'active', 'approved')
-    OR (effective_from IS NOT NULL AND effective_from > now())
-    OR (effective_until IS NOT NULL AND effective_until <= now())
-)
-  AND embedding_model_id = %(embedding_model_id)s
-  AND embedding_dimensions = %(embedding_dimensions)s
-  AND ('*' = ANY(repositories) OR %(repository)s = ANY(repositories))
-  AND ('*' = ANY(services) OR %(service)s = ANY(services))
-  AND ('*' = ANY(domains) OR %(domain)s = ANY(domains))
-  AND ('*' = ANY(languages) OR lower(%(language)s) = ANY(SELECT lower(x) FROM unnest(languages) AS x))
-ORDER BY embedding <=> %(query_embedding)s::vector
-LIMIT %(top_k)s
-"""
 
 
 def bedrock_embedding(query: str) -> tuple[list[float], str]:
@@ -168,8 +146,6 @@ def retrieve_from_aurora(
             with conn.cursor() as cursor:
                 cursor.execute(SEARCH_SQL, params)
                 rows = cursor.fetchall()
-                cursor.execute(INACTIVE_SEARCH_SQL, params)
-                inactive_rows = cursor.fetchall()
     except Exception as exc:
         # Avoid embedding credentials, SQL parameters, or connection details in output.
         raise RuntimeError(f"Aurora ADR retrieval failed ({type(exc).__name__})") from exc
@@ -198,31 +174,16 @@ def retrieve_from_aurora(
     candidates = [normalize(row, "eligible_in_sql") for row in rows]
     selected = [x for x in candidates if x["score"] >= in_scope_threshold]
     review = [x for x in candidates if review_threshold <= x["score"] < in_scope_threshold]
-    inactive_near_matches = []
-    for item in inactive_rows:
-        row = normalize(item, "excluded_inactive_or_expired_in_sql")
-        if row["score"] >= review_threshold:
-            row["reasons"] = [
-                f"status={row.get('status')}, review_state={row.get('review_state')}, "
-                f"effective_from={row.get('effective_from')}, effective_until={row.get('effective_until')}"
-            ]
-            row["lifecycle_near_match"] = True
-            inactive_near_matches.append(row)
 
     if selected:
         disposition = "in_scope"
         reason = f"{len(selected)} active, metadata-eligible ADR chunk(s) passed the configured vector similarity threshold."
-        if inactive_near_matches:
-            reason += " Similar inactive/superseded chunks were excluded and recorded for audit."
-    elif review or inactive_near_matches:
+    elif review:
         disposition = "uncertain"
-        reason = (
-            "A relevant ADR candidate is below the in-scope threshold or only an inactive/superseded ADR matched; "
-            "human review is required."
-        )
+        reason = "Active, metadata-eligible ADRs were retrieved below the in-scope threshold; human review is required."
     else:
         disposition = "not_in_scope"
-        reason = "No active or inactive metadata-eligible ADR passed the vector review threshold; this is not proof that no ADR applies."
+        reason = "No active, metadata-eligible ADR passed the vector review threshold; this is not proof that no ADR applies."
     return {
         "retrieval_version": "aurora-bedrock-pgvector-v1.0.0",
         "event_id": event.get("case_id", event.get("event_id", "unknown")),
@@ -238,15 +199,14 @@ def retrieve_from_aurora(
         "selected_adrs": selected,
         "review_candidates": review,
         "candidate_count_after_metadata_filters": len(candidates),
-        "excluded_adrs": inactive_near_matches,
-        "inactive_near_matches": inactive_near_matches,
-        "inactive_near_match_count": len(inactive_near_matches),
-        "excluded_inactive_or_out_of_scope_count": "lifecycle and applicability exclusions are enforced in parameterized SQL filters",
+        "excluded_adrs": [],
+        "lifecycle_policy": "only accepted/approved/active, current and effective ADR chunks are eligible for ranking",
+        "excluded_inactive_or_out_of_scope_count": "excluded by lifecycle/applicability SQL predicates before vector ranking",
         "audit": {
             "query_sha256": sha(query),
             "embedding_model_id": model_id,
             "embedding_dimensions": EMBEDDING_DIMENSIONS,
             "scoring_note": "1 - cosine distance is a retrieval similarity, not a probability of applicability or deviation.",
-            "db_query_sha256": hashlib.sha256((SEARCH_SQL + INACTIVE_SEARCH_SQL).encode("utf-8")).hexdigest(),
+            "db_query_sha256": hashlib.sha256(SEARCH_SQL.encode("utf-8")).hexdigest(),
         },
     }
