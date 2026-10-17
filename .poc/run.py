@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 from store import CsvStore
 import model
+import confidence
 
 SUFFIXES={".go",".py",".pyi",".js",".jsx",".mjs",".cjs",".ts",".tsx",".java"}
 SKIP={".git","node_modules","vendor","target","build",".venv","venv","__pycache__"}
@@ -147,7 +148,7 @@ def main():
             text=path.read_text(encoding="utf-8",errors="replace");display=path.relative_to(workspace).as_posix()
             for line_no,line in enumerate(text.splitlines(),1):
                 if norm.search(line):
-                    n+=1;ev={"evidence_id":f"{run_id}:evidence-{n:05d}","run_id":run_id,"evidence_type":"normative_requirement","artifact_id":artifact_map.get(display,""),"symbol_id":"","edge_id":"","claim":"Normative requirement extracted from "+role,"excerpt":line.strip(),"path":display,"start_line":line_no,"end_line":line_no,"sha256":sha(text.encode())}
+                    n+=1;ev={"evidence_id":f"{run_id}:evidence-{n:05d}","run_id":run_id,"evidence_type":"normative_requirement","artifact_id":artifact_map.get(display,""),"symbol_id":"","edge_id":"","claim":"Normative requirement extracted from "+role,"excerpt":line.strip(),"path":display,"start_line":line_no,"end_line":line_no,"sha256":sha(line.strip().encode("utf-8"))}
                     evidence.append(ev);requirements.append({"evidence_id":ev["evidence_id"],"source":role,"line":line_no,"text":line.strip()})
         for e in graph.get("edges",[]):
             if not e.get("reachable_from_entry"):continue
@@ -172,7 +173,8 @@ def main():
         for ev in evidence:store.append("evidence",ev)
         event("evidence","complete","success",{"evidence":len(evidence),"requirements":len(requirements)})
         entry=", ".join(f.get("qualified_name","") for f in graph.get("functions",[]) if f.get("symbol_id") in graph.get("entry_symbol_ids",[])) or a.root_function
-        context={"comparison":a.comparison,"root_symbol":entry,"requirements":requirements,"graph_evidence":{"functions":graph.get("reachable_functions",[]),"edges":graph.get("reachable_edges",[]),"diagnostics":graph.get("diagnostics",[]),"syntax_diagnostics":[{"path":f.get("path"),"errors":f.get("errors")} for f in syntax["files"] if f.get("has_syntax_errors")]},"graph":graph,"evidence":[{"evidence_id":e["evidence_id"],"claim":e["claim"],"excerpt":e["excerpt"],"path":e["path"],"start_line":e["start_line"],"edge_id":e["edge_id"]} for e in evidence],"diff_excerpt":diff_text[:12000]}
+        evidence_index=[{"evidence_id":e["evidence_id"],"evidence_type":e["evidence_type"],"claim":e["claim"],"excerpt":e["excerpt"],"path":e["path"],"start_line":e["start_line"],"edge_id":e["edge_id"],"artifact_id":e["artifact_id"],"sha256":e["sha256"]} for e in evidence]
+        context={"comparison":a.comparison,"root_symbol":entry,"requirements":requirements,"graph_evidence":{"functions":graph.get("reachable_functions",[]),"edges":graph.get("reachable_edges",[]),"diagnostics":graph.get("diagnostics",[]),"syntax_diagnostics":[{"path":f.get("path"),"errors":f.get("errors")} for f in syntax["files"] if f.get("has_syntax_errors")]},"graph":graph,"evidence":evidence_index,"evidence_items":evidence_index,"diff_excerpt":diff_text[:12000]}
         prompt=model.render_prompt(context);reservation=run_id+":budget"
         event("budget","token_count_start","running",{"provider":a.provider})
         try:
@@ -193,7 +195,7 @@ def main():
         except Exception as ex:
             store.append("llm_transactions",{"transaction_id":run_id+":llm","run_id":run_id,"provider":a.provider,"model":provider_model,"status":"failed","prompt_sha256":sha(prompt.encode()),"input_chars":len(prompt),"estimated_input_tokens":est,"error":str(ex)[:2000],"created_at":now()})
             event("model","complete","failed",{"error":str(ex)[:800]});raise
-        cand=envelope["assessment"];schema_errors=[]
+        model_candidate=dict(envelope["assessment"]);model_self_confidence=model_candidate.get("confidence");model_proposed_outcome=model_candidate.get("outcome","inconclusive");cand=dict(model_candidate);schema_errors=[]
         if cand.get("outcome") not in OUTCOMES:schema_errors.append("invalid outcome")
         if not isinstance(cand.get("summary"),str) or not cand["summary"].strip():schema_errors.append("invalid summary")
         if not isinstance(cand.get("rationale"),str) or not cand["rationale"].strip():schema_errors.append("invalid rationale")
@@ -207,14 +209,39 @@ def main():
         validation="valid" if not schema_errors else "invalid"
         store.append("llm_transactions",{"transaction_id":run_id+":llm","run_id":run_id,"provider":envelope["provider"],"model":envelope["model"],"request_id":envelope.get("request_id"),"status":"success" if not schema_errors else "rejected","prompt_sha256":envelope["prompt_sha256"],"input_chars":envelope["input_chars"],"output_chars":envelope["output_chars"],"estimated_input_tokens":est,"actual_input_tokens":envelope.get("input_tokens"),"actual_output_tokens":envelope.get("output_tokens"),"duration_ms":envelope.get("duration_ms"),"error":"; ".join(schema_errors),"created_at":envelope.get("created_at")})
         store.append("budget_reservations",{"reservation_id":reservation,"run_id":run_id,"provider":a.provider,"model":envelope["model"],"max_input_tokens":a.max_input_tokens,"max_output_tokens":a.max_output_tokens,"estimated_input_tokens":est,"reserved_at":now(),"status":"completed" if not schema_errors else "rejected","actual_input_tokens":envelope.get("input_tokens"),"actual_output_tokens":envelope.get("output_tokens")})
-        if schema_errors:cand={"outcome":"inconclusive","summary":"Model candidate rejected by deterministic validation","rationale":"Candidate did not pass schema/evidence validation: "+"; ".join(schema_errors),"evidence_ids":[],"limitations":["The model candidate was not accepted by the application validator."],"confidence":0.0}
-        event("model","complete","success" if not schema_errors else "rejected",{"model":envelope["model"],"outcome":cand["outcome"],"validation":validation,"input_tokens":envelope.get("input_tokens"),"output_tokens":envelope.get("output_tokens")})
+        if schema_errors:
+            cand={"outcome":"inconclusive","summary":"Model candidate rejected by deterministic validation","rationale":"Candidate did not pass schema/evidence validation: "+"; ".join(schema_errors),"evidence_ids":[],"limitations":["The model candidate was not accepted by the application validator."],"confidence":0.0}
+        score_outcome=model_proposed_outcome if not schema_errors and model_proposed_outcome in OUTCOMES else "inconclusive"
+        confidence_result=confidence.score_assessment(graph=graph,syntax=syntax,evidence=evidence,artifact_rows=artifact_rows,cited_ids=cand.get("evidence_ids",[]),proposed_outcome=score_outcome)
+        confidence_result["model_self_reported_confidence"]=model_self_confidence if isinstance(model_self_confidence,(int,float)) else None
+        confidence_result["proposed_outcome"]=model_proposed_outcome
+        if not schema_errors:
+            cand["model_proposed_outcome"]=model_proposed_outcome
+            cand["model_self_reported_confidence"]=model_self_confidence
+            cand["confidence"]=confidence_result["score"]
+            cand["outcome"]=confidence_result["accepted_outcome"]
+            for guardrail in confidence_result["guardrails"]:
+                if guardrail not in cand["limitations"]: cand["limitations"].append(guardrail)
+            if cand["outcome"]!=model_proposed_outcome:
+                cand["rationale"] += " Deterministic evidence gates downgraded the model-proposed outcome: "+ "; ".join(confidence_result["guardrails"])
+        event("model","complete","success" if not schema_errors else "rejected",{"model":envelope["model"],"proposed_outcome":model_proposed_outcome,"accepted_outcome":cand["outcome"],"evidence_strength_score":confidence_result["score"],"evidence_strength_band":confidence_result["band"],"model_self_reported_confidence":model_self_confidence,"validation":validation,"input_tokens":envelope.get("input_tokens"),"output_tokens":envelope.get("output_tokens")})
         write_json(out/"tree-sitter.json",syntax);write_json(out/"callgraph.json",graph);write_json(out/"evidence.json",evidence)
-        write_json(out/"model-response.json",{"metadata":{k:v for k,v in envelope.items() if k!="assessment"},"assessment":cand,"validation_status":validation,"validation_errors":schema_errors})
-        store.append("findings",{"finding_id":run_id+":finding","run_id":run_id,"outcome":cand["outcome"],"confidence":cand["confidence"],"summary":cand["summary"],"rationale":cand["rationale"],"evidence_ids_json":cand["evidence_ids"],"limitations_json":cand["limitations"],"validation_status":validation,"created_at":now()})
+        write_json(out/"confidence.json",confidence_result)
+        write_json(out/"model-response.json",{"metadata":{k:v for k,v in envelope.items() if k!="assessment"},"model_candidate":model_candidate,"accepted_assessment":cand,"confidence":confidence_result,"validation_status":validation,"validation_errors":schema_errors})
+        assessment_id=run_id+":confidence"
+        component_summary=[{"dimension":x["dimension"],"score":x["score"],"weight":x["weight"],"weighted_contribution":x["weighted_contribution"]} for x in confidence_result["components"]]
+        store.append("confidence_assessments",{"assessment_id":assessment_id,"run_id":run_id,"algorithm_version":confidence_result["algorithm_version"],"proposed_outcome":model_proposed_outcome,"accepted_outcome":cand["outcome"],"score_0_to_100":confidence_result["score_0_to_100"],"score_0_to_1":confidence_result["score"],"score_band":confidence_result["band"],"calibrated_probability":False,"model_self_reported_confidence":model_self_confidence,"component_scores_json":component_summary,"caps_json":confidence_result["caps"],"guardrails_json":confidence_result["guardrails"],"principle":confidence_result["principle"],"evidence_ids_json":cand.get("evidence_ids",[]),"created_at":now()})
+        for item in confidence_result["components"]:
+            store.append("confidence_components",{"component_id":assessment_id+":"+item["dimension"],"assessment_id":assessment_id,"run_id":run_id,"dimension":item["dimension"],"score":item["score"],"weight":item["weight"],"weighted_contribution":item["weighted_contribution"],"explanation":item["explanation"],"evidence_ids_json":item["evidence_ids"],"details_json":item["details"],"algorithm_version":confidence_result["algorithm_version"],"created_at":now()})
+        store.append("findings",{"finding_id":run_id+":finding","run_id":run_id,"outcome":cand["outcome"],"confidence":confidence_result["score"],"summary":cand["summary"],"rationale":cand["rationale"],"evidence_ids_json":cand.get("evidence_ids",[]),"limitations_json":cand.get("limitations",[]),"validation_status":validation,"created_at":now()})
         status="complete" if not schema_errors else "model_response_rejected";store.append("runs",{"run_id":run_id,"started_at":started,"completed_at":now(),"github_run_id":os.getenv("GITHUB_RUN_ID",""),"repository":a.repository,"comparison":a.comparison,"language":a.language,"source_path":source.relative_to(workspace).as_posix(),"root_function":a.root_function,"model_provider":a.provider,"model":envelope["model"],"result":cand["outcome"],"status":status,"input_hash":input_hash,"workflow_url":a.workflow_url})
-        report=["# ADR Deviation Analysis PoC","","- Run ID: "+run_id,"- Comparison: "+a.comparison,"- Language: "+a.language,"- Resolver: "+str(graph.get("resolver","document-only")),"- Entry symbol: "+entry,"- Functions: "+str(len(graph.get("functions",[]))),"- Direct call edges: "+str(len(graph.get("edges",[]))),"- Functions reachable from entry: "+str(len(graph.get("reachable_functions",[]))),"- Evidence items: "+str(len(evidence)),"- Model: "+envelope["provider"]+" / "+envelope["model"],"- Candidate validation: "+validation,"","## Finding","","**Outcome:** "+cand["outcome"],"","**Summary:** "+cand["summary"],"","**Rationale:** "+cand["rationale"],"","## Evidence cited",""]
-        report += ["- "+x for x in cand["evidence_ids"]] or ["- No evidence cited."]
+        report=["# ADR Deviation Analysis PoC","","- Run ID: "+run_id,"- Comparison: "+a.comparison,"- Language: "+a.language,"- Resolver: "+str(graph.get("resolver","document-only")),"- Entry symbol: "+entry,"- Functions: "+str(len(graph.get("functions",[]))),"- Direct call edges: "+str(len(graph.get("edges",[]))),"- Functions reachable from entry: "+str(len(graph.get("reachable_functions",[]))),"- Evidence items: "+str(len(evidence)),"- Model: "+envelope["provider"]+" / "+envelope["model"],"- Candidate validation: "+validation,"","## Finding","","**Model-proposed outcome:** "+str(model_proposed_outcome),"","**Accepted outcome:** "+cand["outcome"],"","**Summary:** "+cand["summary"],"","**Rationale:** "+cand["rationale"],"","","## Evidence-strength score","","**Score:** "+str(confidence_result["score_0_to_100"])+"/100 ("+confidence_result["band"]+"). This is a deterministic evidence-support score, not a calibrated probability.","","**Model self-reported confidence:** "+str(model_self_confidence)+" (recorded for inspection only; it does not contribute to the evidence-strength score).","","**Scoring algorithm:** "+confidence_result["algorithm_version"],"","| Dimension | Score | Weight | Contribution | Why |","|---|---:|---:|---:|---|"]
+        for component in confidence_result["components"]:
+            report.append("| "+component["dimension"].replace("_"," ")+" | "+str(round(component["score"]*100,1))+" | "+str(round(component["weight"]*100,1))+"% | "+str(round(component["weighted_contribution"]*100,1))+" | "+component["explanation"].replace("|","\\|")+" |")
+        if confidence_result["caps"] or confidence_result["guardrails"]:
+            report += ["","","### Scoring caps and outcome guardrails",""] + ["- "+x for x in confidence_result["caps"]+confidence_result["guardrails"]]
+        report += ["","","### Evidence cited",""]
+        report += ["- "+x for x in cand.get("evidence_ids",[])] or ["- No evidence cited."]
         report += ["","## Limitations",""]+["- "+x for x in cand["limitations"]]+["","","CSV audit tables: "+str(Path(a.db_dir))+"/","Input SHA-256: "+input_hash,""]
         (out/"report.md").write_text("\n".join(report),encoding="utf-8")
         event("report","complete","success",{"outcome":cand["outcome"],"out_dir":str(out)})
