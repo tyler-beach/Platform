@@ -30,7 +30,10 @@ def basename(q):
     return re.split(r"[:(]",s,1)[0].strip()
 def semantic(language,source,out):
     out.parent.mkdir(parents=True,exist_ok=True)
-    if language=="go": run_cmd(["go","run",".","--root",str(source),"--out",str(out)],Path(".poc/analyzers/go").resolve())
+    if language=="go":
+        go_mod=Path(".poc/analyzers/go").resolve()
+        if not (go_mod/"go.sum").is_file(): run_cmd(["go","mod","tidy"],go_mod)
+        run_cmd(["go","run",".","--root",str(source),"--out",str(out)],go_mod)
     elif language in {"typescript","javascript"}: run_cmd(["node",str(Path(".poc/analyzers/typescript/callgraph.cjs").resolve()),"--root",str(source),"--out",str(out),"--language",language])
     elif language=="python": run_cmd([sys.executable,str(Path(".poc/analyzers/python_callgraph.py").resolve()),"--root",str(source),"--out",str(out)])
     elif language=="java":
@@ -96,7 +99,7 @@ def main():
     run_id=re.sub(r"[^A-Za-z0-9_.-]","-",a.run_id)[:100];started=now()
     out=Path(a.out_dir).resolve()/run_id;out.mkdir(parents=True,exist_ok=True)
     store=CsvStore(a.db_dir);events=[]
-    provider_model=os.getenv("ANTHROPIC_MODEL","claude-sonnet-4-5") if a.provider=="anthropic" else "deterministic-rules-v1"
+    provider_model=os.getenv("ANTHROPIC_MODEL","claude-sonnet-5") if a.provider=="anthropic" else "deterministic-rules-v1"
     def event(stage,kind,status,details=None):
         events.append(stage+":"+kind+":"+status)
         store.append("run_events",{"event_id":run_id+":event-%04d"%len(events),"run_id":run_id,"timestamp":now(),"stage":stage,"event_type":kind,"status":status,"details_json":details or {}})
@@ -167,7 +170,17 @@ def main():
         event("evidence","complete","success",{"evidence":len(evidence),"requirements":len(requirements)})
         entry=", ".join(f.get("qualified_name","") for f in graph.get("functions",[]) if f.get("symbol_id") in graph.get("entry_symbol_ids",[])) or a.root_function
         context={"comparison":a.comparison,"root_symbol":entry,"requirements":requirements,"graph_evidence":{"functions":graph.get("reachable_functions",[]),"edges":graph.get("reachable_edges",[]),"diagnostics":graph.get("diagnostics",[]),"syntax_diagnostics":[{"path":f.get("path"),"errors":f.get("errors")} for f in syntax["files"] if f.get("has_syntax_errors")]},"graph":graph,"evidence":[{"evidence_id":e["evidence_id"],"claim":e["claim"],"excerpt":e["excerpt"],"path":e["path"],"start_line":e["start_line"],"edge_id":e["edge_id"]} for e in evidence],"diff_excerpt":diff_text[:12000]}
-        prompt=model.render_prompt(context);est=(len(prompt)+3)//4;reservation=run_id+":budget"
+        prompt=model.render_prompt(context);reservation=run_id+":budget"
+        event("budget","token_count_start","running",{"provider":a.provider})
+        try:
+            token_preflight=model.count_input_tokens(a.provider,context)
+            est=int(token_preflight["input_tokens"])
+        except Exception as ex:
+            store.append("llm_transactions",{"transaction_id":run_id+":preflight","run_id":run_id,"provider":a.provider,"model":provider_model,"request_id":"","status":"token_count_failed","prompt_sha256":sha(prompt.encode()),"input_chars":len(prompt),"error":str(ex)[:2000],"created_at":now()})
+            event("budget","token_count_complete","failed",{"error":str(ex)[:1000]})
+            raise
+        store.append("llm_transactions",{"transaction_id":run_id+":preflight","run_id":run_id,"provider":a.provider,"model":token_preflight.get("model",provider_model),"request_id":token_preflight.get("request_id",""),"status":"token_counted","prompt_sha256":token_preflight.get("prompt_sha256",sha(prompt.encode())),"input_chars":token_preflight.get("input_chars",len(prompt)),"estimated_input_tokens":est,"actual_input_tokens":est if a.provider=="anthropic" else "","duration_ms":token_preflight.get("duration_ms"),"error":"","created_at":token_preflight.get("created_at",now())})
+        event("budget","token_count_complete","success",{"input_tokens":est,"method":token_preflight.get("method")})
         allowed=est<=a.max_input_tokens
         store.append("budget_reservations",{"reservation_id":reservation,"run_id":run_id,"provider":a.provider,"model":provider_model,"max_input_tokens":a.max_input_tokens,"max_output_tokens":a.max_output_tokens,"estimated_input_tokens":est,"reserved_at":now(),"status":"approved" if allowed else "denied"})
         event("budget","decision","approved" if allowed else "denied",{"estimated_input_tokens":est,"max_input_tokens":a.max_input_tokens,"max_output_tokens":a.max_output_tokens})
