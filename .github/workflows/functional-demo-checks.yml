@@ -1,0 +1,65 @@
+name: Functional Demo Harness Checks
+
+on:
+  pull_request:
+    paths:
+      - ".github/demo/**"
+      - ".github/workflows/functional-analysis-demo.yml"
+      - ".github/workflows/functional-demo-checks.yml"
+      - "docs/functional-analysis-demo.md"
+
+permissions:
+  contents: read
+
+jobs:
+  exercise-demo-matrix:
+    name: "Tree-sitter languages × comparison paths × outcomes"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Tree-sitter language pack
+        run: python -m pip install -r .github/demo/requirements.txt
+      - name: Check Python syntax
+        run: python -m py_compile .github/demo/pipeline.py .github/demo/ast_scan.py
+      - name: Exercise five languages, three comparisons, and three outcomes
+        shell: bash
+        run: |
+          set -euo pipefail
+          count=0
+          for language in go python javascript typescript java; do
+            for comparison in code-diff technical-spec spec-vs-implementation; do
+              for sample_case in deviation aligned insufficient-evidence; do
+                echo "::group::${language} / ${comparison} / ${sample_case}"
+                rm -rf run-data
+                python .github/demo/pipeline.py prepare \
+                  --comparison "$comparison" \
+                  --sample-case "$sample_case" \
+                  --language "$language" \
+                  --run-id "pull-request-smoke-test" \
+                  --output run-data
+
+                if [[ "$comparison" != "technical-spec" ]]; then
+                  SOURCE_PATH="$(python -c 'import json; m=json.load(open("run-data/input-manifest.json")); print(next(a["path"] for a in m["artifacts"] if a["role"] == "implementation"))')"
+                  python .github/demo/ast_scan.py \
+                    --language "$language" \
+                    --source "run-data/$SOURCE_PATH" \
+                    --out run-data/ast-analysis.json
+                fi
+
+                python .github/demo/pipeline.py analyze --output run-data
+                python .github/demo/pipeline.py evidence --output run-data
+                python .github/demo/pipeline.py budget --output run-data
+                python .github/demo/pipeline.py mock-model --output run-data
+                python .github/demo/pipeline.py validate --output run-data
+                python .github/demo/pipeline.py report --output run-data
+                count=$((count + 1))
+                echo "::endgroup::"
+              done
+            done
+          done
+          echo "All $count Tree-sitter language/comparison/outcome combinations passed."

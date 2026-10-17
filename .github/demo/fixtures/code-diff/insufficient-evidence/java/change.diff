@@ -1,0 +1,7 @@
+diff --git a/Handler.java b/Handler.java
+index 1111111..4444444 100644
+--- a/Handler.java
++++ b/Handler.java
+@@ -1,2 +1,3 @@
+ class Handler {
++return this.assessments.run(ctx, request);

@@ -18,6 +18,7 @@ The documentation source is in the docs folder and is built with MkDocs Material
 - [Engineering playbook](https://tyler-beach.github.io/Platform/ENGINEERING_PLAYBOOK/)
 - [Adversarial design review](https://tyler-beach.github.io/Platform/ADVERSARIAL_DESIGN_REVIEW/)
 - [Architecture diagrams](https://tyler-beach.github.io/Platform/architecture/)
+- [Functional analysis demo (GitHub Actions)](https://github.com/tyler-beach/Platform/actions/workflows/functional-analysis-demo.yml)
 
 The Pages URL is expected but will not be live until GitHub Actions deploys the site and repository Pages settings allow workflow-based deployment. The REST/OpenAPI document is a proposed façade, not a claim of a deployed HTTP server.
 
