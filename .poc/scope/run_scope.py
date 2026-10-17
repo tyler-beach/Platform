@@ -19,7 +19,10 @@ def event_text(event: dict[str, Any]) -> str:
     observations = event.get("source_observations", [])
     parts = [
         str(event.get("change_summary", "")),
+        str(event.get("diff_summary", "")),
         " ".join(event.get("evidence_terms", [])),
+        "\n".join(str(x) for x in event.get("normative_requirements", [])),
+        "\n".join(str(x) for x in event.get("call_edges", [])),
         "\n".join(str(o.get("excerpt", "")) + " " + str(o.get("claim", "")) for o in observations),
     ]
     return "\n".join(part for part in parts if part)
@@ -61,9 +64,12 @@ def assess_candidates(event: dict[str, Any], retrieval_result: dict[str, Any]) -
 
         observations = event.get("source_observations", [])
         evidence_refs = [{
-            "evidence_id": f"{event.get('case_id', 'event')}:SRC:{i + 1}",
+            "evidence_id": obs.get("evidence_id") or f"{event.get('case_id', 'event')}:SRC:{i + 1}",
+            "artifact_id": obs.get("artifact_id"),
+            "edge_id": obs.get("edge_id"),
+            "evidence_type": obs.get("evidence_type", "source_observation"),
             "path": obs.get("path"),
-            "line": obs.get("line"),
+            "line": obs.get("line", obs.get("start_line")),
             "excerpt": obs.get("excerpt"),
             "claim": obs.get("claim"),
             "excerpt_sha256": sha(str(obs.get("excerpt", ""))),
@@ -213,6 +219,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--catalog", type=Path, default=DEFAULT_CATALOG)
     parser.add_argument("--scenarios", type=Path, default=DEFAULT_SCENARIOS)
+    parser.add_argument("--event-json", type=Path, default=None,
+                        help="run one supplied change/evidence event instead of the labeled scenarios")
     parser.add_argument("--output-dir", type=Path, default=ROOT / ".poc" / "scope" / "output")
     parser.add_argument("--backend", choices=("local", "aurora"), default="local",
                         help="local is offline lexical search; aurora uses Bedrock embeddings and Aurora pgvector")
@@ -224,7 +232,19 @@ def main() -> None:
         args.in_scope_threshold = 0.55 if args.backend == "aurora" else 0.28
     if args.review_threshold is None:
         args.review_threshold = 0.43 if args.backend == "aurora" else 0.14
-    catalog, scenarios = load_jsonl(args.catalog), load_jsonl(args.scenarios)
+    catalog = load_jsonl(args.catalog)
+    if args.event_json:
+        event_path = args.event_json if args.event_json.is_absolute() else ROOT / args.event_json
+        event = json.loads(event_path.read_text(encoding="utf-8"))
+        required_fields = ("repository", "service", "domain", "language", "change_summary")
+        missing = [field for field in required_fields if not event.get(field)]
+        if missing:
+            parser.error("event JSON is missing required field(s): " + ", ".join(missing))
+        if not event.get("source_observations") and not event.get("call_edges") and not event.get("diff_summary"):
+            parser.error("event JSON must include source_observations, call_edges, or diff_summary evidence")
+        scenarios = [event]
+    else:
+        scenarios = load_jsonl(args.scenarios)
     out_dir = args.output_dir if args.output_dir.is_absolute() else ROOT / args.output_dir
     out_dir.mkdir(parents=True, exist_ok=True)
     results = []
