@@ -12,7 +12,6 @@ def main():
     root=Path(a.root).resolve();files=[];errors=[]
     for path in sorted(x for x in root.rglob("*") if x.is_file() and x.suffix.lower() in EXTENSIONS and not any(part in EXCLUDE for part in x.parts)):
         lang=EXTENSIONS[path.suffix.lower()]
-        if lang=="tsx": lang="typescript"
         try:
             data=path.read_bytes();parser=get_parser(lang);tree=parser.parse(data);root_node=tree.root_node
             stack=[root_node];error_nodes=[];nodes=0;calls=0;funcs=0
