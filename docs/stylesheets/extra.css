@@ -814,6 +814,7 @@
 }
 
 .diagram-viewport {
+  position: relative;
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
@@ -834,6 +835,118 @@
   border-radius: 5px !important;
   background: transparent !important;
   box-shadow: none !important;
+  cursor: zoom-in;
+}
+
+.diagram-expand {
+  position: absolute;
+  top: 0.8rem;
+  right: 0.8rem;
+  z-index: 1;
+  padding: 0.48rem 0.72rem;
+  border: 1px solid rgba(20, 35, 54, 0.24);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #17263b;
+  font: inherit;
+  font-size: 0.74rem;
+  font-weight: 750;
+  cursor: zoom-in;
+  box-shadow: 0 2px 8px rgba(12, 25, 43, 0.16);
+}
+
+.diagram-expand:hover,
+.diagram-expand:focus-visible {
+  outline: 3px solid var(--md-accent-fg-color);
+  outline-offset: 2px;
+}
+
+.diagram-dialog {
+  box-sizing: border-box;
+  width: min(98vw, 120rem);
+  max-width: 98vw;
+  height: 96vh;
+  height: min(96vh, 96dvh);
+  max-height: 96vh;
+  max-height: 96dvh;
+  padding: clamp(0.7rem, 2vw, 1.5rem);
+  border: 1px solid var(--platform-line);
+  border-radius: 12px;
+  background: var(--md-default-bg-color);
+  color: var(--md-default-fg-color);
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  gap: 0.5rem;
+}
+
+.diagram-dialog[open] {
+  display: grid;
+}
+
+.diagram-dialog::backdrop {
+  background: rgba(7, 15, 27, 0.82);
+  backdrop-filter: blur(2px);
+}
+
+.diagram-dialog__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.diagram-dialog__header h2 {
+  margin: 0;
+  font-size: clamp(1rem, 2vw, 1.35rem);
+}
+
+.diagram-dialog__close {
+  flex: 0 0 auto;
+  padding: 0.48rem 0.72rem;
+  border: 1px solid var(--platform-line);
+  border-radius: 7px;
+  background: var(--platform-panel);
+  color: var(--md-default-fg-color);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.diagram-dialog__close:focus-visible {
+  outline: 3px solid var(--md-accent-fg-color);
+  outline-offset: 2px;
+}
+
+.diagram-dialog__image-frame {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  place-items: center;
+  overflow: auto;
+  border: 1px solid var(--platform-line);
+  border-radius: 8px;
+  background: #f4f7fb;
+}
+
+.diagram-dialog__image {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.diagram-dialog__caption,
+.diagram-dialog__hint {
+  margin: 0;
+  color: var(--md-default-fg-color--light);
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+.diagram-dialog__hint {
+  text-align: right;
 }
 
 .diagram-figure figcaption {

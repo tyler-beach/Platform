@@ -10,6 +10,8 @@ hide:
 
 The platform compares implementation and technical specifications with architectural decisions. Its design separates request admission, durable orchestration, deterministic evidence collection, model assessment, validation and review.
 
+Select **Expand** on any diagram to view its original vector at near-full-screen size. Press Escape or select **Close** to return to the page.
+
 ## AWS deployment architecture
 
 <figure class="diagram-figure">

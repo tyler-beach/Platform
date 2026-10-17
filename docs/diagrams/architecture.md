@@ -8,7 +8,7 @@ hide:
 
 <span class="page-eyebrow">SYSTEM MODELS</span>
 
-These diagrams use the AWS Architecture Icons and scale to the available page width. Use the architecture page for the design rationale and component ownership.
+These diagrams use the AWS Architecture Icons and scale to the available page width. Select **Expand** on a diagram to inspect its original vector in a near-full-screen viewer; press Escape or select **Close** to return. Use the architecture page for design rationale and component ownership.
 
 ## 01 · AWS deployment architecture
 

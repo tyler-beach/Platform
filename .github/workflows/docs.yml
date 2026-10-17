@@ -87,7 +87,7 @@ jobs:
       - name: Run deterministic PoC behavior tests
         run: python -m unittest discover -s .poc/tests -v
       - name: Run demo explorer browser-core tests
-        run: node --test docs/javascripts/demo-explorer.test.cjs
+        run: node --test docs/javascripts/demo-explorer.test.cjs docs/javascripts/diagram-viewer.test.cjs
       - name: Build documentation site
         run: mkdocs build --strict
       - name: Set static workflow links to this repository
