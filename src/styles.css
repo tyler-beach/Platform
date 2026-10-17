@@ -648,3 +648,15 @@ button { color: inherit; }
   .technical-trace__panel { padding: 13px; }
   .technical-trace pre { max-height: 340px; font-size: 10px; }
 }
+
+
+.technical-trace__panel--wide { grid-column: 1 / -1; }
+.technical-trace__tables { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 16px 0; }
+.technical-trace__tables > div { padding: 13px; border: 1px solid #dce4ed; border-radius: 7px; background: #fff; }
+.technical-trace__tables strong { color: #14253a; font-size: 11px; }
+.technical-trace__tables p { margin: 9px 0 0; color: #52637a; font-size: 11px; line-height: 1.55; overflow-wrap: anywhere; }
+.technical-trace__tables code { color: #0f514d; font: 10px var(--mono); }
+@media (max-width: 760px) {
+  .technical-trace__panel--wide { grid-column: auto; }
+  .technical-trace__tables { grid-template-columns: minmax(0, 1fr); }
+}
