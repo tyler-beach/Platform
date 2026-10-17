@@ -39,6 +39,8 @@ jobs:
           python -m pip install --disable-pip-version-check -r .poc/requirements.txt
           npm install --prefix .poc/analyzers/typescript --ignore-scripts --no-audit --no-fund
           (cd .poc/analyzers/go && go mod tidy)
+      - name: Test confidence scoring rules
+        run: python -m unittest discover -s .poc/tests -v
       - name: Run real analyzer and mock assessment
         env:
           LANGUAGE: ${{ matrix.language }}
