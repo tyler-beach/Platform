@@ -38,3 +38,11 @@ The runner executes the current assessment adapter, applies the versioned eviden
 The default `mock` provider is offline and deterministic. It is useful for regression testing the harness and can expose limitations in the rules, but it is not evidence of live model quality. To evaluate live model behavior, run `--provider anthropic` only when the API key, expected cost, and test-data handling are explicitly approved.
 
 **Dataset status:** the cases are initial, hand-authored expected dispositions, not independently adjudicated ground truth. Architecture reviewers should review the expected labels and evidence spans, add realistic repositories and real-world false-positive/false-negative examples, and version those changes before tuning operational thresholds. The evidence-strength score remains an explainable support rating—not a calibrated probability—and no unattended merge blocking is enabled.
+
+## Natural-language ADR corpus
+
+The repository also contains 50 synthetic natural-language ADRs under `.poc/evaluation/adr-corpus/adrs/`, with a separate manifest and pinned configuration/unsupported-source fixtures. Run the offline audit with:
+
+    python .poc/evaluation/evaluate_adr_corpus.py --output-dir /tmp/adr-corpus-audit
+
+This audit checks ADR and fixture hashes, exact requirement passages, source locators, generic configuration extraction, and unsupported-source coverage. It records expected dispositions as unadjudicated labels. It does not invoke a model, measure semantic accuracy, or calibrate the evidence-strength score; those labels need architecture review before they can support quality thresholds.

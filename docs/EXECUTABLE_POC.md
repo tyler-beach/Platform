@@ -2,6 +2,8 @@
 
 This is the executable proof of concept for the ADR Deviation Platform. Launch Actions → ADR Deviation PoC Analysis → Run workflow. The default is the Go fixture and deterministic mock provider, so it requires no model key and makes no model API call.
 
+The [interactive PoC demo](demo/index.md) shows a generated fixture run through each stage, displays source-version evidence and confidence components, and browses GitHub Actions job status. Detailed CSV-backed run records are included only when a private-repository build verifies private Pages access and the explicit `PAGES_REAL_RUN_DATA_ENABLED=true` repository variable. Pull-request builds never receive the ledger token.
+
 ## What runs for real
 
 1. **Admit and pin inputs.** The run captures source/spec/ADR/diff inputs, file sizes, SHA-256 hashes, and a run ID.
@@ -11,6 +13,8 @@ This is the executable proof of concept for the ADR Deviation Platform. Launch A
 5. **Create evidence.** Normative requirements, reachable call edges, and diff lines become evidence objects with IDs, paths, line numbers, artifact hashes, and excerpts.
 6. **Budget and assess.** The workflow performs a token-budget gate. Mock mode uses a deterministic assessment adapter. Anthropic mode uses the Messages API, a required structured tool schema, a configurable model name, and the prompt in .poc/prompts/assess.md.
 7. **Validate and persist.** The application checks the outcome schema and verifies every cited evidence ID belongs to this run. It writes a Markdown report, JSON bundles and linked CSV rows.
+
+The same manual GitHub Actions workflow also supports a configuration-only run: select `none` for language and supply a YAML/JSON `config_source`. The `source_path` can be the same directory. No language resolver is invoked in that mode. Code files still require a selected language.
 
 ## Run against a repository path
 
@@ -30,13 +34,13 @@ The score is a weighted calculation with a versioned algorithm:
 | Dimension | Weight | What it checks |
 |---|---:|---|
 | Requirement clarity | 20% | Whether a cited normative requirement states a specific, operational constraint |
-| Call-path resolution | 25% | The least-certain edge on the cited entry-to-call paths; unresolved and approximate dispatch are not treated as proven direct calls |
+| Observation resolution | 25% | Call paths are bounded by their least-certain edge; direct configuration facts use the collector resolution status |
 | Requirement-observation linkage | 20% | Whether a validated explicit link names the requirement and observed source behavior and labels the relationship |
 | Evidence coverage | 15% | Whether citations cover the requirement and observed behavior |
 | Provenance integrity | 10% | Whether every citation resolves to a pinned input artifact and its excerpt hash matches |
 | Analysis completeness | 10% | Whether the entry resolves, parsing/semantic diagnostics exist, and reachable dynamic edges remain |
 
-The calculation stores the raw score for each dimension, its weight and contribution, the explanation, supporting evidence IDs, and any cap/guardrail. A score is capped at 49/100 when no normative requirement or resolved cited call path exists, and at 39/100 when citation/provenance validation fails. A `supported_deviation` is downgraded if it lacks a cited normative requirement, a cited call edge, or a validated `contradicts` link connecting them; it is also downgraded if the entry/path is insufficiently resolved or evidence integrity fails.
+The calculation stores the raw score for each dimension, its weight and contribution, the explanation, supporting evidence IDs, and any cap/guardrail. A score is capped at 49/100 when no normative requirement or resolved cited source observation exists, and at 39/100 when citation/provenance validation fails. A `supported_deviation` is downgraded if it lacks a cited normative requirement, a cited source observation, or a validated `contradicts` link connecting them; it is also downgraded if relevant collection coverage is incomplete, an observation is unresolved, or evidence integrity fails.
 
 The evidence package is intended to answer **what, why, and how**: which requirement line conflicts, which changed/source line and edge support the observation, how the analyzer resolved that edge, which transitive path reaches it, which exact input artifact hash was analyzed, and which uncertainty reduced the score. Open `confidence.json` and `callgraph.json` beside `evidence.json` for the full machine-readable trail. CSV tables `confidence_assessments.csv` and `confidence_components.csv` preserve the score and its component arithmetic. `assessment_evidence_links.csv` records each requirement-to-observation link, including the relationship and explanation.
 
@@ -63,12 +67,16 @@ The source tables live in .poc-db/. CSV files are one table each; CSV itself can
 | artifacts.csv | Input paths, size, and SHA-256 source versions |
 | symbols.csv | Function/method index, signatures and resolver status |
 | call_edges.csv | Direct call sites, target IDs, resolution basis, dispatch kind and reachability |
-| evidence.csv | Normative requirement, edge and diff evidence with source spans |
+| evidence.csv | Normative requirement, code-edge, configuration and diff evidence with source spans |
+| observations.csv | Versioned language-neutral observations joined to run, artifact, locator and evidence IDs |
+| collection_reports.csv | Per-source completeness, unsupported/failed files, counts and sanitized diagnostics |
 | budget_reservations.csv | Input/output budget, estimate, decision and measured usage |
 | llm_transactions.csv | Provider, model, prompt hash, request ID, status, usage, duration and error |
 | findings.csv | Validated assessment candidate and evidence references |
 
 The GitHub workflow serializes writes and persists the tables on a separate poc-database branch, then uploads the current CSV snapshot and run bundle as an Actions artifact. This keeps generated audit rows out of the architecture/source branch. The branch is a reviewable PoC ledger, not a transactional multi-writer database. contents: write must be allowed for the workflow's GITHUB_TOKEN.
+
+The additive observation and coverage tables do not change older CSV headers. Each source-collection stage writes start/completion events; partial collection is recorded as partial and prevents a supported-deviation outcome.
 
 ## Enable Anthropic
 

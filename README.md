@@ -26,7 +26,7 @@ The Pages URL is expected but will not be live until GitHub Actions deploys the 
 ## Start here in the repository
 
 - [Project brief](docs/PROJECT_BRIEF.md)
-- [Architecture overview](docs/ARCHITECTURE.md)
+- [Architecture overview](docs/architecture-overview.md)
 - [gRPC and Protobuf design](docs/RPC_AND_PROTOBUF.md)
 - [AI pipeline and harness](docs/AI_PIPELINE.md)
 - [Adversarial design review](docs/ADVERSARIAL_DESIGN_REVIEW.md)

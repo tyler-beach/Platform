@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """Executable, audited ADR-deviation PoC. Only the model decision is mocked."""
 from __future__ import annotations
-import argparse, hashlib, json, os, re, subprocess, sys
+import argparse, hashlib, json, os, re, subprocess, sys, tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
-from store import CsvStore
+from store import CsvStore, SCHEMAS
 import model
 import confidence
+import observations as observation_contract
 
 SUFFIXES={".go",".py",".pyi",".js",".jsx",".mjs",".cjs",".ts",".tsx",".java"}
 SKIP={".git","node_modules","vendor","target","build",".venv","venv","__pycache__"}
@@ -18,9 +19,10 @@ def write_json(p: Path,v: Any):
     p.parent.mkdir(parents=True,exist_ok=True);p.write_text(json.dumps(v,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
 def run_cmd(cmd,cwd=None):
     r=subprocess.run(cmd,cwd=str(cwd) if cwd else None,text=True,capture_output=True)
-    if r.stdout: print(r.stdout,end="")
-    if r.stderr: print(r.stderr[-4000:],file=sys.stderr)
-    if r.returncode: raise RuntimeError("Command failed: "+ " ".join(cmd)+"\n"+r.stderr[-6000:])
+    # Analyzer output can include source excerpts or compiler-echoed literals.
+    # Preserve only bounded, non-content diagnostics in the main run log.
+    if r.returncode:
+        raise RuntimeError(f"Analyzer command failed ({Path(cmd[0]).name}, exit {r.returncode}; stderr bytes={len(r.stderr.encode('utf-8', errors='replace'))})")
 def under(p: Path,base: Path):
     try:p.resolve().relative_to(base.resolve());return True
     except ValueError:return False
@@ -84,8 +86,9 @@ def bind_graph(g,root_name,run_id):
 
 def main():
     p=argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--language",required=True,choices=["go","python","javascript","typescript","java"])
+    p.add_argument("--language",choices=["go","python","javascript","typescript","java"])
     p.add_argument("--source",required=True);p.add_argument("--root-function",default="Submit")
+    p.add_argument("--config-source",default="",help="Optional root of YAML/JSON infrastructure or application configuration")
     p.add_argument("--comparison",required=True,choices=["code-diff","technical-spec","spec-vs-implementation"])
     p.add_argument("--provider",choices=["mock","anthropic"],default=os.getenv("MODEL_PROVIDER","mock"))
     p.add_argument("--run-id",default="local-"+datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ"))
@@ -95,6 +98,8 @@ def main():
     p.add_argument("--repository",default=os.getenv("GITHUB_REPOSITORY","local"));p.add_argument("--workflow-url",default=os.getenv("GITHUB_WORKFLOW_URL",""))
     a=p.parse_args();workspace=Path.cwd().resolve();source=Path(a.source).resolve()
     if not source.is_dir() or not under(source,workspace): raise SystemExit("--source must be an existing directory within the checked-out workspace")
+    config_source=Path(a.config_source).resolve() if a.config_source else None
+    if config_source and (not config_source.is_dir() or not under(config_source,workspace)): raise SystemExit("--config-source must be an existing directory within the checked-out workspace")
     spec=Path(a.spec_path).resolve() if a.spec_path else None;adr=Path(a.adr_path).resolve()
     if not under(adr,workspace) or not adr.is_file(): raise SystemExit("--adr-path must be an existing file in the workspace")
     if a.comparison in {"technical-spec","spec-vs-implementation"} and (not spec or not under(spec,workspace) or not spec.is_file()): raise SystemExit("--spec-path must identify an existing workspace file")
@@ -108,10 +113,12 @@ def main():
         events.append(stage+":"+kind+":"+status)
         store.append("run_events",{"event_id":run_id+":event-%04d"%len(events),"run_id":run_id,"timestamp":now(),"stage":stage,"event_type":kind,"status":status,"details_json":details or {}})
     try:
-        event("admission","start","running",{"source":str(source.relative_to(workspace)),"comparison":a.comparison,"language":a.language})
+        event("admission","start","running",{"source":str(source.relative_to(workspace)),"comparison":a.comparison,"language":a.language or "not selected"})
         code=files_under(source)
-        if not code and a.comparison!="technical-spec": raise RuntimeError("no supported code files under source root")
-        input_paths=(code if a.comparison!="technical-spec" else [])+[adr]
+        config_files,unsupported_config_files=observation_contract.discover_configuration_files(config_source) if config_source else ([],[])
+        if not code and a.comparison!="technical-spec" and not config_files: raise RuntimeError("no supported code or configuration files under source root")
+        if code and not a.language and a.comparison!="technical-spec": raise RuntimeError("--language is required when source code is present")
+        input_paths=(code if a.comparison!="technical-spec" else [])+config_files+[adr]
         if a.comparison in {"technical-spec","spec-vs-implementation"}: input_paths.append(spec)
         if diff and a.comparison in {"code-diff","spec-vs-implementation"}: input_paths.append(diff)
         unique=[];seen=set()
@@ -120,27 +127,61 @@ def main():
         digest=hashlib.sha256();artifact_map={};artifact_rows=[]
         for i,path in enumerate(unique,1):
             data=path.read_bytes();display=path.relative_to(workspace).as_posix()
-            role="implementation" if path in code else "adr" if path==adr else "technical_spec" if path==spec else "diff"
+            role="implementation" if path in code else "configuration" if path in config_files else "adr" if path==adr else "technical_spec" if path==spec else "diff"
             aid=f"{run_id}:artifact-{i:04d}";artifact_map[display]=aid
-            artifact_rows.append({"artifact_id":aid,"run_id":run_id,"role":role,"path":display,"sha256":sha(data),"byte_length":len(data),"version":"sha256:"+sha(data)})
+            artifact_row={"artifact_id":aid,"run_id":run_id,"role":role,"path":display,"sha256":sha(data),"byte_length":len(data),"version":"sha256:"+sha(data)}
+            artifact_rows.append(artifact_row)
             digest.update(display.encode());digest.update(b"\0");digest.update(data);digest.update(b"\0")
         input_hash=digest.hexdigest()
         for row in artifact_rows:store.append("artifacts",row)
         event("admission","complete","success",{"artifacts":len(artifact_rows),"input_hash":input_hash})
-        syntax_path=out/"tree-sitter.json";event("syntax","start","running")
-        run_cmd([sys.executable,str(Path(".poc/syntax_index.py").resolve()),"--root",str(source),"--out",str(syntax_path)])
-        syntax=json.loads(syntax_path.read_text(encoding="utf-8"))
-        event("syntax","complete","success",{"files":len(syntax["files"]),"errors":sum(len(f["errors"]) for f in syntax["files"])})
-        if a.comparison=="technical-spec": graph={"language":a.language,"resolver":"document-only","functions":[],"edges":[],"diagnostics":[]}
+        syntax_path=out/"tree-sitter.json"
+        if code and a.comparison!="technical-spec":
+            event("syntax","start","running")
+            run_cmd([sys.executable,str(Path(".poc/syntax_index.py").resolve()),"--root",str(source),"--out",str(syntax_path)])
+            syntax=json.loads(syntax_path.read_text(encoding="utf-8"))
+            event("syntax","complete","success",{"files":len(syntax["files"]),"errors":sum(len(f["errors"]) for f in syntax["files"])})
+        else:
+            syntax={"files":[]}
+            write_json(syntax_path,syntax)
+        if a.comparison=="technical-spec" or not code: graph={"language":a.language or "none","resolver":"document-only","functions":[],"edges":[],"diagnostics":[]}
         else:
             event("semantic_analysis","start","running",{"resolver":a.language})
-            graph=bind_graph(semantic(a.language,source,out/"callgraph.json"),a.root_function,run_id)
+            with tempfile.TemporaryDirectory(prefix="adr-platform-analyzer-") as temp_dir:
+                graph=bind_graph(semantic(a.language,source,Path(temp_dir)/"callgraph.json"),a.root_function,run_id)
+            graph, graph_redacted = observation_contract.redact_source_values(graph)
+            if graph_redacted:
+                event("semantic_analysis","source_redaction","applied")
             write_json(out/"callgraph.json",graph)
             event("semantic_analysis","complete","success",{"resolver":graph.get("resolver"),"functions":len(graph.get("functions",[])),"edges":len(graph.get("edges",[])),"reachable_functions":len(graph.get("reachable_functions",[])),"root_resolved":graph.get("entry_resolution")=="resolved"})
         for f in graph.get("functions",[]):
             store.append("symbols",{"symbol_id":f.get("symbol_id"),"run_id":run_id,"language":a.language,"qualified_name":f.get("qualified_name"),"symbol_kind":f.get("symbol_kind"),"signature":f.get("signature"),"declared_type":f.get("declared_type"),"path":f.get("path"),"start_line":f.get("start_line"),"end_line":f.get("end_line"),"resolver":f.get("resolver",graph.get("resolver")),"resolution_status":f.get("resolution_status","resolved")})
         for e in graph.get("edges",[]):
             store.append("call_edges",{"edge_id":e.get("edge_id"),"run_id":run_id,"caller_symbol_id":e.get("caller_symbol_id"),"callee_symbol_id":e.get("callee_symbol_id"),"call_expression":e.get("call_expression"),"path":e.get("path"),"line":e.get("line"),"resolution_status":e.get("resolution_status"),"resolution_basis":e.get("resolution_basis"),"dispatch_kind":e.get("dispatch_kind"),"is_transitive":e.get("is_transitive",False)})
+        collection_reports=[];all_observations=[];observation_evidence_ids={}
+        event("source_collection","start","running",{"code_files":len(code),"configuration_root":str(config_source.relative_to(workspace)) if config_source else ""})
+        if code and a.comparison!="technical-spec":
+            # Call-graph paths are relative to --source; provenance paths remain workspace-relative.
+            code_map={}
+            for row in artifact_rows:
+                artifact_path=Path(row["path"])
+                try: code_map[artifact_path.relative_to(source.relative_to(workspace)).as_posix()]=row
+                except ValueError: pass
+            normalized=observation_contract.from_callgraph(graph,code_map,run_id=run_id)
+            all_observations.extend(normalized["observations"]);collection_reports.append(normalized["coverage"])
+        if config_source:
+            config_map={}
+            for row in artifact_rows:
+                artifact_path=Path(row["path"])
+                try: config_map[artifact_path.relative_to(config_source.relative_to(workspace)).as_posix()]=row
+                except ValueError: pass
+            normalized_config=observation_contract.collect_configuration(config_source,config_map)
+            all_observations.extend(normalized_config["observations"]);collection_reports.append(normalized_config["coverage"])
+            if unsupported_config_files:
+                report=normalized_config["coverage"];report["unsupported_files"]=sorted(set(report["unsupported_files"]+[x.relative_to(config_source).as_posix() for x in unsupported_config_files]));report["complete"]=False
+        write_json(out/"observations.json",{"schema_version":observation_contract.SCHEMA_VERSION,"observations":all_observations,"coverage_reports":collection_reports})
+        collection_state="success" if all(report.get("complete") for report in collection_reports) else "partial"
+        event("source_collection","complete",collection_state,{"observations":len(all_observations),"sources":len(collection_reports),"incomplete_sources":sum(not report.get("complete") for report in collection_reports)})
         docs=[("adr",adr)]
         if a.comparison in {"technical-spec","spec-vs-implementation"}:docs.append(("technical_spec",spec))
         evidence=[];requirements=[];n=0;norm=re.compile(r"\b(must|must not|shall|shall not|required|prohibited|should not|never)\b",re.I)
@@ -148,33 +189,64 @@ def main():
             text=path.read_text(encoding="utf-8",errors="replace");display=path.relative_to(workspace).as_posix()
             for line_no,line in enumerate(text.splitlines(),1):
                 if norm.search(line):
-                    n+=1;ev={"evidence_id":f"{run_id}:evidence-{n:05d}","run_id":run_id,"evidence_type":"normative_requirement","artifact_id":artifact_map.get(display,""),"symbol_id":"","edge_id":"","claim":"Normative requirement extracted from "+role,"excerpt":line.strip(),"path":display,"start_line":line_no,"end_line":line_no,"sha256":sha(line.strip().encode("utf-8"))}
-                    evidence.append(ev);requirements.append({"evidence_id":ev["evidence_id"],"source":role,"line":line_no,"text":line.strip()})
+                    safe_line, _ = observation_contract.redact_source_text(line.strip())
+                    n+=1;ev={"evidence_id":f"{run_id}:evidence-{n:05d}","run_id":run_id,"evidence_type":"normative_requirement","artifact_id":artifact_map.get(display,""),"symbol_id":"","edge_id":"","claim":"Normative requirement extracted from "+role,"excerpt":safe_line,"path":display,"start_line":line_no,"end_line":line_no,"sha256":sha(safe_line.encode("utf-8"))}
+                    evidence.append(ev);requirements.append({"evidence_id":ev["evidence_id"],"source":role,"line":line_no,"text":safe_line})
         for e in graph.get("edges",[]):
             if not e.get("reachable_from_entry"):continue
             rel=e.get("path","");ln=int(e.get("line") or 0);src=(source/rel).resolve() if rel else None;excerpt=""
             if src and src.is_file():
                 lines=src.read_text(encoding="utf-8",errors="replace").splitlines()
                 if 1<=ln<=len(lines):excerpt=lines[ln-1].strip()
+            excerpt, _ = observation_contract.redact_source_text(excerpt)
             n+=1
             try:display=(source/rel).resolve().relative_to(workspace).as_posix()
             except ValueError:display=rel
             status=e.get("resolution_status","unresolved")
             ev={"evidence_id":f"{run_id}:evidence-{n:05d}","run_id":run_id,"evidence_type":"resolved_call_edge" if status.startswith("resolved") else "unresolved_call_edge","artifact_id":artifact_map.get(display,""),"symbol_id":e.get("caller_symbol_id",""),"edge_id":e.get("edge_id",""),"claim":f"Call edge {status} ({e.get('resolution_basis')}) from {e.get('caller_qualified_name')} to {e.get('callee_qualified_name')}","excerpt":excerpt or e.get("call_expression",""),"path":display,"start_line":ln,"end_line":ln,"sha256":sha(excerpt.encode()) if excerpt else ""}
             evidence.append(ev)
+        for item in all_observations:
+            if item["predicate"]=="code.call_edge":
+                matching=next((e for e in evidence if e.get("edge_id")==item["value"].get("edge_id")),None)
+                if matching:
+                    matching["observation_id"]=item["observation_id"];matching["resolution_status"]=item["resolution"]["status"]
+                    observation_evidence_ids[item["observation_id"]]=matching["evidence_id"]
+            else:
+                n+=1;ev=observation_contract.to_evidence(item,f"{run_id}:evidence-{n:05d}");ev["run_id"]=run_id;evidence.append(ev)
+                observation_evidence_ids[item["observation_id"]]=ev["evidence_id"]
         diff_text=""
         if diff and a.comparison in {"code-diff","spec-vs-implementation"}:
-            diff_text=diff.read_text(encoding="utf-8",errors="replace")
+            diff_text=observation_contract.redact_source_text(diff.read_text(encoding="utf-8",errors="replace"))[0]
             display=diff.relative_to(workspace).as_posix()
             for ln,line in enumerate(diff_text.splitlines(),1):
                 if line.startswith(("+","-")) and not line.startswith(("+++","---")):
                     n+=1;evidence.append({"evidence_id":f"{run_id}:evidence-{n:05d}","run_id":run_id,"evidence_type":"diff_line","artifact_id":artifact_map.get(display,""),"symbol_id":"","edge_id":"","claim":"Added or removed diff line","excerpt":line[:500],"path":display,"start_line":ln,"end_line":ln,"sha256":sha(line.encode())})
         write_json(out/"evidence.json",evidence)
-        for ev in evidence:store.append("evidence",ev)
+        evidence_columns=set(SCHEMAS["evidence"])
+        for ev in evidence:store.append("evidence",{key:value for key,value in ev.items() if key in evidence_columns})
+        for item in all_observations:
+            store.append("observations",{
+                "observation_id":item["observation_id"],"run_id":run_id,"schema_version":item["schema_version"],
+                "evidence_id":observation_evidence_ids.get(item["observation_id"],""),"predicate":item["predicate"],
+                "subject_json":item["subject"],"value_json":json.dumps(item.get("value"),ensure_ascii=False,sort_keys=True,separators=(",",":")),"source_ref_json":item["source_ref"],
+                "collector_json":item["collector"],"resolution_json":item["resolution"],
+                "evidence_class":item["evidence_class"],"redacted":bool(item.get("redacted",False)),
+            })
+        for index,report in enumerate(collection_reports,1):
+            store.append("collection_reports",{
+                "coverage_id":f"{run_id}:coverage-{index:03d}","run_id":run_id,"source_type":report.get("source_type"),
+                "collector":report.get("collector"),"collector_version":report.get("collector_version"),
+                "complete":bool(report.get("complete")),"scope_root":report.get("scope_root",str(source.relative_to(workspace))),
+                "inspected_count":report.get("inspected_count",0),"emitted_count":report.get("emitted_count",0),
+                "unresolved_count":report.get("unresolved_count",0),"approximate_count":report.get("approximate_count",0),
+                "redacted_value_count":report.get("redacted_value_count",0),
+                "unsupported_files_json":report.get("unsupported_files",[]),"failed_files_json":report.get("failed_files",[]),
+                "missing_source_refs_json":report.get("missing_source_refs",[]),"diagnostics_json":report.get("diagnostics",[]),
+            })
         event("evidence","complete","success",{"evidence":len(evidence),"requirements":len(requirements)})
         entry=", ".join(f.get("qualified_name","") for f in graph.get("functions",[]) if f.get("symbol_id") in graph.get("entry_symbol_ids",[])) or a.root_function
-        evidence_index=[{"evidence_id":e["evidence_id"],"evidence_type":e["evidence_type"],"claim":e["claim"],"excerpt":e["excerpt"],"path":e["path"],"start_line":e["start_line"],"edge_id":e["edge_id"],"artifact_id":e["artifact_id"],"sha256":e["sha256"]} for e in evidence]
-        context={"comparison":a.comparison,"root_symbol":entry,"requirements":requirements,"graph_evidence":{"functions":graph.get("reachable_functions",[]),"edges":graph.get("reachable_edges",[]),"diagnostics":graph.get("diagnostics",[]),"syntax_diagnostics":[{"path":f.get("path"),"errors":f.get("errors")} for f in syntax["files"] if f.get("has_syntax_errors")]},"graph":graph,"evidence":evidence_index,"evidence_items":evidence_index,"diff_excerpt":diff_text[:12000]}
+        evidence_index=[{"evidence_id":e["evidence_id"],"evidence_type":e["evidence_type"],"claim":e["claim"],"excerpt":e["excerpt"],"path":e["path"],"start_line":e.get("start_line"),"edge_id":e.get("edge_id"),"artifact_id":e["artifact_id"],"sha256":e["sha256"],"observation_id":e.get("observation_id"),"resolution_status":e.get("resolution_status")} for e in evidence]
+        context={"comparison":a.comparison,"root_symbol":entry,"requirements":requirements,"graph_evidence":{"functions":graph.get("reachable_functions",[]),"edges":graph.get("reachable_edges",[]),"diagnostics":graph.get("diagnostics",[]),"syntax_diagnostics":[{"path":f.get("path"),"errors":f.get("errors")} for f in syntax["files"] if f.get("has_syntax_errors")]},"graph":graph,"evidence":evidence_index,"evidence_items":evidence_index,"observations":all_observations,"collection_reports":collection_reports,"diff_excerpt":diff_text[:12000]}
         prompt=model.render_prompt(context);reservation=run_id+":budget"
         event("budget","token_count_start","running",{"provider":a.provider})
         try:
@@ -215,8 +287,10 @@ def main():
                 obs_ev=evidence_lookup.get(link.get("observation_evidence_id"))
                 if req_ev is None or req_ev.get("evidence_type")!="normative_requirement":
                     schema_errors.append("evidence link requirement_evidence_id must reference a normative requirement")
-                if obs_ev is None or obs_ev.get("evidence_type") not in {"resolved_call_edge","unresolved_call_edge","diff_line"}:
-                    schema_errors.append("evidence link observation_evidence_id must reference a call edge or diff line")
+                if obs_ev is None or obs_ev.get("evidence_type") not in {"resolved_call_edge","unresolved_call_edge","configuration_property","source_observation","diff_line"}:
+                    schema_errors.append("evidence link observation_evidence_id must reference observed source or diff evidence")
+                elif link.get("relationship")=="contradicts" and (obs_ev.get("resolution_status") in {"unresolved","unresolved_dynamic"} or obs_ev.get("evidence_type")=="unresolved_call_edge"):
+                    schema_errors.append("unresolved observations cannot support a contradiction link")
                 if link.get("relationship") not in {"contradicts","consistent_with","uncertain"}:
                     schema_errors.append("evidence link relationship is invalid")
                 if not isinstance(link.get("explanation"),str) or not link.get("explanation","").strip():
@@ -232,7 +306,7 @@ def main():
         if schema_errors:
             cand={"outcome":"inconclusive","summary":"Model candidate rejected by deterministic validation","rationale":"Candidate did not pass schema/evidence validation: "+"; ".join(schema_errors),"evidence_ids":[],"limitations":["The model candidate was not accepted by the application validator."],"confidence":0.0}
         score_outcome=model_proposed_outcome if not schema_errors and model_proposed_outcome in OUTCOMES else "inconclusive"
-        confidence_result=confidence.score_assessment(graph=graph,syntax=syntax,evidence=evidence,artifact_rows=artifact_rows,cited_ids=cand.get("evidence_ids",[]),evidence_links=cand.get("evidence_links",[]),proposed_outcome=score_outcome)
+        confidence_result=confidence.score_assessment(graph=graph,syntax=syntax,evidence=evidence,artifact_rows=artifact_rows,cited_ids=cand.get("evidence_ids",[]),evidence_links=cand.get("evidence_links",[]),proposed_outcome=score_outcome,coverage_reports=collection_reports)
         confidence_result["model_self_reported_confidence"]=model_self_confidence if isinstance(model_self_confidence,(int,float)) else None
         confidence_result["proposed_outcome"]=model_proposed_outcome
         if not schema_errors:
@@ -259,8 +333,10 @@ def main():
             link=invalid.get("link",{})
             store.append("assessment_evidence_links",{"link_id":assessment_id+":link-%03d"%link_num,"run_id":run_id,"finding_id":run_id+":finding","requirement_evidence_id":link.get("requirement_evidence_id"),"observation_evidence_id":link.get("observation_evidence_id"),"relationship":link.get("relationship"),"explanation":link.get("explanation"),"validation_status":"invalid: "+invalid.get("reason","validation failed"),"created_at":now()})
         store.append("findings",{"finding_id":run_id+":finding","run_id":run_id,"outcome":cand["outcome"],"confidence":confidence_result["score"],"summary":cand["summary"],"rationale":cand["rationale"],"evidence_ids_json":cand.get("evidence_ids",[]),"limitations_json":cand.get("limitations",[]),"validation_status":validation,"created_at":now()})
-        status="complete" if not schema_errors else "model_response_rejected";store.append("runs",{"run_id":run_id,"started_at":started,"completed_at":now(),"github_run_id":os.getenv("GITHUB_RUN_ID",""),"repository":a.repository,"comparison":a.comparison,"language":a.language,"source_path":source.relative_to(workspace).as_posix(),"root_function":a.root_function,"model_provider":a.provider,"model":envelope["model"],"result":cand["outcome"],"status":status,"input_hash":input_hash,"workflow_url":a.workflow_url})
-        report=["# ADR Deviation Analysis PoC","","- Run ID: "+run_id,"- Comparison: "+a.comparison,"- Language: "+a.language,"- Resolver: "+str(graph.get("resolver","document-only")),"- Entry symbol: "+entry,"- Functions: "+str(len(graph.get("functions",[]))),"- Direct call edges: "+str(len(graph.get("edges",[]))),"- Functions reachable from entry: "+str(len(graph.get("reachable_functions",[]))),"- Evidence items: "+str(len(evidence)),"- Model: "+envelope["provider"]+" / "+envelope["model"],"- Candidate validation: "+validation,"","## Finding","","**Model-proposed outcome:** "+str(model_proposed_outcome),"","**Accepted outcome:** "+cand["outcome"],"","**Summary:** "+cand["summary"],"","**Rationale:** "+cand["rationale"],"","","## Evidence-strength score","","**Score:** "+str(confidence_result["score_0_to_100"])+"/100 ("+confidence_result["band"]+"). This is a deterministic evidence-support score, not a calibrated probability.","","**Model self-reported confidence:** "+str(model_self_confidence)+" (recorded for inspection only; it does not contribute to the evidence-strength score).","","**Scoring algorithm:** "+confidence_result["algorithm_version"],"","| Dimension | Score | Weight | Contribution | Why |","|---|---:|---:|---:|---|"]
+        status="complete" if not schema_errors else "model_response_rejected";store.append("runs",{"run_id":run_id,"started_at":started,"completed_at":now(),"github_run_id":os.getenv("GITHUB_RUN_ID",""),"repository":a.repository,"comparison":a.comparison,"language":a.language or "none","source_path":source.relative_to(workspace).as_posix(),"root_function":a.root_function,"model_provider":a.provider,"model":envelope["model"],"result":cand["outcome"],"status":status,"input_hash":input_hash,"workflow_url":a.workflow_url})
+        report=["# ADR Deviation Analysis PoC","","- Run ID: "+run_id,"- Comparison: "+a.comparison,"- Language: "+(a.language or "not selected"),"- Resolver: "+str(graph.get("resolver","document-only")),"- Entry symbol: "+entry,"- Functions: "+str(len(graph.get("functions",[]))),"- Direct call edges: "+str(len(graph.get("edges",[]))),"- Functions reachable from entry: "+str(len(graph.get("reachable_functions",[]))),"- Source observations: "+str(len(all_observations)),"- Evidence items: "+str(len(evidence)),"- Model: "+envelope["provider"]+" / "+envelope["model"],"- Candidate validation: "+validation,"","## Observation coverage",""]
+        report.extend([f"- {r.get('source_type')}: complete={r.get('complete')}; inspected={r.get('inspected_count')}; emitted={r.get('emitted_count')}; diagnostics={len(r.get('diagnostics',[]))}" for r in collection_reports] or ["- No source adapter was selected."])
+        report += ["","## Finding","","**Model-proposed outcome:** "+str(model_proposed_outcome),"","**Accepted outcome:** "+cand["outcome"],"","**Summary:** "+cand["summary"],"","**Rationale:** "+cand["rationale"],"","","## Evidence-strength score","","**Score:** "+str(confidence_result["score_0_to_100"])+"/100 ("+confidence_result["band"]+"). This is a deterministic evidence-support score, not a calibrated probability.","","**Model self-reported confidence:** "+str(model_self_confidence)+" (recorded for inspection only; it does not contribute to the evidence-strength score).","","**Scoring algorithm:** "+confidence_result["algorithm_version"],"","| Dimension | Score | Weight | Contribution | Why |","|---|---:|---:|---:|---|"]
         for component in confidence_result["components"]:
             report.append("| "+component["dimension"].replace("_"," ")+" | "+str(round(component["score"]*100,1))+" | "+str(round(component["weight"]*100,1))+"% | "+str(round(component["weighted_contribution"]*100,1))+" | "+component["explanation"].replace("|","\\|")+" |")
         if confidence_result["caps"] or confidence_result["guardrails"]:

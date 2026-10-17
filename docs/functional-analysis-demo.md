@@ -1,5 +1,7 @@
 # Functional analysis demo
 
+> For the current end-to-end ADR PoC workflow, generated evidence/confidence outputs, and recent GitHub Actions runs, open the [interactive PoC demo](demo/index.md).
+
 <span class="page-eyebrow">GITHUB ACTIONS / WALKTHROUGH</span>
 
 Run the [Functional Analysis Demo workflow](https://github.com/tyler-beach/Platform/actions/workflows/functional-analysis-demo.yml) to follow a synthetic analysis from input selection through parsing, evidence assembly, budget preflight, a mock assessment, validation and a final report.

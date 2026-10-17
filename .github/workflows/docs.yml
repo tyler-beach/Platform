@@ -6,6 +6,10 @@ on:
       - "docs/**"
       - "mkdocs.yml"
       - "docs-requirements.txt"
+      - ".poc/**"
+      - ".github/workflows/poc-analysis.yml"
+      - ".github/workflows/poc-evaluation.yml"
+      - "docs/javascripts/**"
       - ".github/workflows/docs.yml"
       - "proto/**"
   push:
@@ -14,12 +18,21 @@ on:
       - "docs/**"
       - "mkdocs.yml"
       - "docs-requirements.txt"
+      - ".poc/**"
+      - ".github/workflows/poc-analysis.yml"
+      - ".github/workflows/poc-evaluation.yml"
+      - "docs/javascripts/**"
       - ".github/workflows/docs.yml"
       - "proto/**"
+  workflow_run:
+    workflows: ["ADR Deviation PoC Analysis", "ADR Deviation Labeled Evaluation"]
+    types: [completed]
   workflow_dispatch:
 
 permissions:
   contents: read
+  actions: read
+  pages: read
 
 concurrency:
   group: docs-${{ github.ref }}
@@ -27,6 +40,7 @@ concurrency:
 
 jobs:
   build:
+    if: ${{ github.event_name != 'workflow_run' || (github.event.workflow_run.event != 'pull_request' && github.event.workflow_run.head_branch == 'main') }}
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -37,12 +51,136 @@ jobs:
           python-version: "3.12"
           cache: pip
           cache-dependency-path: docs-requirements.txt
+      - name: Set up Go for the synthetic PoC walkthrough
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.x"
+      - name: Set up Node for browser behavior tests
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
       - name: Install documentation dependencies
-        run: python -m pip install -r docs-requirements.txt
+        run: |
+          python -m pip install -r docs-requirements.txt
+          python -m pip install --disable-pip-version-check -r .poc/requirements.txt
+      - name: Resolve this repository's Pages and source URLs
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+        run: |
+          echo "ADR_REPO_URL=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" >> "$GITHUB_ENV"
+          echo "ADR_REPO_NAME=${GITHUB_REPOSITORY}" >> "$GITHUB_ENV"
+          pages_url="$(gh api "/repos/${GITHUB_REPOSITORY}/pages" --jq .html_url 2>/dev/null || true)"
+          if [[ -n "$pages_url" ]]; then
+            echo "ADR_SITE_URL=${pages_url%/}/" >> "$GITHUB_ENV"
+          fi
       - name: Validate OpenAPI contract
         run: openapi-spec-validator docs/openapi.yaml
+      - name: Run deterministic PoC behavior tests
+        run: python -m unittest discover -s .poc/tests -v
+      - name: Run demo explorer browser-core tests
+        run: node --test docs/javascripts/demo-explorer.test.cjs
       - name: Build documentation site
         run: mkdocs build --strict
+      - name: Set static workflow links to this repository
+        run: python .poc/demo/prepare_site.py --site-dir site --repository "$GITHUB_REPOSITORY"
+      - name: Generate the synthetic mock walkthrough from the PoC
+        env:
+          DEMO_ROOT: ${{ runner.temp }}/adr-poc-pages-demo
+        run: |
+          mkdir -p "$DEMO_ROOT"
+          python .poc/run.py \
+            --source .poc/fixtures/go \
+            --language go \
+            --comparison spec-vs-implementation \
+            --provider mock \
+            --run-id pages-fixture-walkthrough \
+            --root-function Submit \
+            --db-dir "$DEMO_ROOT/db" \
+            --out-dir "$DEMO_ROOT/runs" \
+            --adr-path .poc/fixtures/go/ADR-001.md \
+            --spec-path .poc/fixtures/go/technical-spec.md \
+            --diff-path .poc/fixtures/go/change.diff
+          mkdir -p site/demo/data
+          python .poc/demo/export_site_snapshot.py \
+            --db-dir "$DEMO_ROOT/db" \
+            --run-dir "$DEMO_ROOT/runs/pages-fixture-walkthrough" \
+            --fixture-root .poc/fixtures/go \
+            --output site/demo/data/sample-run.json
+      - name: Validate generated walkthrough data
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          page = Path("site/demo/index.html").read_text(encoding="utf-8")
+          data = json.loads(Path("site/demo/data/sample-run.json").read_text(encoding="utf-8"))
+          assert 'id="demo-explorer"' in page
+          assert data["schema_version"] == "adr-demo-run-v1"
+          assert data["sample"]["synthetic"] is True and data["sample"]["provider"] == "mock"
+          assert data["stages"] and data["evidence"] and data["confidence"]["components"]
+          assert "not a calibrated probability" in data["confidence"]["interpretation"].lower()
+          print(f"Validated generated demo walkthrough ({len(data['stages'])} stages, {len(data['evidence'])} evidence items).")
+          PY
+      - name: Prepare bounded real run history for internal Pages
+        if: github.event_name != 'pull_request' && (github.event_name == 'workflow_run' || github.ref == 'refs/heads/main')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REAL_DATA_OPT_IN: ${{ vars.PAGES_REAL_RUN_DATA_ENABLED }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          DEMO_ROOT: ${{ runner.temp }}/adr-poc-pages-demo
+        run: |
+          set -euo pipefail
+          if [[ "$REAL_DATA_OPT_IN" != "true" ]]; then
+            mkdir -p site/demo/data
+            python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          path = Path("site/demo/data/real-runs.json")
+          path.write_text(json.dumps({
+              "schema_version": "adr-demo-history-v1", "repository": os.environ.get("GITHUB_REPOSITORY", "tyler-beach/Platform"),
+              "data_available": False,
+              "api_history_available": False, "run_count": 0, "workflow_runs": [], "runs": [],
+              "message": "Detailed run records are disabled for this Pages deployment."
+          }, indent=2) + "\n", encoding="utf-8")
+          PY
+            echo "Real run data disabled; Pages will contain the synthetic fixture walkthrough only."
+            exit 0
+          fi
+          repository_info="$(gh api "/repos/${GITHUB_REPOSITORY}")"
+          pages_info="$(gh api "/repos/${GITHUB_REPOSITORY}/pages")"
+          python - "$repository_info" "$pages_info" "$REAL_DATA_OPT_IN" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          sys.path.insert(0, str(Path(".poc/demo").resolve()))
+          from pages_visibility import real_data_export_enabled
+          repository = json.loads(sys.argv[1])
+          pages = json.loads(sys.argv[2])
+          real_data_export_enabled(repository.get("visibility", ""), pages.get("public"), sys.argv[3])
+          print("Private repository and private Pages access verified.")
+          PY
+          db_dir="$DEMO_ROOT/real-db"
+          mkdir -p "$db_dir"
+          if gh api "/repos/${GITHUB_REPOSITORY}/branches/poc-database" >/dev/null 2>&1; then
+            gh repo clone "$GITHUB_REPOSITORY" "$RUNNER_TEMP/poc-db-pages" -- --depth 1 --single-branch --branch poc-database
+            cp "$RUNNER_TEMP/poc-db-pages/.poc-db/"*.csv "$db_dir/"
+          else
+            python - "$db_dir" <<'PY'
+          import sys
+          from pathlib import Path
+          sys.path.insert(0, str(Path(".poc").resolve()))
+          from store import CsvStore
+          CsvStore(sys.argv[1])
+          PY
+          fi
+          python .poc/demo/actions_history.py --output "$DEMO_ROOT/actions-history.json"
+          python .poc/demo/export_site_snapshot.py \
+            --db-dir "$db_dir" --history --limit 20 \
+            --actions-history "$DEMO_ROOT/actions-history.json" \
+            --output site/demo/data/real-runs.json
       - name: Verify homepage layout structure
         run: |
           python - <<'PY'
@@ -145,7 +283,7 @@ jobs:
           path: site
 
   deploy:
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.event_name == 'workflow_run')
     needs: build
     runs-on: ubuntu-latest
     environment:

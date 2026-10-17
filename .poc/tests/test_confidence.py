@@ -68,6 +68,55 @@ class ConfidenceScoringTests(unittest.TestCase):
         self.assertEqual(score["accepted_outcome"],"potential_deviation")
         self.assertTrue(any("relationship explicitly links" in x for x in score["guardrails"]))
 
+    def test_configuration_observation_can_support_generic_assessment_without_call_graph(self):
+        source = "2"
+        ev = [
+            evidence("EV-REQ", "normative_requirement", "ART-DOC", text="Critical workloads must keep at least two pods available."),
+            evidence("EV-CONFIG", "configuration_property", "ART-CONFIG", text=source),
+        ]
+        ev[1]["resolution_status"] = "direct"
+        artifacts = [{"artifact_id": "ART-DOC"}, {"artifact_id": "ART-CONFIG"}]
+        link = [{"requirement_evidence_id": "EV-REQ", "observation_evidence_id": "EV-CONFIG",
+                 "relationship": "contradicts", "explanation": "Configured value is below the required minimum."}]
+        score = confidence.score_assessment(
+            graph={"edges": [], "functions": [], "diagnostics": []}, syntax={"files": []},
+            evidence=ev, artifact_rows=artifacts, cited_ids=["EV-REQ", "EV-CONFIG"],
+            evidence_links=link, proposed_outcome="supported_deviation",
+            coverage_reports=[{"source_type": "configuration", "complete": True}],
+        )
+        self.assertEqual(score["accepted_outcome"], "supported_deviation")
+        self.assertEqual(score["components"][1]["dimension"], "observation_resolution")
+
+    def test_incomplete_configuration_coverage_blocks_supported_deviation(self):
+        ev = [evidence("EV-REQ", "normative_requirement", "ART-DOC", text="Buckets must use encryption."),
+              evidence("EV-CONFIG", "configuration_property", "ART-CONFIG", text="false")]
+        ev[1]["resolution_status"] = "direct"
+        link = [{"requirement_evidence_id": "EV-REQ", "observation_evidence_id": "EV-CONFIG",
+                 "relationship": "contradicts", "explanation": "Observed encryption setting is false."}]
+        score = confidence.score_assessment(
+            graph={"edges": [], "functions": [], "diagnostics": []}, syntax={"files": []},
+            evidence=ev, artifact_rows=[{"artifact_id": "ART-DOC"}, {"artifact_id": "ART-CONFIG"}],
+            cited_ids=["EV-REQ", "EV-CONFIG"], evidence_links=link, proposed_outcome="supported_deviation",
+            coverage_reports=[{"source_type": "configuration", "complete": False}],
+        )
+        self.assertNotEqual(score["accepted_outcome"], "supported_deviation")
+        self.assertTrue(any("coverage" in guard.lower() for guard in score["guardrails"]))
+
+    def test_unresolved_observation_cannot_validate_contradiction(self):
+        ev = [evidence("EV-REQ", "normative_requirement", "ART-DOC"),
+              evidence("EV-OBS", "source_observation", "ART-SRC")]
+        ev[1]["resolution_status"] = "unresolved"
+        link = [{"requirement_evidence_id": "EV-REQ", "observation_evidence_id": "EV-OBS",
+                 "relationship": "contradicts", "explanation": "This observation is unresolved."}]
+        score = confidence.score_assessment(
+            graph={"edges": [], "functions": [], "diagnostics": []}, syntax={"files": []},
+            evidence=ev, artifact_rows=[{"artifact_id": "ART-DOC"}, {"artifact_id": "ART-SRC"}],
+            cited_ids=["EV-REQ", "EV-OBS"], evidence_links=link,
+            proposed_outcome="supported_deviation", coverage_reports=[{"complete": True}],
+        )
+        self.assertFalse(score["evidence_links"])
+        self.assertNotEqual(score["accepted_outcome"], "supported_deviation")
+
 if __name__=="__main__":
     unittest.main()
 

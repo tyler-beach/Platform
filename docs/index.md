@@ -10,6 +10,7 @@ hide:
 <p class="home-hero__lede">Connect architectural decisions, plain-English technical specifications, and implementation changes. Surface potential divergence with traceable evidence—not unsupported AI opinions.</p>
 <div class="home-hero__actions">
 <a class="md-button md-button--primary" href="./architecture/">Explore the architecture</a>
+<a class="md-button md-button--primary" href="./demo/">Run the interactive PoC demo</a>
 <a class="md-button" href="./ENGINEERING_PLAYBOOK/">Engineering playbook</a>
 </div>
 <div class="home-hero__signals">
@@ -67,4 +68,4 @@ hide:
 </div>
 </section>
 
-<div class="home-status"><span class="home-status__mark">i</span><div><strong>Current status: architecture and contract baseline</strong><p>This site documents the proposed design. The production API, worker implementations, database, state machine and model harness are not claimed to exist yet. Follow the <a href="./ROADMAP/">roadmap</a> and <a href="./OPEN_QUESTIONS/">open questions</a> for outstanding implementation and approval decisions.</p></div></div>
+<div class="home-status"><span class="home-status__mark">i</span><div><strong>Current status: design baseline plus runnable PoC</strong><p>The repository includes GitHub Actions workflows and a deterministic local/mock analysis harness; these are not the proposed production API, AWS workers, database, or Step Functions state machine. <a href="./demo/">Explore the PoC and its run outputs</a>, then follow the <a href="./ROADMAP/">roadmap</a> and <a href="./OPEN_QUESTIONS/">open questions</a> for outstanding implementation and approval decisions.</p></div></div>

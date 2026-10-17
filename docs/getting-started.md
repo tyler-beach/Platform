@@ -39,4 +39,4 @@ Open the local URL printed by MkDocs. Swagger loads the checked-in docs/openapi.
 5. Persist job state and audit events idempotently; test workflow-start failure recovery.
 6. Make finding evidence references resolvable before adding external publication.
 
-See [architecture](architecture.md), [API behavior](contracts/API_CONTRACT.md), and [roadmap](ROADMAP.md).
+See [system architecture](system-architecture.md), [API behavior](contracts/API_CONTRACT.md), and [roadmap](ROADMAP.md).

@@ -1,0 +1,6 @@
+apiVersion: adr-corpus.test/v1
+kind: ConfigurationSnapshot
+metadata:
+  name: adr-015
+observed:
+  permittedResourceArn: "arn:aws:s3:::orders-prod/*"

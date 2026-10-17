@@ -6,7 +6,10 @@ on:
       - ".poc/evaluation/**"
       - ".poc/model.py"
       - ".poc/confidence.py"
-      - ".poc/tests/test_evaluation.py"
+      - ".poc/observations.py"
+      - ".poc/run.py"
+      - ".poc/store.py"
+      - ".poc/tests/**"
       - ".github/workflows/poc-evaluation.yml"
   workflow_dispatch:
     inputs:
@@ -31,7 +34,9 @@ jobs:
         with:
           python-version: "3.12"
       - name: Run evaluation unit tests
-        run: python -m unittest discover -s .poc/tests -p "test_evaluation.py" -v
+        run: |
+          python -m pip install --disable-pip-version-check -r .poc/requirements.txt
+          python -m unittest discover -s .poc/tests -v
       - name: Execute labeled cases
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -39,6 +44,8 @@ jobs:
           PROVIDER: ${{ github.event_name == 'workflow_dispatch' && inputs.provider || 'mock' }}
         run: |
           python .poc/evaluation/evaluate.py --provider "$PROVIDER" --output-dir "$RUNNER_TEMP/adr-deviation-evaluation"
+      - name: Audit the 50-ADR corpus and configuration evidence
+        run: python .poc/evaluation/evaluate_adr_corpus.py --output-dir "$RUNNER_TEMP/adr-deviation-evaluation"
       - name: Publish evaluation report
         if: always()
         uses: actions/upload-artifact@v4
@@ -47,5 +54,7 @@ jobs:
           path: |
             ${{ runner.temp }}/adr-deviation-evaluation/evaluation.md
             ${{ runner.temp }}/adr-deviation-evaluation/evaluation.json
+            ${{ runner.temp }}/adr-deviation-evaluation/adr-corpus-evaluation.md
+            ${{ runner.temp }}/adr-deviation-evaluation/adr-corpus-evaluation.json
           if-no-files-found: warn
           retention-days: 30

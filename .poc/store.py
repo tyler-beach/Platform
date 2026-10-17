@@ -12,6 +12,8 @@ SCHEMAS = {
  "symbols": ["symbol_id","run_id","language","qualified_name","symbol_kind","signature","declared_type","path","start_line","end_line","resolver","resolution_status"],
  "call_edges": ["edge_id","run_id","caller_symbol_id","callee_symbol_id","call_expression","path","line","resolution_status","resolution_basis","dispatch_kind","is_transitive"],
  "evidence": ["evidence_id","run_id","evidence_type","artifact_id","symbol_id","edge_id","claim","excerpt","path","start_line","end_line","sha256"],
+ "observations": ["observation_id","run_id","schema_version","evidence_id","predicate","subject_json","value_json","source_ref_json","collector_json","resolution_json","evidence_class","redacted"],
+ "collection_reports": ["coverage_id","run_id","source_type","collector","collector_version","complete","scope_root","inspected_count","emitted_count","unresolved_count","approximate_count","redacted_value_count","unsupported_files_json","failed_files_json","missing_source_refs_json","diagnostics_json"],
  "budget_reservations": ["reservation_id","run_id","provider","model","max_input_tokens","max_output_tokens","estimated_input_tokens","reserved_at","status","actual_input_tokens","actual_output_tokens"],
  "llm_transactions": ["transaction_id","run_id","provider","model","request_id","status","prompt_sha256","input_chars","output_chars","estimated_input_tokens","actual_input_tokens","actual_output_tokens","duration_ms","error","created_at"],
  "findings": ["finding_id","run_id","outcome","confidence","summary","rationale","evidence_ids_json","limitations_json","validation_status","created_at"],

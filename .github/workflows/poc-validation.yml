@@ -12,6 +12,41 @@ permissions:
   contents: read
 
 jobs:
+  configuration-observation-smoke:
+    name: Generic configuration observation smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install parser dependency
+        run: python -m pip install --disable-pip-version-check -r .poc/requirements.txt
+      - name: Collect configuration without a language selection
+        run: |
+          python .poc/run.py \
+            --source .poc/fixtures/infrastructure \
+            --config-source .poc/fixtures/infrastructure \
+            --comparison code-diff \
+            --provider mock \
+            --run-id "validation-config-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --db-dir "$RUNNER_TEMP/poc-db-config" \
+            --out-dir "$RUNNER_TEMP/poc-runs" \
+            --adr-path .poc/fixtures/infrastructure/ADR-001.md
+          observations="$RUNNER_TEMP/poc-runs/validation-config-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/observations.json"
+          report="$RUNNER_TEMP/poc-runs/validation-config-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/report.md"
+          python - "$observations" "$report" <<'PY'
+          import json, sys
+          bundle = json.load(open(sys.argv[1], encoding="utf-8"))
+          observations = bundle["observations"]
+          assert observations, "no configuration observations emitted"
+          assert all(item["source_ref"]["sha256"] and item["source_ref"]["version"] for item in observations)
+          assert any(item["source_ref"]["locator"].get("line") for item in observations)
+          assert any(item["source_ref"]["path"].endswith("platform.yaml") for item in observations)
+          assert any(item["source_ref"]["path"].endswith("storage.json") for item in observations)
+          assert "Language: not selected" in open(sys.argv[2], encoding="utf-8").read()
+          print(f"Configuration assertion passed: {len(observations)} pinned observations")
+          PY
   semantic-smoke:
     name: Semantic analyzer / ${{ matrix.language }}
     runs-on: ubuntu-latest
