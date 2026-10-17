@@ -24,4 +24,5 @@ Comparison contract: {{comparison}}
 Entry symbol: {{root_symbol}}
 ADR / technical specification: {{requirements}}
 Resolved call graph and evidence: {{graph_evidence}}
+Auditable evidence index (only cite these evidence IDs): {{evidence_items}}
 Changed-file diff: {{diff_excerpt}}
