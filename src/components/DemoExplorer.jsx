@@ -29,6 +29,27 @@ export default function DemoExplorer() {
 
     <div className="demo-trust-banner"><div className="demo-trust-banner__icon"><ShieldCheck size={19} /></div><div><strong>This walkthrough uses example data</strong><p>The guided scenarios are synthetic and do not inspect a live system. You can open the separate PoC workflow and inspect its run artifacts when you want to see the underlying implementation.</p></div><Link to="/architecture/SECURITY">How trust is handled <ArrowRight size={14} /></Link></div>
 
+    <section className="technical-trace demo-example-library" aria-labelledby="demo-example-library-title">
+      <div className="technical-trace__heading">
+        <div><span className="demo-label">EXAMPLE LIBRARY · SYNTHETIC DATA</span><h2 id="demo-example-library-title">Go deeper with realistic artifacts</h2></div>
+        <p>Follow a multi-requirement review and inspect the proposed API contract. These are authored examples, not results from a live scan or a deployed API.</p>
+      </div>
+      <div className="technical-trace__grid">
+        <article className="technical-trace__panel">
+          <div className="technical-trace__panel-title"><FileCode2 size={17} /><div><strong>01 / Session Management Service</strong><small>10 requirements · 4 ADRs · mixed outcomes</small></div></div>
+          <p className="technical-trace__explain">Explore numeric limits, security boundaries, Kubernetes availability, async processing, audit hygiene, and missing-evidence cases in one technical specification.</p>
+          <ul className="technical-trace__notes"><li>Aligned requirements and supported deviations</li><li>Potential findings and inconclusive cases</li><li>Evidence-linked example finding and reviewer actions</li></ul>
+          <a href={`${BASE_URL}demo/realistic-session-service/`}>Read the full technical specification <ArrowUpRight size={13} /></a>
+        </article>
+        <article className="technical-trace__panel">
+          <div className="technical-trace__panel-title"><Braces size={17} /><div><strong>02 / API response payloads</strong><small>202 accepted · job state · findings · 409</small></div></div>
+          <p className="technical-trace__explain">Inspect proposed JSON for async job acceptance, lifecycle polling, evidence references, an inconclusive result, and an idempotency conflict.</p>
+          <ul className="technical-trace__notes"><li>Job state is separate from finding outcome</li><li>Findings cite immutable evidence references</li><li>Contract is design-only; no server is deployed</li></ul>
+          <a href={`${BASE_URL}demo/api-payload-examples/`}>Inspect API payload examples <ArrowUpRight size={13} /></a>
+        </article>
+      </div>
+    </section>
+
     <RequirementLab />
 
     <section className="technical-trace" aria-labelledby="technical-trace-title">
