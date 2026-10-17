@@ -11,6 +11,7 @@
     return [
       { id: "poc-analysis.yml", title: "ADR Deviation PoC Analysis", launch: `${base}/actions/workflows/poc-analysis.yml` },
       { id: "poc-evaluation.yml", title: "ADR Deviation Labeled Evaluation", launch: `${base}/actions/workflows/poc-evaluation.yml` },
+      { id: "functional-analysis-demo.yml", title: "Functional Analysis Demo", launch: `${base}/actions/workflows/functional-analysis-demo.yml` },
     ];
   }
   const API = (repository) => `https://api.github.com/repos/${repository}`;
@@ -442,8 +443,10 @@
       const activeWorkflows = workflowDefinitions(activeRepository);
       byId("demo-open-analysis").href = activeWorkflows[0].launch;
       byId("demo-open-evaluation").href = activeWorkflows[1].launch;
+      byId("demo-open-functional").href = activeWorkflows[2].launch;
       byId("demo-guide-analysis").href = activeWorkflows[0].launch;
       byId("demo-guide-evaluation").href = activeWorkflows[1].launch;
+      byId("demo-guide-functional").href = activeWorkflows[2].launch;
       if (realHistory && realHistory.api_history_available && Array.isArray(realHistory.workflow_runs)) {
         const runs = normalizeRuns(realHistory.workflow_runs, activeRepository);
         setText("demo-history-status", `Loaded ${runs.length} server-verified workflow runs. Detailed audit rows are included only for the internal Pages deployment.`);
@@ -484,8 +487,10 @@
     const workflows = workflowDefinitions(`${OWNER}/${REPOSITORY}`);
     byId("demo-open-analysis").href = workflows[0].launch;
     byId("demo-open-evaluation").href = workflows[1].launch;
+    byId("demo-open-functional").href = workflows[2].launch;
     byId("demo-guide-analysis").href = workflows[0].launch;
     byId("demo-guide-evaluation").href = workflows[1].launch;
+    byId("demo-guide-functional").href = workflows[2].launch;
 
     fetchSiteJson(root.fetch.bind(root), "data/sample-run.json", root.location.origin)
       .then((data) => { snapshot = data; renderSnapshot(); })

@@ -12,6 +12,7 @@ hide:
   <div class="demo-actions">
     <a id="demo-open-analysis" class="md-button md-button--primary" href="#">Run PoC analysis</a>
     <a id="demo-open-evaluation" class="md-button" href="#">Run corpus evaluation</a>
+    <a id="demo-open-functional" class="md-button" href="#">Run Tree-sitter demo</a>
   </div>
 </header>
 
@@ -104,6 +105,7 @@ hide:
     <li>For infrastructure or other declarative YAML/JSON inputs, choose <code>none</code> as the language and set <code>config_source</code>. Unsupported formats are reported as incomplete coverage, not as compliance.</li>
     <li>Open the run's job summary and download the <code>adr-deviation-poc-…</code> artifact. Inspect <code>report.md</code>, <code>confidence.json</code>, <code>evidence.json</code>, <code>observations.json</code>, and the CSV tables.</li>
     <li>Use <a id="demo-guide-evaluation" href="#">ADR Deviation Labeled Evaluation</a> to run deterministic regression cases and the 50-ADR extraction/coverage audit.</li>
+    <li>Use <a id="demo-guide-functional" href="#">Functional Analysis Demo</a> to compare the Tree-sitter and document-analysis workflow across languages and outcomes.</li>
   </ol>
   <p><strong>Scope boundary:</strong> these are repository-hosted demonstrators, not the proposed Step Functions/AWS production service. The synthetic corpus is not independently adjudicated; mock evaluation does not measure model quality. Anthropic mode requires repository secrets and provider-data approval.</p>
 </section>

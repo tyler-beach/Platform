@@ -14,6 +14,7 @@ API_ROOT = f"https://api.github.com/repos/{OWNER}/{REPOSITORY}"
 WORKFLOWS = (
     ("poc-analysis.yml", "ADR Deviation PoC Analysis"),
     ("poc-evaluation.yml", "ADR Deviation Labeled Evaluation"),
+    ("functional-analysis-demo.yml", "Functional Analysis Demo"),
 )
 MAX_RUNS_PER_WORKFLOW = 10
 _RUN_STATES = {"queued", "in_progress", "completed", "waiting", "requested", "pending"}

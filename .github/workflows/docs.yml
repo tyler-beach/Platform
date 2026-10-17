@@ -9,6 +9,7 @@ on:
       - ".poc/**"
       - ".github/workflows/poc-analysis.yml"
       - ".github/workflows/poc-evaluation.yml"
+      - ".github/workflows/functional-analysis-demo.yml"
       - "docs/javascripts/**"
       - ".github/workflows/docs.yml"
       - "proto/**"
@@ -21,11 +22,12 @@ on:
       - ".poc/**"
       - ".github/workflows/poc-analysis.yml"
       - ".github/workflows/poc-evaluation.yml"
+      - ".github/workflows/functional-analysis-demo.yml"
       - "docs/javascripts/**"
       - ".github/workflows/docs.yml"
       - "proto/**"
   workflow_run:
-    workflows: ["ADR Deviation PoC Analysis", "ADR Deviation Labeled Evaluation"]
+    workflows: ["ADR Deviation PoC Analysis", "ADR Deviation Labeled Evaluation", "Functional Analysis Demo"]
     types: [completed]
   workflow_dispatch:
 

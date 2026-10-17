@@ -10,6 +10,10 @@ context.globalThis = context;
 vm.runInNewContext(source, context, { filename: "demo-explorer.js" });
 const core = context.ADRDemoCore;
 
+test("offers the Functional Analysis Demo workflow alongside the audit workflows", () => {
+  assert.ok(core.workflows.some(workflow => workflow.id === "functional-analysis-demo.yml"));
+});
+
 test("normalizes only known public run URLs and safe primitive metadata", () => {
   const rows = core.normalizeRuns([{ id: 42, run_number: 8, run_attempt: 1, name: "PoC <img>", event: "workflow_dispatch", status: "completed", conclusion: "success", head_branch: "main", head_sha: "a".repeat(40), html_url: "https://github.com/tyler-beach/Platform/actions/runs/42" }]);
   assert.equal(rows.length, 1);

@@ -95,7 +95,7 @@ class PagesSnapshotTests(unittest.TestCase):
         self.assertIn("synthetic", page.lower())
         for control in ("demo-previous", "demo-next", "demo-play", "demo-pause", "demo-reload-history"):
             self.assertIn(f'id="{control}"', page)
-        for link in ("demo-open-analysis", "demo-open-evaluation", "demo-guide-analysis", "demo-guide-evaluation"):
+        for link in ("demo-open-analysis", "demo-open-evaluation", "demo-open-functional", "demo-guide-analysis", "demo-guide-evaluation", "demo-guide-functional"):
             self.assertIn(f'id="{link}"', page)
         self.assertNotIn("https://github.com/tyler-beach/Platform/actions/workflows/", page)
         self.assertIn("aria-live", page)
@@ -121,7 +121,7 @@ class PagesSnapshotTests(unittest.TestCase):
         ):
             self.assertIn(required, workflow)
         self.assertIn("if: github.event_name != 'pull_request'", workflow)
-        self.assertIn('workflows: ["ADR Deviation PoC Analysis", "ADR Deviation Labeled Evaluation"]', workflow)
+        self.assertIn('workflows: ["ADR Deviation PoC Analysis", "ADR Deviation Labeled Evaluation", "Functional Analysis Demo"]', workflow)
         self.assertIn("github.ref == 'refs/heads/main'", workflow)
         self.assertIn("github.event.workflow_run.event != 'pull_request'", workflow)
         self.assertIn("github.event.workflow_run.head_branch == 'main'", workflow)
@@ -132,6 +132,8 @@ class PagesSnapshotTests(unittest.TestCase):
         self.assertIn('owner.get("type", "") if isinstance(owner, dict) else ""', workflow)
         self.assertIn("ADR_REPO_URL", (ROOT / "mkdocs.yml").read_text(encoding="utf-8"))
         self.assertIn("ADR_REPO_NAME", workflow)
+        self.assertIn('functional-analysis-demo.yml', workflow)
+        self.assertIn('id="demo-open-functional"', (ROOT / "docs/demo/index.md").read_text(encoding="utf-8"))
 
     def test_internal_pages_runbook_matches_the_workflow_gates(self):
         guide = (ROOT / "docs/how-to/enable-private-pages-demo.md").read_text(encoding="utf-8")
@@ -152,12 +154,18 @@ class PagesSnapshotTests(unittest.TestCase):
         demo = site / "demo"
         demo.mkdir(parents=True)
         links = "".join(f'<a id="{key}" href="#">workflow</a>' for key in (
-            "demo-open-analysis", "demo-open-evaluation", "demo-guide-analysis", "demo-guide-evaluation"))
+            "demo-open-analysis", "demo-open-evaluation", "demo-open-functional", "demo-guide-analysis", "demo-guide-evaluation", "demo-guide-functional"))
         (demo / "index.html").write_text(links, encoding="utf-8")
+        functional = site / "functional-analysis-demo"
+        functional.mkdir()
+        (functional / "index.html").write_text('<a id="functional-analysis-workflow" href="#">workflow</a><a id="functional-analysis-workflow-step" href="#">workflow</a>', encoding="utf-8")
         prepare_site(site, "example-org/adr-platform")
         result = (demo / "index.html").read_text(encoding="utf-8")
         self.assertEqual(result.count("https://github.com/example-org/adr-platform/actions/workflows/poc-analysis.yml"), 2)
         self.assertEqual(result.count("https://github.com/example-org/adr-platform/actions/workflows/poc-evaluation.yml"), 2)
+        self.assertEqual(result.count("https://github.com/example-org/adr-platform/actions/workflows/functional-analysis-demo.yml"), 2)
+        functional_result = (functional / "index.html").read_text(encoding="utf-8")
+        self.assertEqual(functional_result.count('href="https://github.com/example-org/adr-platform/actions/workflows/functional-analysis-demo.yml"'), 2)
         with self.assertRaisesRegex(ValueError, "owner/name"):
             prepare_site(site, "https://example.com/repo")
 
@@ -320,8 +328,12 @@ class PagesSnapshotTests(unittest.TestCase):
         def fake_fetch(path):
             seen.append(path)
             if "/workflows/" in path:
-                workflow = "poc-analysis.yml" if "poc-analysis" in path else "poc-evaluation.yml"
-                run_id = 123 if workflow == "poc-analysis.yml" else 456
+                if "poc-analysis.yml" in path:
+                    workflow, run_id = "poc-analysis.yml", 123
+                elif "poc-evaluation.yml" in path:
+                    workflow, run_id = "poc-evaluation.yml", 456
+                else:
+                    workflow, run_id = "functional-analysis-demo.yml", 789
                 return {"workflow_runs": [{
                     "id": run_id, "run_number": 7, "run_attempt": 2, "name": "Demo", "event": "workflow_dispatch",
                     "status": "completed", "conclusion": "success", "head_branch": "main", "head_sha": "a" * 40,
@@ -332,10 +344,41 @@ class PagesSnapshotTests(unittest.TestCase):
                                "steps": [{"number": 1, "name": "Run mock", "status": "completed", "conclusion": "success"}]}]}
         history = collect_history(fake_fetch, limit=1)
         self.assertTrue(history["available"])
-        self.assertEqual(len(history["runs"]), 2)
+        self.assertEqual(len(history["runs"]), 3)
         self.assertTrue(any("attempts/2/jobs" in path for path in seen))
         self.assertNotIn("Authorization", json.dumps(history))
         self.assertEqual(history["runs"][0]["jobs"][0]["steps"][0]["name"], "Run mock")
+
+    def test_functional_analysis_workflow_is_projected_without_artifacts_or_source(self):
+        seen = []
+
+        def fake_fetch(path):
+            seen.append(path)
+            if "/workflows/" in path:
+                if "functional-analysis-demo.yml" not in path:
+                    return {"workflow_runs": []}
+                return {"workflow_runs": [{
+                    "id": 789, "run_number": 12, "run_attempt": 1, "name": "Functional Analysis Demo",
+                    "event": "workflow_dispatch", "status": "completed", "conclusion": "success",
+                    "head_branch": "main", "head_sha": "b" * 40,
+                    "html_url": "https://github.com/example-org/adr-platform/actions/runs/789",
+                    "created_at": "2026-10-17T10:00:00Z", "updated_at": "2026-10-17T10:01:00Z",
+                    "artifacts_url": "https://api.github.com/private-artifacts", "source": "do-not-export",
+                }]}
+            return {"jobs": [{"id": 901, "name": "2 · Tree-sitter and document analysis", "status": "completed",
+                               "conclusion": "success", "steps": [{"number": 1, "name": "Parse selected source",
+                               "status": "completed", "conclusion": "success", "source": "do-not-export"}]}],
+                    "artifacts": [{"name": "functional-analysis-demo", "url": "do-not-export"}]}
+
+        history = collect_history(fake_fetch, limit=1, repository="example-org/adr-platform")
+        demo_runs = [run for run in history["runs"] if run["workflow_file"] == "functional-analysis-demo.yml"]
+        self.assertEqual(len(demo_runs), 1)
+        self.assertEqual(demo_runs[0]["html_url"], "https://github.com/example-org/adr-platform/actions/runs/789")
+        self.assertEqual(demo_runs[0]["jobs"][0]["name"], "2 · Tree-sitter and document analysis")
+        self.assertFalse(any("artifacts" in path or "do-not-export" in path for path in seen))
+        encoded = json.dumps(history)
+        self.assertNotIn("do-not-export", encoded)
+        self.assertNotIn("artifacts_url", encoded)
 
     def test_internal_actions_history_ignores_untrusted_run_urls(self):
         def fake_fetch(path):
@@ -349,8 +392,12 @@ class PagesSnapshotTests(unittest.TestCase):
     def test_internal_actions_history_uses_the_private_clone_repository_identity(self):
         def fake_fetch(path):
             if "/workflows/" in path:
-                workflow = "poc-analysis.yml" if "poc-analysis" in path else "poc-evaluation.yml"
-                run_id = 123 if workflow == "poc-analysis.yml" else 456
+                if "poc-analysis.yml" in path:
+                    run_id = 123
+                elif "poc-evaluation.yml" in path:
+                    run_id = 456
+                else:
+                    run_id = 789
                 return {"workflow_runs": [{
                     "id": run_id, "run_number": 1, "status": "completed",
                     "html_url": f"https://github.com/example-org/adr-platform/actions/runs/{run_id}",
@@ -358,7 +405,7 @@ class PagesSnapshotTests(unittest.TestCase):
             return {"jobs": []}
         history = collect_history(fake_fetch, limit=1, repository="example-org/adr-platform")
         self.assertEqual(history["repository"], "example-org/adr-platform")
-        self.assertEqual(len(history["runs"]), 2)
+        self.assertEqual(len(history["runs"]), 3)
         with self.assertRaisesRegex(ValueError, "owner/name"):
             collect_history(fake_fetch, limit=1, repository="https://example.com/repo")
 
