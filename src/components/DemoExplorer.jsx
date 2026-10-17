@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, ArrowUpRight, CheckCircle2, ChevronRight, CircleHelp, Clock3, ExternalLink, FileCode2, GitBranch, Play, RefreshCw, ShieldCheck, Workflow } from 'lucide-react';
 import { BASE_URL } from '../content.js';
@@ -142,10 +142,24 @@ function RequirementLab() {
   const [activeStage, setActiveStage] = useState(2);
   const [activeEvidence, setActiveEvidence] = useState('E-02');
   const [review, setReview] = useState({});
+  const tabRefs = useRef({});
   const example = requirementExamples[activeKey];
   const stage = example.stages[activeStage];
   const selectedEvidence = example.evidence.find(item => item.id === activeEvidence) || example.evidence[0];
   function chooseExample(key) { setActiveKey(key); setActiveStage(0); setActiveEvidence('E-01'); }
+  function handleTabKeyDown(event, index) {
+    const keys = Object.keys(requirementExamples);
+    let nextIndex = index;
+    if (event.key === 'ArrowRight') nextIndex = (index + 1) % keys.length;
+    else if (event.key === 'ArrowLeft') nextIndex = (index - 1 + keys.length) % keys.length;
+    else if (event.key === 'Home') nextIndex = 0;
+    else if (event.key === 'End') nextIndex = keys.length - 1;
+    else return;
+    event.preventDefault();
+    const nextKey = keys[nextIndex];
+    chooseExample(nextKey);
+    tabRefs.current[nextKey]?.focus();
+  }
 
   return <section className="requirement-lab" aria-labelledby="requirement-lab-title">
     <header className="requirement-lab__topbar">
@@ -155,10 +169,10 @@ function RequirementLab() {
     <div className="requirement-lab__intro">
       <div><span className="demo-label">DECISION → IMPLEMENTATION</span><h2 id="requirement-lab-title">See where the system<br/><em>drifts from the decision.</em></h2><p>Choose a policy. Follow the evidence. Inspect the gap. This is the core ADR investigation loop—not a language-specific code demo.</p></div>
       <nav className="requirement-lab__switcher" role="tablist" aria-label="Select an architectural decision">
-        {Object.values(requirementExamples).map(item => <button key={item.key} type="button" role="tab" aria-selected={activeKey === item.key} className={activeKey === item.key ? 'is-active' : ''} onClick={() => chooseExample(item.key)}><span className="requirement-lab__switcher-index">{item.key === 'pdb' ? '01' : '02'}</span><span><strong>{item.key === 'pdb' ? 'Pod disruption budget' : 'Session lifetime'}</strong><small>{item.key === 'pdb' ? 'AVAILABILITY' : 'IDENTITY SECURITY'}</small></span><ArrowUpRight size={14}/></button>)}
+        {Object.values(requirementExamples).map((item, index) => <button key={item.key} ref={node => { tabRefs.current[item.key] = node; }} id={`adr-tab-${item.key}`} tabIndex={activeKey === item.key ? 0 : -1} type="button" role="tab" aria-controls="requirement-lab-panel" aria-selected={activeKey === item.key} className={activeKey === item.key ? 'is-active' : ''} onKeyDown={event => handleTabKeyDown(event, index)} onClick={() => chooseExample(item.key)}><span className="requirement-lab__switcher-index">{item.key === 'pdb' ? '01' : '02'}</span><span><strong>{item.key === 'pdb' ? 'Pod disruption budget' : 'Session lifetime'}</strong><small>{item.key === 'pdb' ? 'AVAILABILITY' : 'IDENTITY SECURITY'}</small></span><ArrowUpRight size={14}/></button>)}
       </nav>
     </div>
-    <div className="requirement-lab__surface">
+    <div className="requirement-lab__surface" id="requirement-lab-panel" role="tabpanel" aria-labelledby={`adr-tab-${activeKey}`} tabIndex={0}>
       <div className="requirement-lab__surface-head"><div><span className="demo-label">{example.eyebrow}</span><h3>{example.title}</h3></div><span className="requirement-lab__scope"><span/> POLICY SCOPE · DEFINED</span></div>
       <div className="requirement-lab__rule"><span className="requirement-lab__rule-tag">DECISION</span><p>{example.requirement}</p><button type="button" className="requirement-lab__rule-link" onClick={() => {setActiveStage(1);setActiveEvidence('E-01');}}>Inspect requirement <ArrowRight size={14}/></button></div>
       <div className="requirement-lab__journey">
@@ -171,9 +185,9 @@ function RequirementLab() {
         <article className="requirement-lab__signal requirement-lab__signal--finding"><div className="requirement-lab__signal-head"><span className="requirement-lab__signal-icon"><ShieldCheck size={15}/></span><span className="demo-label">CANDIDATE FINDING</span><span className="requirement-lab__signal-index">03</span></div><p><strong>{example.outcome}</strong> — verify the workload/session scope, source freshness, and counterevidence before deciding.</p><span className="requirement-lab__finding-note">NOT AN ENFORCEMENT ACTION</span></article>
       </div>
       <div className="requirement-lab__evidence-strip">
-        <div className="requirement-lab__evidence-title"><span className="demo-label">EVIDENCE TRAIL</span><strong>What supports the finding?</strong><small>{example.evidence.length} source references</small></div>
+        <div className="requirement-lab__evidence-title"><span className="demo-label">EVIDENCE TRAIL</span><strong>What supports the finding?</strong><small>{example.evidence.length} illustrative references</small></div>
         <div className="requirement-lab__evidence-select">{example.evidence.map(item => <button key={item.id} type="button" className={activeEvidence === item.id ? 'is-active' : ''} aria-pressed={activeEvidence === item.id} onClick={() => setActiveEvidence(item.id)}><span>{item.id}</span><strong>{item.title}</strong><ArrowUpRight size={14}/></button>)}</div>
-        <div className="requirement-lab__source-view" aria-live="polite"><FileCode2 size={17}/><div><span className="demo-label">SELECTED SOURCE</span><strong>{selectedEvidence.title}</strong><p>{selectedEvidence.detail} <span>·</span> {selectedEvidence.source}</p></div><span className="requirement-lab__pinned">REFERENCE PINNED</span></div>
+        <div className="requirement-lab__source-view" aria-live="polite"><FileCode2 size={17}/><div><span className="demo-label">SELECTED SOURCE</span><strong>{selectedEvidence.title}</strong><p>{selectedEvidence.detail} <span>·</span> {selectedEvidence.source}</p></div><span className="requirement-lab__pinned">SYNTHETIC REF</span></div>
       </div>
       <footer className="requirement-lab__review-bar"><div className="requirement-lab__gap-inline"><CircleHelp size={16}/><span><strong>Open evidence question</strong><small>{example.gaps}</small></span></div><div className="requirement-lab__review-actions"><span>REVIEW</span>{['confirm', 'dismiss', 'inconclusive'].map(value => <button key={value} type="button" className={review[activeKey] === value ? 'is-active' : ''} aria-pressed={review[activeKey] === value} onClick={() => setReview(previous => ({...previous, [activeKey]: value}))}>{value === 'confirm' ? 'Confirm' : value === 'dismiss' ? 'Dismiss' : 'Inconclusive'}</button>)}</div>{review[activeKey] && <p className="requirement-lab__review-state" role="status">Local demo choice: {review[activeKey]}. Nothing was written to production.</p>}</footer>
     </div>
