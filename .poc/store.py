@@ -15,6 +15,8 @@ SCHEMAS = {
  "budget_reservations": ["reservation_id","run_id","provider","model","max_input_tokens","max_output_tokens","estimated_input_tokens","reserved_at","status","actual_input_tokens","actual_output_tokens"],
  "llm_transactions": ["transaction_id","run_id","provider","model","request_id","status","prompt_sha256","input_chars","output_chars","estimated_input_tokens","actual_input_tokens","actual_output_tokens","duration_ms","error","created_at"],
  "findings": ["finding_id","run_id","outcome","confidence","summary","rationale","evidence_ids_json","limitations_json","validation_status","created_at"],
+ "confidence_assessments": ["assessment_id","run_id","algorithm_version","proposed_outcome","accepted_outcome","score_0_to_100","score_0_to_1","score_band","calibrated_probability","model_self_reported_confidence","component_scores_json","caps_json","guardrails_json","principle","evidence_ids_json","created_at"],
+ "confidence_components": ["component_id","assessment_id","run_id","dimension","score","weight","weighted_contribution","explanation","evidence_ids_json","details_json","algorithm_version","created_at"],
 }
 class CsvStore:
     def __init__(self, root: str | Path):
