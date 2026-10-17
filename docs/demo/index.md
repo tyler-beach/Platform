@@ -13,5 +13,6 @@ Use these longer examples to follow multiple requirements through evidence, find
 - [Session Management Service: multi-requirement technical specification](realistic-session-service.md) — ten requirements, four ADRs, mixed alignments, deviations, potential findings and inconclusive cases, reviewer actions, and an evidence-linked finding envelope.
 - [API response mockups](api-payload-examples.md) — contract-shaped job acceptance, lifecycle polling, findings with immutable evidence references, an inconclusive result, and a stable 409 error response.
 - [Finding review playbook](finding-review-playbook.md) — how to interpret outcome categories, validate evidence and revisions, challenge inferences, and record human dispositions.
+- [Evidence lineage walkthrough](evidence-lineage-example.md) — follow pinned inputs, evidence references, a finding envelope, validation invariants, and a separate reviewer audit event.
 
 The examples use synthetic source data. The API contract is the production target; these payloads are mock responses, not responses from a running service.
