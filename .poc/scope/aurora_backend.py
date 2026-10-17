@@ -36,7 +36,7 @@ LIMIT %(top_k)s
 """
 
 
-def _bedrock_embedding(query: str) -> tuple[list[float], str]:
+def bedrock_embedding(query: str) -> tuple[list[float], str]:
     try:
         import boto3
     except ImportError as exc:
@@ -126,7 +126,7 @@ def retrieve_from_aurora(
         raise ValueError("Invalid top-k or similarity thresholds")
 
     query = build_query(event)
-    embedding, model_id = _bedrock_embedding(query)
+    embedding, model_id = bedrock_embedding(query)
     vector_literal = "[" + ",".join(format(v, ".9g") for v in embedding) + "]"
     params = {
         "query_embedding": vector_literal,
