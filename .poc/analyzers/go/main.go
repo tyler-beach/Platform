@@ -66,7 +66,7 @@ func main() {
 	diagnostics:=[]string{}
 	for _,p:=range pkgs { for _,e:=range p.Errors { diagnostics=append(diagnostics,p.PkgPath+": "+e.Msg) } }
 	prog,ssaPkgs:=ssautil.AllPackages(pkgs,ssa.InstantiateGenerics); prog.Build()
-	graph:=cha.CallGraph(ssaPkgs...)
+	graph:=cha.CallGraph(prog)
 	functionsBySSA:=map[*ssa.Function]Function{}
 	functionsByID:=map[string]Function{}
 	for _,pkg:=range ssaPkgs {
