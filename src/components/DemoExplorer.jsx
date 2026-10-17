@@ -74,6 +74,13 @@ export default function DemoExplorer() {
           <ul className="technical-trace__notes"><li>Fields and enum values follow the current OpenAPI/Protobuf contract</li><li>Evidence is version-bound; source access is separately authorized</li><li>Mock response only; the production API implementation is a separate work item</li></ul>
           <a href={`${BASE_URL}demo/api-payload-examples/`}>Explore all API response mockups <ArrowUpRight size={13} /></a>
         </article>
+        </article>
+        <article className="technical-trace__panel">
+          <div className="technical-trace__panel-title"><ShieldCheck size={17} /><div><strong>03 / Evidence lineage &amp; review audit</strong><small>Pinned inputs · validated references · separate disposition</small></div></div>
+          <p className="technical-trace__explain">Trace one synthetic finding from immutable decision and source versions through evidence validation to a reviewer deferring the decision. The example makes missing runtime context explicit rather than treating static evidence as proof.</p>
+          <ul className="technical-trace__notes"><li>Check artifact versions, digests, line locators, and same-job evidence references</li><li>Separate the machine-generated finding from the human review event</li><li>See why missing evidence remains inconclusive—not compliant by default</li></ul>
+          <a href={`${BASE_URL}demo/evidence-lineage-example/`}>Open the evidence lineage walkthrough <ArrowUpRight size={13} /></a>
+        </article>
       </div>
     </section>
 
