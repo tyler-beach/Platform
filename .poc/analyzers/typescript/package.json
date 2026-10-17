@@ -1,0 +1,7 @@
+{
+  "name": "adr-poc-typescript-resolver",
+  "private": true,
+  "version": "0.1.0",
+  "description": "TypeScript compiler API symbol resolver for the ADR deviation PoC",
+  "dependencies": { "typescript": "5.9.3" }
+}

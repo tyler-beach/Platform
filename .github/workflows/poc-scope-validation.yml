@@ -1,0 +1,37 @@
+name: ADR Scope Retrieval Validation
+
+on:
+  pull_request:
+    paths:
+      - ".poc/scope/**"
+      - ".poc/tests/test_scope.py"
+      - ".github/workflows/poc-scope-validation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scope-simulation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Test scope gates, candidate retrieval, and cue triage
+        run: python -m unittest discover -s .poc/tests -p "test_scope.py" -v
+      - name: Validate catalog provenance manifest without AWS calls
+        run: python .poc/scope/index_catalog.py --dry-run
+      - name: Run offline scope simulation
+        run: python .poc/scope/run_scope.py --output-dir "$RUNNER_TEMP/adr-scope-report"
+      - name: Publish scope and triage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: adr-scope-simulation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/adr-scope-report/scope-report.md
+            ${{ runner.temp }}/adr-scope-report/scope-report.json
+          if-no-files-found: error
+          retention-days: 30

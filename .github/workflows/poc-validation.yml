@@ -1,0 +1,117 @@
+name: ADR Deviation PoC Validation
+
+on:
+  pull_request:
+    paths:
+      - ".poc/**"
+      - ".poc-db/**"
+      - ".github/workflows/poc-*.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  configuration-observation-smoke:
+    name: Generic configuration observation smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install parser dependency
+        run: python -m pip install --disable-pip-version-check -r .poc/requirements.txt
+      - name: Collect configuration without a language selection
+        run: |
+          python .poc/run.py \
+            --source .poc/fixtures/infrastructure \
+            --config-source .poc/fixtures/infrastructure \
+            --comparison code-diff \
+            --provider mock \
+            --run-id "validation-config-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --db-dir "$RUNNER_TEMP/poc-db-config" \
+            --out-dir "$RUNNER_TEMP/poc-runs" \
+            --adr-path .poc/fixtures/infrastructure/ADR-001.md
+          observations="$RUNNER_TEMP/poc-runs/validation-config-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/observations.json"
+          report="$RUNNER_TEMP/poc-runs/validation-config-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/report.md"
+          python - "$observations" "$report" <<'PY'
+          import json, sys
+          bundle = json.load(open(sys.argv[1], encoding="utf-8"))
+          observations = bundle["observations"]
+          assert observations, "no configuration observations emitted"
+          assert all(item["source_ref"]["sha256"] and item["source_ref"]["version"] for item in observations)
+          assert any(item["source_ref"]["locator"].get("line") for item in observations)
+          assert any(item["source_ref"]["path"].endswith("platform.yaml") for item in observations)
+          assert any(item["source_ref"]["path"].endswith("storage.json") for item in observations)
+          assert "Language: not selected" in open(sys.argv[2], encoding="utf-8").read()
+          print(f"Configuration assertion passed: {len(observations)} pinned observations")
+          PY
+  semantic-smoke:
+    name: Semantic analyzer / ${{ matrix.language }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [go, python, javascript, typescript, java]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.x"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Install syntax and TypeScript dependencies
+        run: |
+          python -m pip install --disable-pip-version-check -r .poc/requirements.txt
+          npm install --prefix .poc/analyzers/typescript --ignore-scripts --no-audit --no-fund
+          (cd .poc/analyzers/go && go mod tidy)
+      - name: Test confidence scoring rules
+        run: python -m unittest discover -s .poc/tests -v
+      - name: Run real analyzer and mock assessment
+        env:
+          LANGUAGE: ${{ matrix.language }}
+        run: |
+          case "$LANGUAGE" in
+            go) SOURCE=".poc/fixtures/go" ;;
+            python) SOURCE=".poc/fixtures/python" ;;
+            javascript) SOURCE=".poc/fixtures/javascript" ;;
+            typescript) SOURCE=".poc/fixtures/typescript" ;;
+            java) SOURCE=".poc/fixtures/java" ;;
+          esac
+          python .poc/run.py \
+            --language "$LANGUAGE" \
+            --source "$SOURCE" \
+            --root-function Submit \
+            --comparison spec-vs-implementation \
+            --provider mock \
+            --run-id "validation-${LANGUAGE}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --db-dir "$RUNNER_TEMP/poc-db-${LANGUAGE}" \
+            --out-dir "$RUNNER_TEMP/poc-runs" \
+            --adr-path "$SOURCE/ADR-001.md" \
+            --spec-path "$SOURCE/technical-spec.md"
+          report="$RUNNER_TEMP/poc-runs/validation-${LANGUAGE}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/report.md"
+          test -s "$report"
+          grep -q "## Finding" "$report"
+          grep -q "supported_deviation" "$report"
+          graph="$RUNNER_TEMP/poc-runs/validation-${LANGUAGE}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/callgraph.json"
+          python - "$graph" <<'PY'
+          import json, sys
+          graph = json.load(open(sys.argv[1], encoding="utf-8"))
+          assert graph.get("entry_resolution") == "resolved", "entry function was not resolved"
+          reachable = graph.get("reachable_functions", [])
+          edges = graph.get("reachable_edges", [])
+          assert len(reachable) >= 3, f"expected a transitive graph of at least 3 functions, got {len(reachable)}"
+          assert any("assess" in str(edge.get("callee_qualified_name", "")).lower() for edge in edges), "provider assessment edge missing from reachable graph"
+          assert any(edge.get("is_transitive") for edge in edges), "no multi-hop/transitive call edge was marked"
+          assert all(edge.get("resolution_status") and edge.get("resolution_basis") for edge in edges), "edge resolution metadata missing"
+          print(f"Graph assertion passed: {len(reachable)} reachable functions, {len(edges)} reachable edges")
+          PY

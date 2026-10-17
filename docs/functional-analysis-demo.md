@@ -1,12 +1,16 @@
 # Functional analysis demo
 
+> For the current end-to-end ADR PoC workflow, generated evidence/confidence outputs, and recent GitHub Actions runs, open the [interactive PoC demo](demo/index.md).
+
 <span class="page-eyebrow">GITHUB ACTIONS / WALKTHROUGH</span>
 
-Run the [Functional Analysis Demo workflow](https://github.com/tyler-beach/Platform/actions/workflows/functional-analysis-demo.yml) to follow a synthetic analysis from input selection through parsing, evidence assembly, budget preflight, a mock assessment, validation and a final report.
+Run the <a id="functional-analysis-workflow" href="https://github.com/tyler-beach/Platform/actions/workflows/functional-analysis-demo.yml">Functional Analysis Demo workflow</a> to follow a synthetic analysis from input selection through parsing, evidence assembly, budget preflight, a mock assessment, validation and a final report.
+
+On an organization-owned repository with internal or private Pages access configured, set `PAGES_ACTIONS_HISTORY_ENABLED=true` to show completed runs with bounded job and step status in the Pages explorer. This does not publish the downloadable workflow artifact or source files. The separate `PAGES_REAL_RUN_DATA_ENABLED=true` setting adds validated CSV-backed audit details. Pull-request runs do not trigger a Pages refresh.
 
 ## Run a scenario
 
-1. Open the [workflow](https://github.com/tyler-beach/Platform/actions/workflows/functional-analysis-demo.yml) and select **Run workflow**.
+1. Open the <a id="functional-analysis-workflow-step" href="https://github.com/tyler-beach/Platform/actions/workflows/functional-analysis-demo.yml">workflow</a> and select **Run workflow**.
 2. Pick the comparison, source language and sample outcome.
 3. Start the run. Open each job in the graph to see its log and step summary.
 4. Open the final job summary and download the `functional-analysis-demo` artifact for the full set of intermediate files and the Markdown report.

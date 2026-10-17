@@ -1,0 +1,1 @@
+Administrative UI changes must preserve keyboard navigation and accessible names for interactive controls.

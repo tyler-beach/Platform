@@ -1,0 +1,1 @@
+Authentication secrets, bearer tokens, API keys, and sensitive payloads must not be emitted into application logs. Log structured identifiers and redact sensitive fields.
