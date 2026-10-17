@@ -58,5 +58,5 @@ test("API docs describe the production target without claiming the service is de
   assert.ok(openapi.includes("version: 1.0.0"));
   assert.ok(openapi.includes("Production-target REST/JSON mapping"));
   assert.ok(apiContract.includes("Production-target v1 contract"));
-  assert.ok(apiContract.includes("not a deployed service"));
+  assert.ok(apiContract.includes("rather than a deployed service"));
 });
