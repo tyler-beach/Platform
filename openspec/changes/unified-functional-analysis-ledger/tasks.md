@@ -16,6 +16,7 @@
 - [x] 2.5 Add isolated tests for API retry exhaustion, Git non-fast-forward exhaustion, bounded scan saturation, and expired-artifact recovery reporting.
 - [x] 2.6 Retry unresolved ledger identities during scheduled reconciliation and test recovery when the final artifact becomes available later.
 - [x] 2.7 Keep unresolved ledger rows visible as incomplete after they age out of the automatic recovery scan.
+- [x] 2.8 Make the scheduled reconciler directly executable from the repository root without ambient `PYTHONPATH`, with subprocess regression coverage.
 
 ## Verification and reconciliation
 

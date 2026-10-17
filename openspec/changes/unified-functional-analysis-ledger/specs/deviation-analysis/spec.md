@@ -5,12 +5,20 @@ Each persisted Functional Analysis record MUST bind the repository, workflow ID,
 
 Only successful Functional Analysis runs from the repository default branch may produce a validated analysis record. Pull-request and non-default-branch runs MUST remain run-scoped and MUST NOT be ingested into the shared CSV ledger. A privileged writer MUST run trusted code from the default branch, use least-privilege Actions read and contents write permissions, and treat every downloaded artifact as untrusted data. Before artifact lookup/download, it MUST validate the source repository, workflow ID, event type, and default-branch name through the Actions API. It MUST validate run identity, attempt, artifact bounds and paths, schema, hashes, and evidence references before mutation. Existing CSV table headers MUST remain compatible through an additive versioned record table.
 
+The scheduled reconciler MUST be executable directly from the repository root in a clean Python environment without relying on test-runner path setup or an ambient `PYTHONPATH`.
+
 #### Scenario: A validated synthetic run is persisted
 - **GIVEN** a completed Functional Analysis run from an approved source and a validated, versioned artifact bundle
 - **WHEN** the ledger writer accepts the run
 - **THEN** the record binds to the repository, run ID, attempt, input hashes, evidence references, execution state, and domain outcome
 - **AND** the confidence field is either produced from the versioned evidence-strength algorithm's validated inputs or marked unavailable with a reason
 - **AND** the fixture-oracle result is not described as confidence or model quality.
+
+#### Scenario: The scheduled reconciler is launched by its workflow
+- **GIVEN** the workflow invokes the reconciler script from the repository root with no ambient `PYTHONPATH`
+- **WHEN** Python starts `.poc/demo/reconcile_functional_analysis.py`
+- **THEN** the reconciler imports its sibling demo modules and the shared `.poc` store module
+- **AND** it reaches its CLI argument handling rather than failing during module import.
 
 #### Scenario: The same run attempt is delivered twice
 - **GIVEN** a ledger record already exists for the same repository, workflow run ID, and attempt

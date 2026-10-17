@@ -18,6 +18,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 from functional_analysis_ledger import (
     MAX_ARCHIVE_BYTES,
     execution_only_record,

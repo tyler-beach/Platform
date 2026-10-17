@@ -3,6 +3,8 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import os
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -81,6 +83,20 @@ def expected_context(**updates):
 
 
 class FunctionalAnalysisLedgerTests(unittest.TestCase):
+    def test_reconciler_cli_imports_when_launched_from_repository_root(self):
+        environment = os.environ.copy()
+        environment.pop("PYTHONPATH", None)
+        result = subprocess.run(
+            [sys.executable, ".poc/demo/reconcile_functional_analysis.py", "--help"],
+            cwd=ROOT,
+            env=environment,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("--repository", result.stdout)
+
     def test_api_retry_exhaustion_is_bounded_and_does_not_expose_credentials(self):
         api = GitHubAPI("sensitive-token", "example-org/adr-platform")
         with patch("reconcile_functional_analysis.urllib.request.urlopen",
