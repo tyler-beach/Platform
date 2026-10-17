@@ -11,7 +11,7 @@ For TypeScript/JavaScript, Node.js 20+ and the pinned TypeScript compiler are re
 
 ## Enable Anthropic
 
-Set MODEL_PROVIDER=anthropic, ANTHROPIC_API_KEY, and optionally ANTHROPIC_MODEL. The default model is configurable; no key is needed in mock mode. The Anthropic adapter uses the Messages API and a required tool schema to request a structured assessment. It records request metadata and token usage, never the API key or full authorization headers. The prompts live in prompts/assess.md.
+Set MODEL_PROVIDER=anthropic, ANTHROPIC_API_KEY, and optionally ANTHROPIC_MODEL. The default model is configurable (currently claude-sonnet-5-5); no key is needed in mock mode. The Anthropic adapter uses the Messages API and a required tool schema to request a structured assessment. It records request metadata and token usage, never the API key or full authorization headers. The prompts live in prompts/assess.md.
 
 In GitHub Actions, add ANTHROPIC_API_KEY as a repository or environment secret to activate the optional provider. Keep mock mode as the default until outbound provider calls are explicitly enabled.
 
