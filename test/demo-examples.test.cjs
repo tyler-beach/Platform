@@ -27,6 +27,6 @@ test("API examples show async acceptance, findings, inconclusive state, and stab
   for (const phrase of ["HTTP 202", "JOB_STATE_QUEUED", "JOB_STATE_SUCCEEDED", "FINDING_OUTCOME_SUPPORTED_DEVIATION", "FINDING_OUTCOME_INCONCLUSIVE", "IDEMPOTENCY_KEY_REUSED", "requestId", "nextPageToken"]) {
     assert.ok(api.includes(phrase), "missing API payload detail: " + phrase);
   }
-  assert.ok(api.includes("not deployed"));
+  assert.ok(api.includes("no production HTTP service is deployed"));
   assert.ok(api.includes("proto/adrplatform/v1/platform.proto"));
 });
