@@ -22,7 +22,7 @@ flowchart TD
   I --> K[Audit bundle: query hash, ADR chunks, edges, evidence links, score]
 ```
 
-The key separation is that **retrieval scope is not a deviation finding**. An ADR can be relevant but not violated, and a highly similar retired ADR must never become the governing decision. The current simulation refuses to emit `supported_deviation`; the production path should promote a model-proposed finding only after the existing evidence and provenance guards pass.
+The flow has two explicit outputs. First, retrieval produces matches among active, effective, metadata-applicable ADRs. Second, each matched ADR is compared against source-backed code/spec/diff evidence and receives one result: `aligned`, `deviation`, or `uncertain`. Retired, superseded, draft, rejected, or expired ADRs are filtered out before ranking and are not match candidates. No active ADR match means `no_applicable_adr`; it does not mean the change is compliant.
 
 ## Local reproducible simulation
 
@@ -33,14 +33,14 @@ No AWS resources, credentials, database, or additional dependencies are required
 It reads:
 
 - `.poc/scope/adr_catalog.jsonl`: eight versioned ADR chunks with lifecycle and applicability metadata plus transparent demo control cues.
-- `.poc/scope/scenarios.jsonl`: nine labeled events with repository/service/domain/language, changed paths, change summary and illustrative source observations.
+- `.poc/scope/scenarios.jsonl`: eleven labeled events with repository/service/domain/language, changed paths, expected ADR matches, expected comparison result and source observations. Includes direct-request deviation, queue-handoff alignment, and an async-worker provider call that must not be mistaken for a deviation.
 - `.poc/scope/retrieval.py`: hard metadata filters followed by a lexical ranking baseline.
 - `.poc/scope/run_scope.py`: retrieval plus conservative, cue-based triage; generates Markdown and JSON reports. It also accepts a single real event via `--event-json`.
 - `.poc/scope/event-template.json`: example envelope for passing repository/service scope and source line/call-edge/diff evidence into retrieval.
 - `.poc/scope/index_catalog.py`: validates source hashes before indexing chunks; skips unchanged embeddings on a live re-index and supersedes older versions when a newer active version is present in the manifest.
 - `.poc/tests/test_scope.py`: assertions for lifecycle exclusion, metadata filtering, retrieval, evidence hashes and non-promotion of flags.
 
-The report includes candidate ADR IDs and versions, lexical relevance scores, reasons, excluded ADRs, matched cues, evidence path/line/excerpt/hash, and a catalog hash. The cue matcher is intentionally limited and transparent; a match only creates a `potential_deviation` candidate. A missing cue does not prove compliance.
+The report includes matched active ADR IDs/versions, retrieval relevance, per-ADR `aligned`/`deviation`/`uncertain` comparison, exact requirement evidence, source path/line/excerpt/hash, typed evidence links, and a catalog hash. The local baseline uses transparent source-excerpt cue rules, not a semantic LLM, so these comparison labels are a deterministic test harness rather than production-quality conclusions. A real model adapter should replace the cue evaluator while preserving the same result contract and deterministic evidence validation.
 
 For a single event envelope, copy and edit `.poc/scope/event-template.json`, then run:
 
@@ -74,9 +74,9 @@ Split long ADRs into chunks around individual decisions/invariants, not arbitrar
 
 1. **Hard applicability gate first:** approved/current lifecycle; date validity; repository, service, domain and language. A high vector score cannot override an exclusion.
 2. **Hybrid candidate generation:** query embedding from a compact summary of the change, technical-spec section, changed-file diff and resolved call-path evidence. Use pgvector top-K plus lexical/tag matches. Reciprocal-rank fusion or an explicit calibrated reranker is preferable to assuming cosine similarity and keyword scores share a scale.
-3. **Applicability triage:** return `in_scope`, `uncertain`, or `not_in_scope` with reasons, matched metadata and ranked chunks. Keep the uncertain bucket. Similarity thresholds in this PoC are provisional routing controls, not probabilities. A retired/superseded ADR with strong similarity is excluded from governing context but retained as an audited near-match and forces `uncertain` when no current ADR passes the threshold.
-4. **Assessment per candidate ADR:** provide only the selected normative text and the minimum source/diff/call-graph evidence needed. Require typed links from requirement evidence IDs to observation evidence IDs, with `contradicts`, `consistent_with`, or `uncertain` plus an explanation.
-5. **Validate before flagging:** verify ADR version/status, source hashes, evidence artifact IDs and excerpt hashes, line ranges, call-edge reachability/resolution, typed evidence links, and required normative language. Preserve unresolved/dynamic edges as uncertainty.
+3. **Active ADR matching only:** return candidate matches from lifecycle-active, in-effect ADR chunks that pass repository/service/domain/language filters. Retired/superseded/draft/rejected/expired chunks are excluded before any similarity scoring; there is no inactive-ADR similarity query and no historical near-match path. Retrieval disposition (`in_scope`, `uncertain`, `not_in_scope`) only describes match retrieval and is not the code comparison result. Similarity thresholds remain provisional routing controls, not probabilities.
+4. **Compare each active ADR match:** provide its normative requirement plus the relevant source/diff/call-graph evidence. Emit `deviation` only when source-backed evidence contradicts the requirement, `aligned` when evidence supports the required behavior without a contradiction, and `uncertain` when evidence is incomplete, mixed, unresolved, or insufficient. Require typed links from requirement evidence IDs to observation evidence IDs, with `contradicts`, `consistent_with`, or `uncertain` plus an explanation.
+5. **Validate before flagging:** verify the matched ADR is active/current/effective, source hashes, evidence artifact IDs and excerpt hashes, line ranges, call-edge reachability/resolution, typed evidence links, and normative text. Preserve unresolved/dynamic edges as uncertainty.
 6. **No applicable ADR is not proof of compliance:** report that retrieval found no sufficiently supported ADR; retain the event and retrieval audit so corpus/scope metadata can be corrected.
 
 A good future policy is to create a review item for candidate conflicts and missing-applicability cases—not an automatic merge block—until the labeled corpus has independent reviewer dispositions and representative precision/recall measurements.
