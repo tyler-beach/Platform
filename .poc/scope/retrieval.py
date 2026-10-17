@@ -93,6 +93,9 @@ def _relevance(adr: dict[str, Any], query_tokens: set[str]) -> dict[str, Any]:
 def build_query(event: dict[str, Any]) -> str:
     fields = [
         event.get("change_summary", ""),
+        event.get("diff_summary", ""),
+        " ".join(str(x) for x in event.get("normative_requirements", [])),
+        " ".join(str(x) for x in event.get("call_edges", [])),
         " ".join(event.get("evidence_terms", [])),
         " ".join(event.get("changed_paths", [])),
     ]
