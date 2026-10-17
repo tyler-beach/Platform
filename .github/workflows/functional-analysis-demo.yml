@@ -47,7 +47,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Prepare selected scenario
         run: |
           python .github/demo/pipeline.py prepare \
@@ -58,7 +58,7 @@ jobs:
             --run-attempt "${{ github.run_attempt }}" \
             --output run-data
       - name: Upload pinned input bundle
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: demo-inputs-${{ github.run_id }}-${{ github.run_attempt }}
           path: run-data/
@@ -70,15 +70,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Download pinned input bundle
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: demo-inputs-${{ github.run_id }}-${{ github.run_attempt }}
           path: run-data/
       - name: Set up Python for Tree-sitter
         if: ${{ inputs.comparison != 'technical-spec' }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.12"
       - name: Install Tree-sitter language pack
@@ -100,7 +100,7 @@ jobs:
       - name: Normalize deterministic observations
         run: python .github/demo/pipeline.py analyze --output run-data
       - name: Upload analysis outputs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: demo-analysis-${{ github.run_id }}-${{ github.run_attempt }}
           path: run-data/
@@ -112,16 +112,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Download analysis bundle
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: demo-analysis-${{ github.run_id }}-${{ github.run_attempt }}
           path: run-data/
       - name: Build version-bound evidence package
         run: python .github/demo/pipeline.py evidence --output run-data
       - name: Upload evidence package
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: demo-evidence-${{ github.run_id }}-${{ github.run_attempt }}
           path: run-data/
@@ -133,16 +133,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Download evidence bundle
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: demo-evidence-${{ github.run_id }}-${{ github.run_attempt }}
           path: run-data/
       - name: Estimate input and reserve demo budget
         run: python .github/demo/pipeline.py budget --output run-data
       - name: Upload budget decision
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: demo-budget-${{ github.run_id }}-${{ github.run_attempt }}
           path: run-data/
@@ -154,16 +154,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Download budget and evidence bundle
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: demo-budget-${{ github.run_id }}-${{ github.run_attempt }}
           path: run-data/
       - name: Produce deterministic structured candidate
         run: python .github/demo/pipeline.py mock-model --output run-data
       - name: Upload mock response
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: demo-mock-response-${{ github.run_id }}-${{ github.run_attempt }}
           path: run-data/
@@ -175,16 +175,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Download mock response and evidence
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: demo-mock-response-${{ github.run_id }}-${{ github.run_attempt }}
           path: run-data/
       - name: Validate source versions and evidence references
         run: python .github/demo/pipeline.py validate --output run-data
       - name: Upload validation result
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: demo-validation-${{ github.run_id }}-${{ github.run_attempt }}
           path: run-data/
@@ -196,9 +196,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Download validated run bundle
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: demo-validation-${{ github.run_id }}-${{ github.run_attempt }}
           path: run-data/
@@ -207,7 +207,7 @@ jobs:
           python .github/demo/pipeline.py report --output run-data
           cat run-data/functional-analysis-report.md >> "$GITHUB_STEP_SUMMARY"
       - name: Upload complete end-to-end run
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: functional-analysis-demo-${{ github.run_id }}-${{ github.run_attempt }}
           path: run-data/
