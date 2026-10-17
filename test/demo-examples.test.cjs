@@ -6,13 +6,15 @@ const test = require("node:test");
 const demoIndex = fs.readFileSync(path.join(__dirname, "../docs/demo/index.md"), "utf8");
 const spec = fs.readFileSync(path.join(__dirname, "../docs/demo/realistic-session-service.md"), "utf8");
 const api = fs.readFileSync(path.join(__dirname, "../docs/demo/api-payload-examples.md"), "utf8");
+const review = fs.readFileSync(path.join(__dirname, "../docs/demo/finding-review-playbook.md"), "utf8");
 const component = fs.readFileSync(path.join(__dirname, "../src/components/DemoExplorer.jsx"), "utf8");
 const openapi = fs.readFileSync(path.join(__dirname, "../docs/openapi.yaml"), "utf8");
 const apiContract = fs.readFileSync(path.join(__dirname, "../docs/contracts/API_CONTRACT.md"), "utf8");
 
-test("demo index exposes the multi-requirement specification and API response mockups", () => {
+test("demo index exposes the multi-requirement specification, API mockups, and review guide", () => {
   assert.ok(demoIndex.includes("realistic-session-service.md"));
   assert.ok(demoIndex.includes("api-payload-examples.md"));
+  assert.ok(demoIndex.includes("finding-review-playbook.md"));
   assert.ok(demoIndex.includes("production target"));
 });
 
@@ -45,6 +47,20 @@ test("API mockups use the production-target contract enums and response shapes",
   assert.ok(api.includes("proto/adrplatform/v1/platform.proto"));
   assert.ok(!api.includes("JOB_STATE_QUEUED"));
   assert.ok(!api.includes("FINDING_OUTCOME_SUPPORTED_DEVIATION"));
+});
+
+test("finding review playbook separates evidence, inference, outcome, and human disposition", () => {
+  for (const phrase of [
+    "Deviation supported",
+    "Potential finding",
+    "Inconclusive",
+    "not calibrated probabilities",
+    "Pin the inputs",
+    "Challenge the inference",
+    "Not established",
+    "reviewer identity",
+    "synthetic artifacts"
+  ]) assert.ok(review.toLowerCase().includes(phrase.toLowerCase()), "missing review guidance: " + phrase);
 });
 
 test("interactive demo labels and renders a contract-shaped mock API response", () => {
