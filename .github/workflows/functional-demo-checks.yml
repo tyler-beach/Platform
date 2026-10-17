@@ -1,0 +1,57 @@
+name: Functional Demo Harness Checks
+
+on:
+  pull_request:
+    paths:
+      - ".github/demo/**"
+      - ".github/workflows/functional-analysis-demo.yml"
+      - ".github/workflows/functional-demo-checks.yml"
+      - "docs/functional-analysis-demo.md"
+
+permissions:
+  contents: read
+
+jobs:
+  exercise-demo-matrix:
+    name: "Run all demo paths and fixture outcomes"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.x"
+          cache: false
+      - name: Check Python syntax
+        run: python -m py_compile .github/demo/pipeline.py
+      - name: Exercise every comparison and outcome
+        shell: bash
+        run: |
+          set -euo pipefail
+          for comparison in code-diff technical-spec spec-vs-implementation; do
+            for sample_case in deviation aligned insufficient-evidence; do
+              echo "::group::${comparison} / ${sample_case}"
+              rm -rf run-data
+              python .github/demo/pipeline.py prepare \
+                --comparison "$comparison" \
+                --sample-case "$sample_case" \
+                --run-id "pull-request-smoke-test" \
+                --output run-data
+
+              if [[ "$comparison" != "technical-spec" ]]; then
+                go run .github/demo/ast_scan.go \
+                  --source run-data/input/handler.go \
+                  --out run-data/ast-analysis.json
+              fi
+
+              python .github/demo/pipeline.py analyze --output run-data
+              python .github/demo/pipeline.py evidence --output run-data
+              python .github/demo/pipeline.py budget --output run-data
+              python .github/demo/pipeline.py mock-model --output run-data
+              python .github/demo/pipeline.py validate --output run-data
+              python .github/demo/pipeline.py report --output run-data
+              echo "::endgroup::"
+            done
+          done
+          echo "All 9 comparison/case combinations passed."
