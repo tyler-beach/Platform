@@ -31,6 +31,10 @@ test("interactive workspace connects decision, evidence, stage trace, and local 
     assert.ok(component.includes(phrase), `missing UI contract: ${phrase}`);
   }
   assert.match(component, /aria-selected=\{activeKey === item\.key\}/);
+  assert.match(component, /handleTabKeyDown/);
+  assert.match(component, /event\.key === 'ArrowRight'/);
+  assert.match(component, /role="tabpanel" aria-labelledby/);
+  assert.match(component, /SYNTHETIC REF/);
   assert.match(component, /aria-pressed=\{activeEvidence === item\.id\}/);
   assert.match(styles, /@media \(max-width: 600px\)/);
 });
