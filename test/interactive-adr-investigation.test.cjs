@@ -42,7 +42,12 @@ test("interactive workspace connects decision, evidence, stage trace, and local 
   assert.match(component, /run_events\.csv/);
   assert.match(component, /details_json/);
   assert.match(component, /assessment_evidence_links/);
-  assert.match(component, /does not claim type resolution or runtime behavior/);
+  assert.match(component, /source-observation-v1/);
+  assert.match(component, /Python AST \+ scope\/import\/type-hint\/constructor index/);
+  assert.match(component, /go\/packages/);
+  assert.match(component, /not one universal Tree-sitter pass/);
+  assert.match(component, /proposed internal EvidenceItem contract/);
+  assert.doesNotMatch(component, /tree-sitter-language-pack/);
   assert.match(component, /aria-pressed=\{activeEvidence === item\.id\}/);
   assert.match(styles, /@media \(max-width: 600px\)/);
 });
