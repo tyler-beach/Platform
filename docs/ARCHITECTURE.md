@@ -1,73 +1,82 @@
-# Architecture overview
+---
+hide:
+  - navigation
+  - toc
+---
 
-## Recommended target
+# Architecture and system design
 
-Use a Go-first, evidence-driven service. The revised communication design is contract-first Protobuf with a gRPC control-plane API where a long-lived synchronous API has a real consumer. Keep AWS Step Functions as the owner of asynchronous job execution and invoke bounded Lambda workers directly. The gRPC server, if included, is a long-lived Go service (candidate: ECS/Fargate behind an HTTPS Application Load Balancer), not a listener inside Lambda.
+<span class="page-eyebrow">SYSTEM DESIGN</span>
 
-Use the Anthropic API directly through an adapter; do not route inference through Bedrock. Use PostgreSQL/Aurora PostgreSQL for authoritative metadata and results; S3 for immutable source snapshots/large artifacts when needed. Add pgvector only if retrieval evaluation demonstrates value.
+The platform compares implementation and technical specifications with architectural decisions. Its design separates request admission, durable orchestration, deterministic evidence collection, model assessment, validation and review.
 
-The gRPC API deployment and always-on cost remain a decision to settle before MVP. A webhook-only MVP can use HTTP/Lambda ingress while retaining Protobuf as a schema discipline.
+## AWS deployment architecture
 
-## Logical components
+<figure class="diagram-figure">
+  <div class="diagram-viewport"><img src="../assets/diagrams/system-architecture.svg" alt="AWS deployment architecture with service icons, account and VPC boundaries, API Gateway, Step Functions, Go Lambda stages, Aurora PostgreSQL, optional S3, IAM, KMS, Secrets Manager, CloudWatch, CloudTrail, controlled egress and Anthropic API." /></div>
+  <figcaption>Service placement, request and data flow, network boundaries, and the direct provider integration.</figcaption>
+</figure>
 
-- **gRPC control-plane API (optional deployment profile):** authenticates callers, authorizes workspace/artifact references, validates requests, creates idempotent jobs, starts workflow executions and serves job/finding reads.
-- **Ingress adapters:** GitHub webhooks and browser/third-party integrations may require HTTP/JSON adapters. These are separate protocol boundaries, not reasons to force all callers to gRPC.
-- **Workflow orchestrator:** Step Functions owns multi-stage job state, branching, retry/catch, parallel work, deadlines and human-review waits.
-- **Artifact normalization:** converts code changes, specs and ADRs into normalized, versioned artifacts while preserving source identity, hash, location, owner, status and revision.
-- **Context retrieval:** resolves candidate decisions and requirements from status/scope/relationships, identifiers, symbols, full-text search and optionally semantic search.
-- **Deterministic analysis:** parses diffs, syntax/AST/symbol relationships, supported document formats and explicit checks to create source-linked evidence.
-- **Evidence package assembly:** prepares the smallest sufficient, budgeted package for one comparison mode.
-- **AI assessment:** Go adapter calls Anthropic directly with a versioned prompt/schema, deadline, token/cost limits and typed errors.
-- **Verification:** checks schema, evidence IDs, source versions, applicability and domain invariants; optional independent model review is selective.
-- **Persistence/delivery:** records jobs, artifacts, findings, run metadata, audit events and reviewer dispositions.
+## Trust boundaries and data handling
 
-## Communication patterns
+<figure class="diagram-figure">
+  <div class="diagram-viewport"><img src="../assets/diagrams/trust-boundaries.svg" alt="Trust-boundary diagram for untrusted code and ADR sources, authenticated API admission, Step Functions and scoped worker roles, durable evidence validation, direct Anthropic processing and publication controls." /></div>
+  <figcaption>Authorization stays in the application. Source text is untrusted, model output is a candidate, and validated findings retain exact source provenance.</figcaption>
+</figure>
 
-- Use **gRPC + Protobuf** for synchronous, strongly typed control-plane calls between clients and a long-lived API service.
-- Use **Step Functions service integrations** for workflow-to-Lambda task calls. Lambda tasks should not be gRPC servers.
-- Use small JSON envelopes for Step Functions state. If shared Protobuf message types are used at that boundary, convert via ProtoJSON explicitly and test round-tripping.
-- Use **SQS/EventBridge** only when buffering, fan-out or event distribution is needed.
-- Use events/notifications for completion if polling becomes insufficient.
-- Do not build synchronous gRPC calls for every internal function. In-process Go interfaces are enough until a real service boundary exists.
+## Runtime profiles
 
-AWS ALB can route gRPC to registered instance/IP targets but cannot use Lambda as the gRPC target. Therefore, a genuine gRPC server means a long-lived service such as ECS/Fargate (or another always-running target). The alternative is HTTP/Lambda ingress for a serverless-only MVP. See docs/RPC_AND_PROTOBUF.md.
+| Profile | Use when | Main trade-off |
+|---|---|---|
+| HTTP/API Gateway with Go Lambda and Step Functions | Webhooks and asynchronous API consumers are sufficient for the first slice | Simple ingress; manage Lambda concurrency and database connections |
+| gRPC control plane on ECS/Fargate behind an HTTPS ALB | A named client needs long-lived gRPC semantics | Adds service rollout, health management and always-on cost |
+| Shared data plane | Either profile | Aurora owns job and result metadata; S3 holds large immutable artifacts where needed |
 
-## Design patterns
+Protobuf can remain the contract source even when the first API is HTTP/JSON. Lambda workers execute tasks; they do not host gRPC listeners. The model provider is the direct Anthropic API, behind a typed Go adapter.
 
-- **Pipeline/stages:** one responsibility and typed input/output per stage.
-- **Ports and adapters:** domain logic avoids AWS/provider-specific types.
-- **Immutable artifacts/evidence:** source versions and stage outputs have stable IDs/hashes.
-- **Contract-first API:** Protobuf is the source schema for the versioned gRPC control-plane API.
-- **Explicit state machine:** job lifecycle and permitted transitions are explicit.
-- **Fan-out/fan-in:** independent deterministic analysis and context retrieval can run in parallel.
-- **Hybrid rules + AI:** deterministic checks for crisp predicates; model reasoning for semantic interpretation.
-- **Idempotent workers:** retries/replays do not duplicate results or external side effects.
-- **Append-oriented audit trail:** record transitions, retries, publishing and reviewer disposition.
-- **Human-in-the-loop:** ambiguous/high-impact findings go to review.
-- **Transactional outbox only if needed:** add when domain persistence and event publication consistency require it.
+The deployment choice between HTTP/Lambda and a long-lived gRPC service, along with the egress route used for provider calls, should be settled before those boundaries are implemented.
 
-Avoid an unversioned global “blackboard” of changing text. Prefer persisted job state and immutable artifacts/evidence packages with explicit IDs and versions.
+## Analysis workflow
 
-## Orchestration boundary
+<figure class="diagram-figure">
+  <div class="diagram-viewport"><img src="../assets/diagrams/analysis-workflow.svg" alt="Six-stage workflow: admit and authorize, pin source versions, gather deterministic evidence, reserve cumulative budget, run a bounded assessment, validate and persist the outcome, then apply freshness and review gates." /></div>
+  <figcaption>One workflow owns stage ordering, retries, deadlines and cancellation. Required-evidence gaps remain visible in the outcome.</figcaption>
+</figure>
 
-Step Functions owns the distributed analysis job. gRPC owns request/response operations at the synchronous API boundary. Neither replaces the other. Do not make gRPC the job orchestrator and do not use Step Functions plus LangGraph as competing owners of the same job lifecycle.
+Key invariants:
 
-LangGraph is optional for a bounded AI sub-workflow if conditional reasoning loops/checkpointing become materially useful. It is not required to call functions or use non-LLM workers.
+1. **Durable acceptance.** Commit the job, idempotency record and dispatch intent before acknowledging. Reconcile workflow-start failures so accepted jobs do not become stranded.
+2. **Pinned evidence.** Preserve source revisions, content hashes and the parser, pipeline and policy versions used.
+3. **Visible completeness.** Every evidence branch reports status and completeness. Missing required evidence triggers bounded recovery or an inconclusive result.
+4. **Shared budget.** Retries, repairs and verification consume the same token, spend, call and deadline allowances.
+5. **Validated persistence.** Go code validates source versions, evidence IDs, applicability and domain rules before committing findings.
+6. **Fresh publication.** Persist the result first, then recheck source freshness and review policy before any external effect.
 
-## Candidate AWS footprint
+## Budget and usage accounting
 
-- **Serverless API profile:** API Gateway/HTTP + Go Lambda, Step Functions and Lambda workers; protobuf can remain the schema/contracts tool without running a gRPC server.
-- **gRPC API profile:** HTTPS ALB + Go gRPC API on ECS/Fargate; API starts and queries Step Functions; worker Lambdas remain unchanged.
-- **Shared data plane:** Aurora/PostgreSQL, S3 where needed, Secrets Manager, IAM, CloudWatch and OpenTelemetry-compatible tracing/export.
-- Add SQS/EventBridge only when operationally needed.
+<figure class="diagram-figure">
+  <div class="diagram-viewport"><img src="../assets/diagrams/token-budget.svg" alt="Budget flow from request construction and token estimation through concurrency-safe reservation, bounded provider execution, usage reconciliation and stop conditions across a shared job ledger." /></div>
+  <figcaption>Per-call limits are combined with a cumulative per-job ledger shared across parallel work, retries and optional verification.</figcaption>
+</figure>
 
-## Failure policy
+The price/model settings and prompt/schema versions are recorded as configuration, not embedded as domain constants. Ambiguous provider usage remains accounted for conservatively until reconciled.
 
-Workers return typed results or classified errors. Retry transient faults with bounded backoff; do not blindly retry invalid input, authorization failures, unsupported formats, stale references or deterministic validation failures. All jobs end as completed, review-required, failed, cancelled or expired. gRPC calls use deadlines, message-size limits and standard status codes. Creation is idempotent by key.
+## Engineering delivery
 
-See docs/RPC_AND_PROTOBUF.md, docs/diagrams/architecture.md, docs/DATA_MODEL.md and docs/OPERATIONS.md.
+<figure class="diagram-figure">
+  <div class="diagram-viewport"><img src="../assets/diagrams/engineering-loop.svg" alt="OpenSpec lifecycle from proposal and behavioral scenarios through regression proof, implementation, layered verification, adversarial review and archive." /></div>
+  <figcaption>Archive follows verification evidence and review—not code completion alone.</figcaption>
+</figure>
 
+## Ownership by concern
 
-## Functional core / imperative shell
+| Concern | Owner | Rule |
+|---|---|---|
+| Identity and workspace scope | Ingress and server-side authorization | A caller-supplied workspace ID is only a selector |
+| Asynchronous job lifecycle | Step Functions plus durable job/dispatch state | No competing orchestrator |
+| Domain policy | Pure Go functions over explicit, versioned inputs | Prompts and workflow expressions do not own policy |
+| Model calls | Typed harness | Enforce budgets, deadlines, schema and retry rules |
+| Provenance | Immutable artifact versions and evidence locators | Findings point to the exact inputs analyzed |
+| Business audit | Durable job/review/audit records | Tracing is operational telemetry, not the business record |
+| Publication | Validated application path | Freshness, authorization, review policy and idempotency must hold |
 
-Keep deterministic policy and evidence transforms in pure domain functions. Infrastructure adapters load facts, call Anthropic, write databases, start workflows and publish results. Avoid hidden effects in applicability/resolution functions, mutable global job state, and prompt-only policy enforcement. Model calls are explicit nondeterministic effects; their inputs/outputs and versions are recorded. Sort evidence deterministically before constructing prompts and fingerprints. Use idiomatic Go errors, and keep domain outcomes such as inconclusive separate from execution failures. See [functional core review](FUNCTIONAL_CORE.md).
