@@ -10,7 +10,7 @@ All curated examples use synthetic fixtures. Live artifact inputs are displayed 
 
 Use these longer examples to follow multiple requirements through evidence, findings, and API payloads rather than inspect a single isolated case.
 
-- [Session Management Service: multi-requirement technical specification](realistic-session-service.md) — ten requirements, four architecture decisions, mixed alignments, deviations, potential findings and inconclusive cases, reviewer actions, and an evidence-linked finding envelope.
-- [Analysis job and findings API payloads](api-payload-examples.md) — job submission (202), asynchronous lifecycle, finding list, an inconclusive finding, and a stable 409 error response.
+- [Session Management Service: multi-requirement technical specification](realistic-session-service.md) — ten requirements, four ADRs, mixed alignments, deviations, potential findings and inconclusive cases, reviewer actions, and an evidence-linked finding envelope.
+- [API response mockups](api-payload-examples.md) — contract-shaped job acceptance, lifecycle polling, findings with immutable evidence references, an inconclusive result, and a stable 409 error response.
 
-All identifiers, source references, payloads, and results in these documents are synthetic teaching examples. They are not live scan output, and the API server is not deployed.
+The examples use synthetic source data. The API contract is the production target; these payloads are mock responses, not responses from a running service.
