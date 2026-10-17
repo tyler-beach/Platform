@@ -263,10 +263,10 @@ function RequirementLab() {
     </div>
 
     <nav className="journey-scenarios" role="tablist" aria-label="Choose an example investigation">
-      {Object.values(requirementExamples).map((item, index) => <button key={item.key} ref={node => { tabRefs.current[item.key] = node; }} id={\`adr-tab-\${item.key}\`} tabIndex={activeKey === item.key ? 0 : -1} type="button" role="tab" aria-controls="journey-panel" aria-selected={activeKey === item.key} className={activeKey === item.key ? 'is-active' : ''} onKeyDown={event => handleTabKeyDown(event, index)} onClick={() => chooseExample(item.key)}><span className="journey-scenarios__number">0{index + 1}</span><span><strong>{item.key === 'ttl' ? 'Session lifetime' : 'Pod availability'}</strong><small>{item.key === 'ttl' ? 'IDENTITY SECURITY' : 'KUBERNETES · RESILIENCE'}</small></span><ArrowUpRight size={15}/></button>)}
+      {Object.values(requirementExamples).map((item, index) => <button key={item.key} ref={node => { tabRefs.current[item.key] = node; }} id={`adr-tab-${item.key}`} tabIndex={activeKey === item.key ? 0 : -1} type="button" role="tab" aria-controls="journey-panel" aria-selected={activeKey === item.key} className={activeKey === item.key ? 'is-active' : ''} onKeyDown={event => handleTabKeyDown(event, index)} onClick={() => chooseExample(item.key)}><span className="journey-scenarios__number">0{index + 1}</span><span><strong>{item.key === 'ttl' ? 'Session lifetime' : 'Pod availability'}</strong><small>{item.key === 'ttl' ? 'IDENTITY SECURITY' : 'KUBERNETES · RESILIENCE'}</small></span><ArrowUpRight size={15}/></button>)}
     </nav>
 
-    <div className="journey-workspace" id="journey-panel" role="tabpanel" aria-labelledby={\`adr-tab-\${activeKey}\`}>
+    <div className="journey-workspace" id="journey-panel" role="tabpanel" aria-labelledby={`adr-tab-${activeKey}`}>
       <aside className="journey-rail" aria-label="Investigation progress">
         <div className="journey-rail__heading"><span className="demo-label">INVESTIGATION</span><strong>{String(activeStage + 1).padStart(2, '0')} <small>/ 05</small></strong></div>
         <div className="journey-rail__track" aria-hidden="true"><span style={{height: progress + '%'}}/></div>
@@ -321,7 +321,7 @@ function RequirementLab() {
           {review[activeKey] && <p className="journey-review-result" role="status">Your local choice: {review[activeKey]}. This example does not change a system or send data anywhere.</p>}
         </div>}
         <footer className="journey-controls">
-          <div className="journey-controls__left"><span>{activeStage + 1} of {example.stages.length}</span><span className="journey-controls__dots" aria-label={\`Step \${activeStage + 1} of 5\`}>{example.stages.map((item, index) => <i key={item[0]} className={index === activeStage ? 'is-active' : index < activeStage ? 'is-complete' : ''}/>)}</span></div>
+          <div className="journey-controls__left"><span>{activeStage + 1} of {example.stages.length}</span><span className="journey-controls__dots" aria-label={`Step ${activeStage + 1} of 5`}>{example.stages.map((item, index) => <i key={item[0]} className={index === activeStage ? 'is-active' : index < activeStage ? 'is-complete' : ''}/>)}</span></div>
           <div className="journey-controls__buttons"><button type="button" className="journey-secondary" disabled={activeStage === 0} onClick={() => goToStage(activeStage - 1)}>Back</button><button type="button" className="journey-secondary" onClick={() => { if (isPlaying) setIsPlaying(false); else { if (activeStage === example.stages.length - 1) setActiveStage(0); setIsPlaying(true); } }}>{isPlaying ? <><Pause size={14}/> Pause</> : <><Play size={14}/> {activeStage === example.stages.length - 1 ? 'Replay' : 'Resume'}</>}</button><button type="button" className="journey-next" onClick={() => { if (activeStage === example.stages.length - 1) { setIsPlaying(false); setActiveStage(0); } else goToStage(activeStage + 1); }}>{activeStage === example.stages.length - 1 ? 'Start again' : 'Next step'} <ArrowRight size={15}/></button></div>
         </footer>
       </div>
