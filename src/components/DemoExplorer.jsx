@@ -43,9 +43,36 @@ export default function DemoExplorer() {
         </article>
         <article className="technical-trace__panel">
           <div className="technical-trace__panel-title"><Braces size={17} /><div><strong>02 / API response payloads</strong><small>202 accepted · job state · findings · 409</small></div></div>
-          <p className="technical-trace__explain">Inspect proposed JSON for async job acceptance, lifecycle polling, evidence references, an inconclusive result, and an idempotency conflict.</p>
-          <ul className="technical-trace__notes"><li>Job state is separate from finding outcome</li><li>Findings cite immutable evidence references</li><li>Contract is design-only; no server is deployed</li></ul>
-          <a href={`${BASE_URL}demo/api-payload-examples/`}>Inspect API payload examples <ArrowUpRight size={13} /></a>
+          <p className="technical-trace__explain">A deterministic mock response shaped to the production-target contract. The status and JSON below are illustrative; they are not fetched from a running API.</p>
+          <div className="api-mock-response__meta"><span className="api-mock-response__status">HTTP 200</span><span>MOCK RESPONSE · application/json</span></div>
+          <pre aria-label="Mock API response for a finding"><code>{JSON.stringify({
+  finding: {
+    findingId: "fnd_ses_005_pdb_minavailable",
+    jobId: "job_01JAXAMPLE482",
+    outcome: "FINDING_OUTCOME_DEVIATION_SUPPORTED",
+    severity: "FINDING_SEVERITY_HIGH",
+    reviewStatus: "REVIEW_STATUS_PENDING",
+    claim: "The supplied PodDisruptionBudget conflicts with ADR-002.",
+    rationale: "minAvailable is 2; the accepted decision specifies 1. This may block voluntary disruption but does not prove an outage.",
+    decisionIds: ["ADR-002"],
+    requirementIds: ["SES-005"],
+    evidence: [{
+      evidenceId: "ev_pdb_001",
+      artifactId: "deploy_session_pdb",
+      artifactVersionId: "git:9c4c0d8",
+      path: "deploy/session/pdb.yaml",
+      startLine: 8,
+      endLine: 10,
+      excerptSha256: "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210"
+    }],
+    humanReviewRequired: true,
+    validationStatus: "VALIDATED",
+    findingFingerprint: "sha256:example-pdb-policy-fingerprint",
+    createdAt: "2026-10-17T23:30:16Z"
+  }
+}, null, 2)}</code></pre>
+          <ul className="technical-trace__notes"><li>Fields and enum values follow the current OpenAPI/Protobuf contract</li><li>Evidence is version-bound; source access is separately authorized</li><li>Mock response only; the production API implementation is a separate work item</li></ul>
+          <a href={`${BASE_URL}demo/api-payload-examples/`}>Explore all API response mockups <ArrowUpRight size={13} /></a>
         </article>
       </div>
     </section>
