@@ -11,6 +11,7 @@ sys.path.insert(0, str(SCOPE_DIR))
 import retrieval
 import run_scope
 import index_catalog
+import aurora_backend
 
 
 class ScopeRetrievalTests(unittest.TestCase):
@@ -39,6 +40,15 @@ class ScopeRetrievalTests(unittest.TestCase):
         self.assertNotIn("score", excluded["ADR-006"])
         self.assertNotIn("lifecycle_near_match", excluded["ADR-006"])
 
+
+    def test_aurora_vector_search_filters_lifecycle_before_similarity_ranking(self):
+        sql = aurora_backend.SEARCH_SQL.lower()
+        self.assertIn("where status in ('accepted', 'approved', 'active')", sql)
+        self.assertIn("review_state in ('current', 'active', 'approved')", sql)
+        self.assertIn("effective_until is null or effective_until > now()", sql)
+        self.assertNotIn("superseded", sql)
+        self.assertNotIn("inactive_search_sql", aurora_backend.__dict__)
+
     def test_service_and_domain_metadata_gate_is_enforced_before_ranking(self):
         event = dict(self.by_id["SCOPE-01"])
         result = retrieval.retrieve(event, self.catalog)
@@ -60,7 +70,7 @@ class ScopeRetrievalTests(unittest.TestCase):
                 )
 
 
-    def test_event_template_uses_supplied_evidence_and_flags_only_a_candidate(self):
+    def test_event_template_returns_an_evidence_linked_comparison(self):
         import json
         event = json.loads((SCOPE_DIR / "event-template.json").read_text(encoding="utf-8"))
         result = run_scope.evaluate_event(event, self.catalog, top_k=5, in_scope_threshold=0.28,
