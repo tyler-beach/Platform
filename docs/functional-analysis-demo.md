@@ -2,85 +2,100 @@
 
 <span class="page-eyebrow">GITHUB ACTIONS / WALKTHROUGH</span>
 
-Use the [Functional Analysis Demo workflow](https://github.com/tyler-beach/Platform/actions/workflows/functional-analysis-demo.yml) to run a synthetic analysis from input selection through source parsing, evidence packaging, budget preflight, a mock model response, evidence validation and a final report.
+Run the [Functional Analysis Demo workflow](https://github.com/tyler-beach/Platform/actions/workflows/functional-analysis-demo.yml) to follow a synthetic analysis from input selection through parsing, evidence assembly, budget preflight, a mock assessment, validation and a final report.
 
-The workflow is designed to make the boundaries and artifacts visible in GitHub Actions. All inputs are synthetic. The mock-model stage makes no network requests and uses no secrets.
+## Run a scenario
 
-## Run it
+1. Open the [workflow](https://github.com/tyler-beach/Platform/actions/workflows/functional-analysis-demo.yml) and select **Run workflow**.
+2. Pick the comparison, source language and sample outcome.
+3. Start the run. Open each job in the graph to see its log and step summary.
+4. Open the final job summary and download the `functional-analysis-demo` artifact for the full set of intermediate files and the Markdown report.
 
-1. Open the [workflow page](https://github.com/tyler-beach/Platform/actions/workflows/functional-analysis-demo.yml) in the repository.
-2. Select **Run workflow**.
-3. Choose a comparison and sample case, then start the run.
-4. Open each job in the workflow graph to inspect its logs and step summary.
-5. Open the final job summary, then download the `functional-analysis-demo` artifact to inspect every intermediate JSON file and the complete Markdown report.
+## Choose the comparison
 
-## Select a comparison
-
-| Comparison input | Inputs pinned for the run | Deterministic analysis |
+| Comparison | Inputs | Work performed |
 |---|---|---|
-| `code-diff` | Synthetic Go handler, its diff and ADR-001 | Parse the handler with `go/parser` / `go/ast`; extract selected call sites and diff evidence |
-| `technical-spec` | Synthetic Markdown specification and ADR-001 | Extract requirement statements and classify explicit execution constraints; AST is not applicable |
-| `spec-vs-implementation` | Async technical specification, synthetic Go handler and diff | Parse the handler and compare its call sites with the specification requirement |
+| `code-diff` | A synthetic source file, its diff and ADR-001 | Parse the changed implementation, extract syntax-node observations, inspect added diff lines and compare evidence with the ADR. |
+| `technical-spec` | A synthetic Markdown specification and ADR-001 | Extract requirement statements, classify explicit execution constraints and compare them with the ADR. Code parsing is skipped. |
+| `spec-vs-implementation` | A synthetic technical spec, source file and diff | Parse the source and compare its call-site observations with the requirement. |
 
-## Select a sample case
+## Choose a source language
 
-| Sample case | Example behavior | Expected outcome |
+The code path uses [Tree-sitter](https://tree-sitter.github.io/tree-sitter/) through the pinned `tree-sitter-language-pack` package. Each grammar feeds the same output and evidence contract.
+
+| Trigger option | Fixture extension |
+|---|---|
+| `go` | `.go` |
+| `python` | `.py` |
+| `javascript` | `.js` |
+| `typescript` | `.ts` |
+| `java` | `.java` |
+
+Tree-sitter gives us real language parsing and exact syntax-node source spans. The current call labels are deliberately simple receiver/method heuristics; they are not type resolution or proof of transitive runtime behavior. The technical-spec-only path uses the deterministic Markdown extractor instead.
+
+## Choose the outcome to exercise
+
+| Sample | What the fixture contains | Expected result |
 |---|---|---|
-| `deviation` | Direct provider call conflicts with the decision, or the specification explicitly requires synchronous execution | `supported_deviation` |
-| `aligned` | The handler enqueues work, or the specification requires the asynchronous workflow | `no_deviation_found` |
-| `insufficient-evidence` | A helper call hides the actual behavior, or the specification does not say whether work is synchronous | `inconclusive` |
+| `deviation` | A direct provider-shaped call, or a requirement that explicitly calls for synchronous execution | `supported_deviation` |
+| `aligned` | An enqueue/workflow handoff, or a requirement for asynchronous processing | `no_deviation_found` |
+| `insufficient-evidence` | A helper call hides its behavior, or the spec leaves execution mode unspecified | `inconclusive` |
 
-The expected outcome is stored in a separate test-oracle file. The mock-model stage does not read that oracle. The final validator compares the candidate with the oracle to make sure every workflow option exercises the intended path.
+The expected result lives in a separate test-oracle file. The mock-model step cannot read it. The final validator compares the candidate outcome with that oracle after checking the evidence package.
 
-## Workflow graph
+## The workflow
 
 ~~~mermaid
 flowchart TD
-  A["1 · Admit + pin inputs"] --> B["2 · AST + document analysis"]
+  A["1 · Admit + pin inputs"] --> B["2 · Tree-sitter + document analysis"]
   B --> C["3 · Evidence contract"]
   C --> D["4 · Budget preflight"]
-  D --> E["5 · Mock LLM assessment"]
+  D --> E["5 · Mock assessment"]
   E --> F["6 · Validate citations + outcome"]
   F --> G["7 · Report + downloadable evidence bundle"]
 ~~~
 
-## What each stage emits
+The jobs intentionally pass versioned artifacts between stages. You can open a stage, inspect its output, and then follow the corresponding JSON file in the downloaded run bundle.
 
-| Stage | Main artifact | Purpose |
+## Stage outputs
+
+| Stage | Output | What to inspect |
 |---|---|---|
-| Admission | `input-manifest.json` | Records the selected mode, fixture origin, byte length and SHA-256 source version |
-| AST / document analysis | `ast-analysis.json`, `analysis.json` | Records parsed call sites, extracted requirements and the analysis limits |
-| Evidence contract | `evidence-package.json`, `evidence-contract-check.json` | Assigns stable evidence IDs and ties every excerpt to a source artifact, version and locator |
-| Budget gate | `budget-decision.json` | Shows an estimated input size, output reservation and call ceiling for the demo |
-| Mock model | `mock-model-response.json` | Shows the structured candidate response, prompt/model fixture versions, rationale and evidence IDs |
-| Validation | `validation-result.json` | Checks that citations exist, versions match, required support types are present and the outcome matches the fixture expectation |
-| Final report | `functional-analysis-report.md`, `functional-analysis-report.json` | Summarizes the run and is included with all intermediate artifacts |
+| Admission | `input-manifest.json` | Selected mode/language, fixture origin, file size and SHA-256 version |
+| Parsing and extraction | `ast-analysis.json`, `analysis.json` | Grammar, parse status, call target, enclosing function, source span, selected diff lines and requirements |
+| Evidence | `evidence-package.json`, `evidence-contract-check.json` | Evidence IDs bound to artifact IDs, source hashes, locators, facts and excerpts |
+| Budget gate | `budget-decision.json` | Input-size estimate, output reservation and call ceiling |
+| Mock assessment | `mock-model-response.json` | Structured candidate, rationale, limitations, evidence IDs and model/prompt fixture versions |
+| Validation | `validation-result.json` | Source hashes, exact syntax-node spans, evidence references, support types and expected outcome |
+| Final report | `functional-analysis-report.md`, `functional-analysis-report.json` | Run summary, cited evidence and validation results |
 
-## Evidence record shape
+## Evidence item shape
 
-An evidence item follows this illustrative contract:
+A Tree-sitter call-site evidence record includes a source locator down to the exact byte range of the syntax node:
 
 ~~~json
 {
-  "evidence_id": "EV-AST-001",
+  "evidence_id": "EV-TS-001",
   "artifact_id": "ART-CODE-001",
   "artifact_version": "sha256:<digest of exact input bytes>",
-  "source_path": "run-data/input/handler.go",
+  "source_path": "input/handler.py",
   "locator": {
-    "kind": "source-line",
-    "line_start": 4,
-    "line_end": 4
+    "kind": "tree-sitter-node",
+    "line_start": 3,
+    "line_end": 3,
+    "start_byte": 74,
+    "end_byte": 113
   },
-  "evidence_type": "ast_call_site",
+  "evidence_type": "syntax_call_site",
   "fact": "synchronous_provider_call: direct call observed at this site",
-  "excerpt": "h.anthropic.Assess"
+  "excerpt": "self.anthropic.assess(ctx, request)"
 }
 ~~~
 
-The actual line number and digest depend on the selected sample. The validator checks every cited ID against the exact evidence package and checks that evidence versions correspond to the input manifest.
+The actual span depends on the selected language and fixture. Validation slices the pinned source bytes using the recorded offsets and requires an exact match to the excerpt. It also verifies that the artifact ID and SHA-256 version resolve to the current run's input manifest.
 
-## What the mock model does—and doesn't
+## What the mock does
 
-The mock model is a deterministic fixture ruleset shaped like a structured model response. It returns an outcome, rationale, limitations, evidence IDs and run metadata. It does not call Anthropic, estimate actual provider billing, claim production AST coverage, or prove transitive runtime behavior. The budget uses a small character-based estimate only to demonstrate the preflight stage and reservation fields.
+The mock assessment is a deterministic ruleset that emits the shape expected from a model response: outcome, rationale, limitations, evidence IDs and run metadata. It makes no network requests and uses no secrets. The budget is a character-based demonstration estimate, not a provider tokenizer, reservation service or billing calculation.
 
-A successful run means that the demo pipeline, evidence contract and fixture expectation agree. It is not an accuracy evaluation of a language model or an implementation of the production analysis service.
+A green run means that parsing, evidence construction, reference validation and the selected fixture expectation agree. It does not measure LLM accuracy or prove behavior beyond the code and evidence included in the scenario.
