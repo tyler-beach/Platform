@@ -11,6 +11,12 @@ This directory contains an executable vertical slice, not just a visual demo. It
 
     python .poc/evaluation/evaluate.py --provider mock --output-dir /tmp/adr-evaluation
 
+## Simulate ADR scope retrieval and flag candidates
+
+    python .poc/scope/run_scope.py --output-dir /tmp/adr-scope-report
+
+This runs the offline ADR catalog, filters by lifecycle/repository/service/domain/language, ranks candidates, and emits review-only cue flags with source hashes. To run one change event use `--event-json /path/to/change-event.json`. The opt-in Bedrock/Aurora adapter is documented in docs/ADR_SCOPE_RETRIEVAL.md; CI never calls AWS.
+
 The labeled evaluation suite runs 14 synthetic boundary cases, records outcome metrics and a review-gate threshold sweep, and emits both Markdown and JSON reports. Labels are provisional until architecture reviewers independently adjudicate them. The evidence-strength score is not a probability. See docs/EVALUATION.md for scope, metrics, limits, and how to opt into live-model evaluation.
 
 For TypeScript/JavaScript, Node.js 20+ and the pinned TypeScript compiler are required. For Go, Go 1.24+ is required. For Java, JDK 21+ is required. Python uses the standard-library AST and scope/index resolver, in addition to shared Tree-sitter syntax diagnostics.
