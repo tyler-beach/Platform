@@ -20,7 +20,7 @@ SEARCH_SQL = """
 SELECT
     chunk_id, adr_id, adr_version, title, chunk_text, normative_text, owner, status, review_state,
     effective_from, effective_until, repositories, services, domains, languages, tags, deviation_check,
-    source_path, source_sha256, embedding_model_id, embedding_dimensions,
+    source_path, source_sha256, embedding_model_id, embedding_input_sha256, embedding_dimensions,
     1.0 - (embedding <=> %(query_embedding)s::vector) AS similarity
 FROM adr_chunks
 WHERE status IN ('accepted', 'approved', 'active')
@@ -41,7 +41,7 @@ INACTIVE_SEARCH_SQL = """
 SELECT
     chunk_id, adr_id, adr_version, title, chunk_text, normative_text, owner, status, review_state,
     effective_from, effective_until, repositories, services, domains, languages, tags, deviation_check,
-    source_path, source_sha256,
+    source_path, source_sha256, embedding_model_id, embedding_input_sha256, embedding_dimensions,
     1.0 - (embedding <=> %(query_embedding)s::vector) AS similarity
 FROM adr_chunks
 WHERE (
@@ -50,6 +50,8 @@ WHERE (
     OR (effective_from IS NOT NULL AND effective_from > now())
     OR (effective_until IS NOT NULL AND effective_until <= now())
 )
+  AND embedding_model_id = %(embedding_model_id)s
+  AND embedding_dimensions = %(embedding_dimensions)s
   AND ('*' = ANY(repositories) OR %(repository)s = ANY(repositories))
   AND ('*' = ANY(services) OR %(service)s = ANY(services))
   AND ('*' = ANY(domains) OR %(domain)s = ANY(domains))
