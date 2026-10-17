@@ -1,0 +1,1 @@
+Do not assume an atomic transaction spans a relational write and workflow/event dispatch. Persist an outbox record with domain state and dispatch idempotently with reconciliation.
