@@ -38,33 +38,47 @@ export default function DemoExplorer() {
       </div>
       <div className="technical-trace__grid">
         <article className="technical-trace__panel">
-          <div className="technical-trace__panel-title"><Braces size={17} /><div><strong>01 / AST observation</strong><small>Tree-sitter · source-level syntax</small></div></div>
-          <p className="technical-trace__explain">The scanner parses source into a syntax tree, walks call-expression nodes, and emits stable source spans. It does not claim type resolution or runtime behavior.</p>
-          <pre aria-label="Example AST observation JSON"><code>{JSON.stringify({
-  scanner: "tree-sitter-language-pack",
-  language: "python",
-  source_path: "src/session.py",
-  source_sha256: "sha256:<digest-of-source-bytes>",
-  parse_status: "parsed",
-  root_has_error: false,
-  syntax_error_count: 0,
-  observations: [{
-    observation_id: "TS-001",
-    enclosing_function: "validate_session",
-    line: 42,
-    column: 9,
-    end_line: 42,
-    end_column: 39,
-    call: "anthropic_client.assess",
-    expression: "anthropic_client.assess(request)",
-    receiver_expression: "anthropic_client",
-    method_name: "assess",
-    classification: "synchronous_provider_call",
-    classification_basis: "syntactic_heuristic"
-  }]
+          <div className="technical-trace__panel-title"><Braces size={17} /><div><strong>01 / AST observation</strong><small>Language-specific AST / SSA · static call graph</small></div></div>
+          <p className="technical-trace__explain">Collectors are language-specific: Python uses <code>ast</code> plus scope/import/type-hint indexes; Go uses <code>go/packages</code>, <code>go/types</code>, SSA and CHA; TypeScript/JavaScript use a dedicated call-graph collector. A normalizer emits source-bound observations. This is not one universal Tree-sitter pass.</p>
+          <pre aria-label="Example normalized code observation JSON"><code>{JSON.stringify({
+  schema_version: "source-observation-v1",
+  observation_id: "obs:<sha256-of-canonical-observation>",
+  predicate: "code.call_edge",
+  subject: {
+    id: "py:src/session.py:42:validate_session",
+    kind: "function",
+    name: "service.session.validate_session"
+  },
+  value: {
+    target: "service.providers.assess",
+    call_expression: "provider.assess(request)",
+    edge_id: "edge:<collector-edge-id>",
+    reachable_from_entry: true,
+    dispatch_kind: "static"
+  },
+  source_ref: {
+    artifact_id: "artifact:<run-bound-id>",
+    version: "git:<immutable-revision>",
+    sha256: "<64-character-source-digest>",
+    path: "src/session.py",
+    locator: { kind: "line", start: 42, end: 42 }
+  },
+  collector: {
+    name: "language-callgraph",
+    version: "callgraph-observations-v1",
+    language: "python",
+    resolver: "Python AST + scope/import/type-hint/constructor index",
+    run_id: "run-example-0042"
+  },
+  resolution: {
+    status: "resolved",
+    source_status: "resolved_static",
+    basis: "scope_import_index"
+  },
+  evidence_class: "static_code_observation"
 }, null, 2)}</code></pre>
-          <ul className="technical-trace__notes"><li>Byte offsets and line/column spans bind observations to exact source.</li><li>Classification is heuristic; receiver names can be misleading.</li><li>Parse errors fail the scan and are retained with source locations.</li></ul>
-          <a href={`https://github.com/${repository}/blob/main/.github/demo/ast_scan.py`} target="_blank" rel="noreferrer">Read the AST scanner <ArrowUpRight size={13} /></a>
+          <ul className="technical-trace__notes"><li>PoC observations use one-based line locators plus immutable artifact version and SHA-256; the Python collector also records symbol line ranges.</li><li>Resolution varies by language and resolver. “Resolved” is static-analysis status, not runtime proof.</li><li>Unresolved / approximate edges and collector diagnostics remain explicit; coverage gaps must not be interpreted as absence.</li></ul>
+          <a href={`https://github.com/${repository}/blob/main/.github/demo/ast_scan.py`} target="_blank" rel="noreferrer">Read the Python AST collector <ArrowUpRight size={13} /></a>
         </article>
         <article className="technical-trace__panel">
           <div className="technical-trace__panel-title"><ShieldCheck size={17} /><div><strong>02 / Evidence item</strong><small>Immutable source reference · claim relation</small></div></div>
