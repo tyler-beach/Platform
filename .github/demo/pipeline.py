@@ -217,10 +217,12 @@ def analyze(args: argparse.Namespace) -> None:
         ],
     }
     save_json(root / "analysis.json", result)
-    observation_text = [f"- Line {o['line']}: `{o['call']}` → `{o['classification']}`"
-                        for o in ast.get("observations", [])]
+    observation_text = [
+        f"- `{o['enclosing_function']}` at {o['line']}:{o['column']}: `{o['expression']}` → `{o['classification']}` (syntactic heuristic)"
+        for o in ast.get("observations", [])
+    ]
     if not observation_text:
-        observation_text = ["- AST stage not applicable for this input; Markdown requirement extraction ran instead."]
+        observation_text = ["- Tree-sitter is not applicable to this spec-only input; Markdown requirement extraction ran instead."]
     req_text = [f"- Line {r['line']}: `{r['classification']}` — {r['text']}" for r in requirements]
     if not req_text:
         req_text = ["- No technical-spec requirements were included in this comparison."]
@@ -264,8 +266,8 @@ def evidence(args: argparse.Namespace) -> None:
         ast = analysis["static_analysis"]
         for idx, item in enumerate(ast.get("observations", [])):
             add(
-                f"EV-AST-{idx+1:03d}", "implementation", item["line"], item.get("end_line", item["line"]),
-                "tree-sitter-node", "ast_call_site",
+                f"EV-TS-{idx+1:03d}", "implementation", item["line"], item.get("end_line", item["line"]),
+                "tree-sitter-node", "syntax_call_site",
                 item["classification"] + ": " + item["reason"], item["expression"],
                 {"start_byte": item["start_byte"], "end_byte": item["end_byte"],
                  "start_column": item.get("column"), "end_column": item.get("end_column")},
@@ -292,7 +294,7 @@ def evidence(args: argparse.Namespace) -> None:
         "source_artifacts": manifest["artifacts"],
         "completeness": {
             "adr_constraints_present": bool(analysis["adr_constraints"]),
-            "implementation_ast_parsed": analysis["static_analysis"].get("parse_status") == "parsed",
+            "implementation_syntax_parsed": analysis["static_analysis"].get("parse_status") == "parsed",
             "specification_requirements_present": bool(analysis["requirements"]),
             "diff_present": "diff" in artifact_by_role,
         },
@@ -388,7 +390,7 @@ def mock_model(args: argparse.Namespace) -> None:
     elif scenario == "code-diff":
         if "synchronous_provider_call" in classes:
             outcome = "supported_deviation"
-            rationale = "The AST identifies a direct provider-style call in the request handler, which conflicts with the accepted ADR constraint."
+            rationale = "Tree-sitter identified a direct provider-shaped call in the request handler; the selected rule classifies it as conflicting with the accepted ADR constraint."
             limitation = ""
         elif "async_enqueue" in classes:
             outcome = "no_deviation_found"
@@ -416,7 +418,7 @@ def mock_model(args: argparse.Namespace) -> None:
     wanted: list[str] = []
     if "EV-ADR-001" in available:
         wanted.append("EV-ADR-001")
-    for eid in ("EV-AST-001", "EV-SPEC-001", "EV-DIFF-001"):
+    for eid in ("EV-TS-001", "EV-SPEC-001", "EV-DIFF-001"):
         if eid in available:
             wanted.append(eid)
     candidate = {
@@ -582,6 +584,7 @@ def report(args: argparse.Namespace) -> None:
         "",
         f"- **Run:** `{manifest['run_id']}`",
         f"- **Comparison:** `{manifest['comparison']}`",
+        f"- **Language:** `{manifest.get('language', 'not applicable')}`",
         f"- **Sample case:** `{manifest['sample_case']}`",
         f"- **Comparison contract:** `{manifest['comparison_contract']}`",
         f"- **Final status:** **{validation_result['status'].upper()}**",
@@ -591,7 +594,7 @@ def report(args: argparse.Namespace) -> None:
         "| Stage | What it did | Result |",
         "|---|---|---|",
         "| 1. Admit and pin inputs | Copied synthetic inputs and SHA-256 versioned them | PASS |",
-        f"| 2. Deterministic analysis | Tree-sitter parse-tree analysis + diff scan + Markdown requirement extraction | {len(obs)} AST call site(s), {len(analysis['requirements'])} requirement(s) |",
+        f"| 2. Deterministic analysis | Tree-sitter parse-tree analysis + diff scan + Markdown requirement extraction | {len(obs)} Tree-sitter call site(s), {len(analysis['requirements'])} requirement(s) |",
         f"| 3. Evidence contract | Built version-bound evidence records | {len(evidence['items'])} items |",
         f"| 4. Budget gate | Character-based mock request estimate; no provider call | {'ALLOW' if budget_result['within_budget'] else 'DENY'} ({budget_result['estimated_input_tokens']} estimated input tokens) |",
         f"| 5. Mock model | Deterministic fixture response; no network request | {model['candidate']['outcome']} |",
@@ -606,7 +609,7 @@ def report(args: argparse.Namespace) -> None:
         lines.append(f"| `{item['artifact_id']}` | {item['role']} | `{item['version'][:23]}…` | `{item['original_fixture_path']}` |")
     lines += [
         "",
-        "## Extracted AST call sites",
+        "## Tree-sitter call-site observations",
         "",
     ]
     if obs:
@@ -614,7 +617,7 @@ def report(args: argparse.Namespace) -> None:
         for item in obs:
             lines.append(f"| {item['line']} | `{item['call']}` | `{item['classification']}` |")
     else:
-        lines.append("AST was not applicable to this comparison; the document parser handled specification requirements.")
+        lines.append("Tree-sitter was not applicable to this comparison; the document parser handled specification requirements.")
     lines += [
         "",
         "## Evidence package",
@@ -657,7 +660,7 @@ def report(args: argparse.Namespace) -> None:
         "- The user-selected comparison mode determines which inputs are admitted.",
         "- Code fixtures are parsed with Tree-sitter grammars for the selected language; Markdown requirements are extracted deterministically.",
         "- Evidence references bind to immutable input hashes and explicit line locators.",
-        "- The mock-model output is a candidate, and a separate validator rejects invalid references or outcomes.",
+        "- The mock-model output is a candidate, and a separate validator checks syntax-node spans, pinned versions, citations and outcomes.",
         "- An inconclusive case remains inconclusive when source evidence does not justify a stronger claim.",
         "",
     ]
