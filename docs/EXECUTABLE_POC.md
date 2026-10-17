@@ -18,6 +18,29 @@ The workflow's source_path must point to a directory inside the checked-out repo
 
 The fixture includes an intentional sync call path through Handler.Submit, Worker.Execute, and AnthropicClient.Assess; the accompanying spec requires asynchronous/non-blocking provider assessment. It exercises interprocedural evidence instead of a method-name-only regex.
 
+## Confidence scoring and auditability
+
+The report has two different confidence fields on purpose:
+
+- **Model self-reported confidence** is retained for evaluation. It is not trusted as evidence, is not used in the score, and should not be interpreted as calibrated.
+- **Evidence-strength score (0–100)** is computed deterministically by `.poc/confidence.py`. It is an explainable support rating—not a statistical probability until we calibrate it against labeled evaluation data.
+
+The score is a weighted calculation with a versioned algorithm:
+
+| Dimension | Weight | What it checks |
+|---|---:|---|
+| Requirement clarity | 25% | Whether a cited normative requirement states a specific, operational constraint |
+| Call-path resolution | 30% | The least-certain edge on each cited entry-to-call path; a static/approximate/dynamic edge is not treated equally |
+| Evidence coverage | 20% | Whether citations cover both the requirement and the observed call behavior, plus relevant diff evidence |
+| Provenance integrity | 15% | Whether every citation resolves to a pinned input artifact and its excerpt hash matches |
+| Analysis completeness | 10% | Whether the entry resolves, parsing/semantic diagnostics exist, and reachable dynamic edges remain |
+
+The calculation stores the raw score for each dimension, its weight and contribution, the explanation, supporting evidence IDs, and any cap/guardrail. A score is capped at 49/100 when no normative requirement or resolved cited call path exists, and at 39/100 when citation/provenance validation fails. A `supported_deviation` is downgraded if it lacks a cited normative requirement and a cited call edge, if the entry/path is insufficiently resolved, or if evidence integrity fails.
+
+The evidence package is intended to answer **what, why, and how**: which requirement line conflicts, which changed/source line and edge support the observation, how the analyzer resolved that edge, which transitive path reaches it, which exact input artifact hash was analyzed, and which uncertainty reduced the score. Open `confidence.json` and `callgraph.json` beside `evidence.json` for the full machine-readable trail. CSV tables `confidence_assessments.csv` and `confidence_components.csv` preserve the score and its component arithmetic.
+
+The weights and thresholds are initial PoC policy, not empirically calibrated truth. Before using this to enforce architecture policy, build a labeled evaluation set of true violations, non-violations, and ambiguous cases; measure precision/recall and calibration; tune thresholds; and retain a human review path for material findings.
+
 ## Semantic limits are explicit
 
 - Go's CHA graph is conservative and may include multiple possible targets for interface calls. It is not a proof of the single target taken at runtime.
