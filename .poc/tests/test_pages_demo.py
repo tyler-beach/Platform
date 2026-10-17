@@ -116,11 +116,13 @@ class PagesSnapshotTests(unittest.TestCase):
     def test_docs_workflow_rebuilds_fixture_and_validates_site_snapshot(self):
         workflow = (ROOT / ".github/workflows/docs.yml").read_text(encoding="utf-8")
         for required in (
-            "actions/setup-go@v5", "npm test",
+            "npm test",
             "python .poc/run.py", "--provider mock", "export_site_snapshot.py",
-            "site/demo/data/sample-run.json", "npm run build", "npm test", "actions/deploy-pages@v4",
+            "site/demo/data/sample-run.json", "npm run build", "npm test",
         ):
             self.assertIn(required, workflow)
+        self.assertRegex(workflow, r"actions/setup-go@[0-9a-f]{40} # v5")
+        self.assertRegex(workflow, r"actions/deploy-pages@[0-9a-f]{40} # v4")
         self.assertIn("if: github.event_name != 'pull_request'", workflow)
         self.assertIn("HISTORY_OPT_IN: ${{ vars.PAGES_ACTIONS_HISTORY_ENABLED }}", workflow)
         self.assertIn("REAL_DATA_OPT_IN: ${{ vars.PAGES_REAL_RUN_DATA_ENABLED }}", workflow)
