@@ -2,6 +2,7 @@ name: Protobuf contracts
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
     paths:
       - "proto/**"
       - "buf.yaml"
@@ -10,20 +11,17 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write
 
 jobs:
   lint-and-breaking:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out repository history
+      - name: Check out repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Run Buf checks
+        uses: bufbuild/buf-action@85aebf73123b5c15fd5528aaecbf9129cddf7fa7 # v1.6.0
         with:
-          fetch-depth: 0
-      - name: Set up Buf
-        uses: bufbuild/buf-setup-action@a47c93e0b1648d5651a065437926377d060baa99 # v1
-      - name: Lint Protobuf schema
-        run: buf lint
-      - name: Build Protobuf schema
-        run: buf build
-      - name: Check for breaking changes against main
-        run: buf breaking --against '.git#branch=main'
+          # Local schema checks only; this repository does not publish to the BSR.
+          push: false
+          archive: false
