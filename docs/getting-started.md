@@ -1,13 +1,13 @@
 # Getting started
 
-This repository contains a design baseline and a runnable GitHub Actions proof of concept. It is not a deployed production application. To run the current PoC, follow [Executable PoC](EXECUTABLE_POC.md) and explore the [interactive demo](demo/index.md). The steps below cover local documentation and contract checks while production implementation remains on the roadmap.
+This repository contains a design baseline and a runnable GitHub Actions proof of concept. It is not a deployed production application. To run the current PoC, follow [Executable PoC](EXECUTABLE_POC.md) and explore the [interactive demo](demo/index.md). The steps below cover the React Pages application and contract checks while production implementation remains on the roadmap.
 
 ## Prerequisites
 
 - Go toolchain to be pinned by the implementation's Go module.
 - Git and a local checkout.
 - Buf CLI for Protobuf lint/build.
-- Python with MkDocs Material for local documentation preview.
+- Node.js 22+ for the React/Vite site, plus Python for contract validation.
 
 ## Validate the API schema
 
@@ -21,14 +21,15 @@ buf build
 
 Before merging Protobuf changes, run the compatibility check in the project Makefile from a checkout with main history available. Existing Protobuf CI covers lint, build and breaking changes for pull requests that touch the schema.
 
-## Preview docs
+## Run the site locally
 
 ~~~sh
 python -m pip install -r docs-requirements.txt
-mkdocs serve
+npm ci
+npm run dev
 ~~~
 
-Open the local URL printed by MkDocs. Swagger loads the checked-in docs/openapi.yaml; request execution is disabled by default because no live service is part of this design baseline.
+Open the local URL printed by Vite. Architecture references are bundled from `docs/`; the API source is the checked-in `docs/openapi.yaml`. No live API service is part of this design baseline.
 
 ## Recommended first implementation slice
 

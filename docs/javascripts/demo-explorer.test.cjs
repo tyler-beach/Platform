@@ -14,6 +14,20 @@ test("offers the Functional Analysis Demo workflow alongside the audit workflows
   assert.ok(core.workflows.some(workflow => workflow.id === "functional-analysis-demo.yml"));
 });
 
+test("uses the configured private clone identity for workflow links", () => {
+  const configured = { content: "example-org/adr-platform" };
+  const document = { readyState: "loading", querySelector: () => configured, addEventListener() {} };
+  const isolated = { URL, Date, Math, Array, Object, Number, String, Promise, TextEncoder, console, document };
+  isolated.globalThis = isolated;
+  vm.runInNewContext(source, isolated, { filename: "demo-explorer.js" });
+  assert.equal(isolated.ADRDemoCore.workflows[0].launch, "https://github.com/example-org/adr-platform/actions/workflows/poc-analysis.yml");
+  configured.content = "javascript:alert(1)";
+  const unsafe = { ...isolated, document: { ...document, querySelector: () => configured } };
+  unsafe.globalThis = unsafe;
+  vm.runInNewContext(source, unsafe, { filename: "demo-explorer.js" });
+  assert.equal(unsafe.ADRDemoCore.workflows[0].launch, "https://github.com/tyler-beach/Platform/actions/workflows/poc-analysis.yml");
+});
+
 function syntheticGallery() {
   const modes = ["code-diff", "technical-spec", "spec-vs-implementation"];
   const cases = ["deviation", "aligned", "insufficient-evidence"];

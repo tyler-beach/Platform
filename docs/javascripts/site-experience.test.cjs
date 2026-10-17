@@ -4,27 +4,43 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const root = path.resolve(__dirname, '../..');
-const homepage = fs.readFileSync(path.join(root, 'docs/index.md'), 'utf8');
-const demoPage = fs.readFileSync(path.join(root, 'docs/demo/index.md'), 'utf8');
-const css = fs.readFileSync(path.join(root, 'docs/stylesheets/extra.css'), 'utf8');
-const nav = fs.readFileSync(path.join(root, 'mkdocs.yml'), 'utf8');
+const app = fs.readFileSync(path.join(root, 'src/site.jsx'), 'utf8');
+const demo = fs.readFileSync(path.join(root, 'src/components/DemoExplorer.jsx'), 'utf8');
+const css = fs.readFileSync(path.join(root, 'src/styles.css'), 'utf8');
+const build = fs.readFileSync(path.join(root, 'vite.config.js'), 'utf8');
+const packageJson = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 
-test('home page offers distinct Architecture and Demo destinations', () => {
-  assert.match(homepage, /href="\.\/system-architecture\/"/);
-  assert.match(homepage, /href="\.\/demo\/"/);
-  assert.match(nav, /Architecture:/);
-  assert.match(nav, /Interactive workflow explorer: demo\/index\.md/);
-  assert.match(demoPage, /class="demo-page"/);
+test('public application is React/Vite with first-class Architecture and Demo routes', () => {
+  assert.ok(packageJson.dependencies.react);
+  assert.ok(packageJson.devDependencies.vite);
+  assert.match(build, /outDir:\s*'site'/);
+  assert.match(app, /path="\/architecture\/\*"/);
+  assert.match(app, /path="\/demo\/\*"/);
+  assert.match(app, /Architecture, made inspectable/);
+  assert.match(app, /Understand the system/);
+  assert.match(app, /See evidence in motion/);
+  assert.match(demo, /demo-gallery-list/);
+  assert.match(demo, /demo-stages/);
+  assert.match(demo, /demo-run-list/);
 });
 
-test('responsive layouts constrain arbitrary data and source panes', () => {
-  assert.match(css, /\.demo-page[\s\S]*overflow-wrap:\s*anywhere/);
-  assert.match(css, /\.demo-page[\s\S]*min-width:\s*0/);
-  assert.match(css, /\.demo-page[\s\S]*pre[\s\S]*overflow-x:\s*auto/);
-  assert.match(css, /@media\s*\([^)]*max-width/);
+test('reference Markdown is sanitized and remains linked to checked-in content', () => {
+  assert.match(app, /rehypeRaw, rehypeSanitize, rehypeSlug/);
+  assert.match(app, /documents\[docPath\]/);
+  assert.match(app, /resolveDocumentHref/);
 });
 
-test('decorative motion respects reduced-motion preference', () => {
+test('responsive content stays contained and motion honors reduced-motion', () => {
+  assert.match(css, /overflow-wrap:\s*anywhere/);
+  assert.match(css, /\.markdown-content pre[\s\S]*overscroll-behavior-inline:\s*contain/);
+  assert.match(css, /\.demo-gallery-input pre[\s\S]*overflow/);
   assert.match(css, /@media\s*\(prefers-reduced-motion:\s*reduce\)/);
-  assert.match(css, /prefers-reduced-motion:\s*reduce[\s\S]*animation-duration:\s*0\.01ms/);
+  assert.match(css, /@media\s*\(max-width:\s*620px\)/);
+});
+
+test('Demo integration loads the existing audited explorer after mount and tears it down', () => {
+  assert.match(demo, /ADRDemoLifecycle\?\.init\(\)/);
+  assert.match(demo, /ADRDemoLifecycle\?\.destroy\(\)/);
+  assert.match(demo, /demo-open-analysis/);
+  assert.match(demo, /demo-open-functional/);
 });

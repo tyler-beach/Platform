@@ -6,7 +6,7 @@ This is the living design notebook and engineering baseline. It separates confir
 
 ## Documentation site
 
-The documentation source is in the docs folder and is built with MkDocs Material. This repository is currently public, and its Pages site is publicly reachable at:
+The documentation source is in the docs folder and is presented through a React + Vite application. This repository is currently public, and its Pages site is publicly reachable at:
 
 **https://tyler-beach.github.io/Platform/**
 
@@ -71,7 +71,8 @@ These are recommendations, not proof that infrastructure exists. The gRPC API ho
 - [Domain data contracts](docs/contracts/CONTRACTS.md)
 - [Evidence and provenance contract](docs/contracts/EVIDENCE.md)
 - [Logging, tracing, metrics, and audit contract](docs/contracts/LOGGING_AND_AUDIT.md)
-- [MkDocs site configuration](mkdocs.yml)
+- [React site application](src/site.jsx)
+- [Vite site configuration](vite.config.js)
 - [Documentation build/deploy workflow](.github/workflows/docs.yml)
 
 ## AI / LLM tooling and functional design
@@ -96,7 +97,7 @@ Code changes and plain-English technical specifications are both first-class inp
 
 ## Status
 
-Design baseline plus runnable GitHub Actions PoC. The PoC runs deterministic code or YAML/JSON configuration analysis, writes an auditable CSV ledger and run bundle, and provides an interactive Pages walkthrough. It does not provide the proposed production gRPC server, generated Go clients, deployed AWS infrastructure, or a production Step Functions workflow. Pull requests run the deterministic tests, language-validation matrix, OpenAPI validation, OpenSpec validation, labeled fixture evaluation, and strict documentation build; Pages deployment occurs only on eligible default-branch runs.
+Design baseline plus runnable GitHub Actions PoC. The PoC runs deterministic code or YAML/JSON configuration analysis, writes an auditable CSV ledger and run bundle, and provides an interactive Pages walkthrough. It does not provide the proposed production gRPC server, generated Go clients, deployed AWS infrastructure, or a production Step Functions workflow. Pull requests run the deterministic tests, language-validation matrix, OpenAPI validation, OpenSpec validation, labeled fixture evaluation, and React Pages build; Pages deployment occurs only on eligible default-branch runs.
 
 ## Guiding rule
 

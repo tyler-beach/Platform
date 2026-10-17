@@ -57,9 +57,9 @@ Include relevant cases for: duplicate request/event; same idempotency key with d
 | Workflow/effect changes | Duplicate/replay, injected crash, retry/deadline, cancellation and partial-failure tests |
 | Prompt/model/retrieval/finding semantics | Labeled before/after AI eval, evidence validity, cost/latency, human review |
 | Security/data policy | Threat update, adversarial fixtures, redaction/tenant tests |
-| Docs-only | Strict MkDocs/OpenAPI build and link/content review |
+| Docs-only | React Pages/OpenAPI build and link/content review |
 
-For Protobuf changes, use Buf lint/build/breaking checks. For documentation, run the strict MkDocs/OpenAPI build. Application test/evaluation gates must be introduced with the implementation rather than claimed to exist today.
+For Protobuf changes, use Buf lint/build/breaking checks. For documentation, run the React Pages/OpenAPI build. Application test/evaluation gates must be introduced with the implementation rather than claimed to exist today.
 
 ## Archive gate
 

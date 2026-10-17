@@ -1,8 +1,10 @@
 (function (root) {
   "use strict";
 
-  const OWNER = "tyler-beach";
-  const REPOSITORY = "Platform";
+  const configuredRepository = root.document && root.document.querySelector('meta[name="adr-repository"]');
+  const repositoryIdentity = configuredRepository && typeof configuredRepository.content === "string" && /^[A-Za-z0-9-]{1,39}\/[A-Za-z0-9_.-]{1,100}$/.test(configuredRepository.content)
+    ? configuredRepository.content : "tyler-beach/Platform";
+  const [OWNER, REPOSITORY] = repositoryIdentity.split("/");
   function safeRepository(value) {
     return typeof value === "string" && /^[A-Za-z0-9-]{1,39}\/[A-Za-z0-9_.-]{1,100}$/.test(value) ? value : `${OWNER}/${REPOSITORY}`;
   }
@@ -24,6 +26,13 @@
   const GALLERY_CASES = ["deviation", "aligned", "insufficient-evidence"];
   const GALLERY_OUTCOMES = { deviation: "supported_deviation", aligned: "no_deviation_found", "insufficient-evidence": "inconclusive" };
   const GALLERY_ROLES = new Set(["adr", "technical_spec", "implementation", "diff"]);
+  let activeDemoCleanup = null;
+  let demoGeneration = 0;
+  function siteDataUrl(file) {
+    const meta = root.document && root.document.querySelector('meta[name="adr-base-path"]');
+    const basePath = meta && meta.content ? meta.content : "/";
+    return new URL(`${basePath.replace(/\/$/, "")}/demo/data/${file}`, root.location.origin).href;
+  }
 
   function plain(value, limit) {
     return typeof value === "string" ? value.slice(0, limit || 180) : "";
@@ -427,9 +436,14 @@
   root.ADRDemoCore = core;
 
   function init() {
-    if (!root.document || !root.document.getElementById("demo-explorer")) return;
+    if (!root.document) return;
+    const mount = root.document.getElementById("demo-explorer");
+    if (!mount || mount.dataset.demoInitialized === "true") return;
+    mount.dataset.demoInitialized = "true";
+    const generation = ++demoGeneration;
     const doc = root.document;
     const byId = (id) => doc.getElementById(id);
+    const isCurrent = () => generation === demoGeneration && doc.getElementById("demo-explorer") === mount;
     const setText = (id, value) => { const node = byId(id); if (node) node.textContent = value == null ? "" : String(value); };
     const el = (tag, className, text) => {
       const node = doc.createElement(tag);
@@ -501,13 +515,15 @@
     async function loadGallery() {
       const status = byId("demo-gallery-status");
       try {
-        const data = await fetchSiteJson(root.fetch.bind(root), "data/scenario-gallery.json", root.location.origin);
+        const data = await fetchSiteJson(root.fetch.bind(root), siteDataUrl("scenario-gallery.json"), root.location.origin);
+        if (!isCurrent()) return;
         const scenarios = normalizeScenarioGallery(data);
         renderGallery(scenarios);
         const live = scenarios.filter(item => item.record_type === "workflow_run").length;
         const rejected = data.live_import.rejected + data.live_import.expired;
         setText("demo-gallery-status", `Loaded 9 curated synthetic scenarios and ${live} validated Functional Analysis workflow artifacts.${rejected ? ` ${rejected} expired or rejected artifact(s) were excluded.` : ""} The live entries are recent workflow attempts, not an unbounded archive.`);
       } catch (error) {
+        if (!isCurrent()) return;
         setText("demo-gallery-status", `${error.message} The separate synthetic walkthrough remains available.`);
         byId("demo-gallery-list").replaceChildren();
         byId("demo-gallery-inputs").replaceChildren();
@@ -785,9 +801,11 @@
       setText("demo-history-status", "Loading recent Actions runs…");
       historyNode.replaceChildren();
       try {
-        const data = await fetchSiteJson(root.fetch.bind(root), "data/real-runs.json", root.location.origin);
+        const data = await fetchSiteJson(root.fetch.bind(root), siteDataUrl("real-runs.json"), root.location.origin);
+        if (!isCurrent()) return;
         if (data && data.schema_version === "adr-demo-history-v1") realHistory = data;
       } catch (_) {
+        if (!isCurrent()) return;
         realHistory = null;
       }
       activeRepository = safeRepository(realHistory && realHistory.repository);
@@ -812,11 +830,13 @@
       const workflowIds = workflows.map((workflow) => workflow.id);
       try {
         const histories = await Promise.all(workflowIds.map((workflow) => fetchWorkflowRuns(root.fetch.bind(root), workflow, activeRepository)));
+        if (!isCurrent()) return;
         const runs = histories.flat();
         setText("demo-history-status", `Loaded ${runs.length} recent Actions runs. Select a run to inspect job steps.`);
         renderRuns(runs);
         if (selectedRun) renderRealRunRecord(selectedRun);
       } catch (error) {
+        if (!isCurrent()) return;
         setText("demo-history-status", error.message);
         historyNode.replaceChildren(el("p", "demo-warning", "Use these workflow links to view runs. The synthetic walkthrough above remains available."));
         workflows.forEach((workflow) => addLink(historyNode, workflow.launch, `Open ${workflow.title} in GitHub Actions`));
@@ -847,9 +867,11 @@
     byId("demo-guide-evaluation").href = workflows[1].launch;
     byId("demo-guide-functional").href = workflows[2].launch;
 
-    fetchSiteJson(root.fetch.bind(root), "data/sample-run.json", root.location.origin)
-      .then((data) => { snapshot = data; renderSnapshot(); })
+    activeDemoCleanup = () => { stopPlayback(); if (mount.dataset) delete mount.dataset.demoInitialized; };
+    fetchSiteJson(root.fetch.bind(root), siteDataUrl("sample-run.json"), root.location.origin)
+      .then((data) => { if (generation !== demoGeneration || doc.getElementById("demo-explorer") !== mount) return; snapshot = data; renderSnapshot(); })
       .catch((error) => {
+        if (generation !== demoGeneration || doc.getElementById("demo-explorer") !== mount) return;
         setText("demo-sample-status", error.message + " Run the offline docs demo build to create it.");
         byId("demo-stage-title").textContent = "Walkthrough unavailable";
         byId("demo-stage-description").textContent = "The run history links remain available below.";
@@ -857,6 +879,7 @@
     loadHistory();
   }
 
+  root.ADRDemoLifecycle = { init, destroy() { demoGeneration += 1; if (activeDemoCleanup) activeDemoCleanup(); activeDemoCleanup = null; } };
   if (root.document) {
     if (root.document.readyState === "loading") root.document.addEventListener("DOMContentLoaded", init, { once: true });
     else init();

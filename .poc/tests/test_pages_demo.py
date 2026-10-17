@@ -16,7 +16,6 @@ sys.path.insert(0, str(ROOT / ".poc" / "demo"))
 from actions_history import collect_history
 from export_site_snapshot import build_history_snapshot, build_snapshot, export_snapshot
 from pages_visibility import actions_history_export_enabled, real_data_export_enabled
-from prepare_site import prepare_site
 
 
 class PagesSnapshotTests(unittest.TestCase):
@@ -87,26 +86,28 @@ class PagesSnapshotTests(unittest.TestCase):
     def test_demo_page_explains_workflows_scores_privacy_and_reduced_motion(self):
         page = (ROOT / "docs/demo/index.md").read_text(encoding="utf-8")
         javascript = (ROOT / "docs/javascripts/demo-explorer.js").read_text(encoding="utf-8")
-        styles = (ROOT / "docs/stylesheets/extra.css").read_text(encoding="utf-8")
-        config = (ROOT / "mkdocs.yml").read_text(encoding="utf-8")
+        styles = (ROOT / "src/styles.css").read_text(encoding="utf-8")
+        app = (ROOT / "src/site.jsx").read_text(encoding="utf-8")
+        demo_app = (ROOT / "src/components/DemoExplorer.jsx").read_text(encoding="utf-8")
         self.assertIn("poc-analysis.yml", javascript)
         self.assertIn("poc-evaluation.yml", javascript)
-        self.assertIn("not a calibrated probability", page.lower())
+        self.assertIn("not a calibrated probability", demo_app.lower())
         self.assertIn("synthetic", page.lower())
         for control in ("demo-previous", "demo-next", "demo-play", "demo-pause", "demo-reload-history"):
-            self.assertIn(f'id="{control}"', page)
+            self.assertIn(f'id="{control}"', demo_app)
         for link in ("demo-open-analysis", "demo-open-evaluation", "demo-open-functional", "demo-guide-analysis", "demo-guide-evaluation", "demo-guide-functional"):
-            self.assertIn(f'id="{link}"', page)
+            self.assertIn(link, demo_app)
         self.assertNotIn("https://github.com/tyler-beach/Platform/actions/workflows/", page)
-        self.assertIn("aria-live", page)
+        self.assertIn("aria-live", demo_app)
         self.assertIn("prefers-reduced-motion: reduce", styles)
-        self.assertIn("demo/index.md", config)
+        self.assertIn('path="/demo/*"', app)
+        self.assertIn("ADRDemoLifecycle", demo_app)
         self.assertIn('textContent', javascript)
         self.assertIn("Finding citation", javascript)
         self.assertIn("Additional run evidence", javascript)
         self.assertIn("evidenceForFinding", javascript)
-        self.assertIn('fetchSiteJson(root.fetch.bind(root), "data/real-runs.json", root.location.origin)', javascript)
-        self.assertIn('fetchSiteJson(root.fetch.bind(root), "data/sample-run.json", root.location.origin)', javascript)
+        self.assertIn('fetchSiteJson(root.fetch.bind(root), siteDataUrl("real-runs.json"), root.location.origin)', javascript)
+        self.assertIn('fetchSiteJson(root.fetch.bind(root), siteDataUrl("sample-run.json"), root.location.origin)', javascript)
         self.assertIn('credentials: "same-origin"', javascript)
         self.assertNotIn(".innerHTML", javascript)
         self.assertNotIn(".insertAdjacentHTML", javascript)
@@ -115,9 +116,9 @@ class PagesSnapshotTests(unittest.TestCase):
     def test_docs_workflow_rebuilds_fixture_and_validates_site_snapshot(self):
         workflow = (ROOT / ".github/workflows/docs.yml").read_text(encoding="utf-8")
         for required in (
-            "actions/setup-go@v5", "node --test docs/javascripts/demo-explorer.test.cjs",
+            "actions/setup-go@v5", "npm test",
             "python .poc/run.py", "--provider mock", "export_site_snapshot.py",
-            "site/demo/data/sample-run.json", "mkdocs build --strict", "actions/deploy-pages@v4",
+            "site/demo/data/sample-run.json", "npm run build", "npm test", "actions/deploy-pages@v4",
         ):
             self.assertIn(required, workflow)
         self.assertIn("if: github.event_name != 'pull_request'", workflow)
@@ -129,15 +130,12 @@ class PagesSnapshotTests(unittest.TestCase):
         self.assertIn("github.ref == 'refs/heads/main'", workflow)
         self.assertIn("github.event.workflow_run.event != 'pull_request'", workflow)
         self.assertIn("github.event.workflow_run.head_branch == 'main'", workflow)
-        self.assertIn("Resolve this repository's Pages and source URLs", workflow)
-        self.assertIn("prepare_site.py", workflow)
         self.assertIn("PAGES_REAL_RUN_DATA_ENABLED", workflow)
         self.assertIn("/pages", workflow)
         self.assertIn('owner.get("type", "") if isinstance(owner, dict) else ""', workflow)
-        self.assertIn("ADR_REPO_URL", (ROOT / "mkdocs.yml").read_text(encoding="utf-8"))
-        self.assertIn("ADR_REPO_NAME", workflow)
+        self.assertIn("BrowserRouter", (ROOT / "src/main.jsx").read_text(encoding="utf-8"))
         self.assertIn('functional-analysis-demo.yml', workflow)
-        self.assertIn('id="demo-open-functional"', (ROOT / "docs/demo/index.md").read_text(encoding="utf-8"))
+        self.assertIn("demo-open-functional", (ROOT / "src/components/DemoExplorer.jsx").read_text(encoding="utf-8"))
 
     def test_docs_workflow_has_independent_history_and_ledger_gates(self):
         workflow = (ROOT / ".github/workflows/docs.yml").read_text(encoding="utf-8")
@@ -170,27 +168,7 @@ class PagesSnapshotTests(unittest.TestCase):
         self.assertIn("public: false", guide)
         self.assertIn("workflow_run", workflow)
         self.assertIn("contents: write", analysis)
-        self.assertIn("how-to/enable-private-pages-demo.md", (ROOT / "mkdocs.yml").read_text(encoding="utf-8"))
-
-    def test_static_workflow_links_follow_clone_repository_and_validate_name(self):
-        site = self.base / "site"
-        demo = site / "demo"
-        demo.mkdir(parents=True)
-        links = "".join(f'<a id="{key}" href="#">workflow</a>' for key in (
-            "demo-open-analysis", "demo-open-evaluation", "demo-open-functional", "demo-guide-analysis", "demo-guide-evaluation", "demo-guide-functional"))
-        (demo / "index.html").write_text(links, encoding="utf-8")
-        functional = site / "functional-analysis-demo"
-        functional.mkdir()
-        (functional / "index.html").write_text('<a id="functional-analysis-workflow" href="#">workflow</a><a id="functional-analysis-workflow-step" href="#">workflow</a>', encoding="utf-8")
-        prepare_site(site, "example-org/adr-platform")
-        result = (demo / "index.html").read_text(encoding="utf-8")
-        self.assertEqual(result.count("https://github.com/example-org/adr-platform/actions/workflows/poc-analysis.yml"), 2)
-        self.assertEqual(result.count("https://github.com/example-org/adr-platform/actions/workflows/poc-evaluation.yml"), 2)
-        self.assertEqual(result.count("https://github.com/example-org/adr-platform/actions/workflows/functional-analysis-demo.yml"), 2)
-        functional_result = (functional / "index.html").read_text(encoding="utf-8")
-        self.assertEqual(functional_result.count('href="https://github.com/example-org/adr-platform/actions/workflows/functional-analysis-demo.yml"'), 2)
-        with self.assertRaisesRegex(ValueError, "owner/name"):
-            prepare_site(site, "https://example.com/repo")
+        self.assertIn("how-to/enable-private-pages-demo.md", (ROOT / "src/generated-doc-index.json").read_text(encoding="utf-8"))
 
     def test_real_history_projection_includes_run_events_and_redacts_evidence_literals(self):
         runs_path = self.db / "runs.csv"

@@ -78,7 +78,7 @@ openspec validate --all
 
 Before implementation, review proposal + delta specs + design + tasks. Before archive, run acceptance scenarios and applicable tests/evaluations, reconcile specs with what shipped, then use the installed CLI's supported archive command. Never archive just to clear the active-change list.
 
-For Proto changes, run Buf lint/build/breaking checks. For docs changes, run the strict MkDocs/OpenAPI build. Once implementation and tests exist, CI should enforce unit, contract, security and relevant AI-evaluation gates. This playbook does not mean those future application gates are already configured.
+For Proto changes, run Buf lint/build/breaking checks. For docs changes, run the React Pages/OpenAPI build. Once implementation and tests exist, CI should enforce unit, contract, security and relevant AI-evaluation gates. This playbook does not mean those future application gates are already configured.
 
 ## Pull request checklist
 

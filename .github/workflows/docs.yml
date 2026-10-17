@@ -4,8 +4,13 @@ on:
   pull_request:
     paths:
       - "docs/**"
-      - "mkdocs.yml"
       - "docs-requirements.txt"
+      - "package.json"
+      - "package-lock.json"
+      - "vite.config.js"
+      - "index.html"
+      - "src/**"
+      - "scripts/**"
       - ".poc/**"
       - ".github/demo/**"
       - ".github/workflows/poc-analysis.yml"
@@ -19,8 +24,13 @@ on:
     branches: [main]
     paths:
       - "docs/**"
-      - "mkdocs.yml"
       - "docs-requirements.txt"
+      - "package.json"
+      - "package-lock.json"
+      - "vite.config.js"
+      - "index.html"
+      - "src/**"
+      - "scripts/**"
       - ".poc/**"
       - ".github/demo/**"
       - ".github/workflows/poc-analysis.yml"
@@ -65,33 +75,18 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Install documentation dependencies
+      - name: Install React site and PoC dependencies
         run: |
-          python -m pip install -r docs-requirements.txt
-          python -m pip install --disable-pip-version-check -r .poc/requirements.txt
-      - name: Resolve this repository's Pages and source URLs
-        if: github.event_name != 'pull_request'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-          GITHUB_SERVER_URL: ${{ github.server_url }}
-        run: |
-          echo "ADR_REPO_URL=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" >> "$GITHUB_ENV"
-          echo "ADR_REPO_NAME=${GITHUB_REPOSITORY}" >> "$GITHUB_ENV"
-          pages_url="$(gh api "/repos/${GITHUB_REPOSITORY}/pages" --jq .html_url 2>/dev/null || true)"
-          if [[ -n "$pages_url" ]]; then
-            echo "ADR_SITE_URL=${pages_url%/}/" >> "$GITHUB_ENV"
-          fi
+          npm ci
+          python -m pip install -r docs-requirements.txt -r .poc/requirements.txt
       - name: Validate OpenAPI contract
         run: openapi-spec-validator docs/openapi.yaml
       - name: Run deterministic PoC behavior tests
         run: python -m unittest discover -s .poc/tests -v
       - name: Run site and explorer behavior tests
-        run: node --test docs/javascripts/demo-explorer.test.cjs docs/javascripts/diagram-viewer.test.cjs docs/javascripts/site-experience.test.cjs
-      - name: Build documentation site
-        run: mkdocs build --strict
-      - name: Set static workflow links to this repository
-        run: python .poc/demo/prepare_site.py --site-dir site --repository "$GITHUB_REPOSITORY"
+        run: npm test
+      - name: Build React Pages application
+        run: npm run build
       - name: Generate the synthetic mock walkthrough from the PoC
         env:
           DEMO_ROOT: ${{ runner.temp }}/adr-poc-pages-demo
@@ -122,7 +117,7 @@ jobs:
           from pathlib import Path
           page = Path("site/demo/index.html").read_text(encoding="utf-8")
           data = json.loads(Path("site/demo/data/sample-run.json").read_text(encoding="utf-8"))
-          assert 'id="demo-explorer"' in page
+          assert 'id="root"' in page
           assert data["schema_version"] == "adr-demo-run-v1"
           assert data["sample"]["synthetic"] is True and data["sample"]["provider"] == "mock"
           assert data["stages"] and data["evidence"] and data["confidence"]["components"]
@@ -237,55 +232,8 @@ jobs:
             --repository "$GITHUB_REPOSITORY" \
             "${history_args[@]}" \
             --output site/demo/data/real-runs.json
-      - name: Verify homepage layout structure
-        run: |
-          python - <<'PY'
-          from html.parser import HTMLParser
-          from pathlib import Path
-          import re
-
-          class HomepageParser(HTMLParser):
-              VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"}
-
-              def __init__(self):
-                  super().__init__(convert_charrefs=True)
-                  self.stack = []
-                  self.classes = []
-                  self.nodes = {}
-
-              def handle_starttag(self, tag, attrs):
-                  attrs = dict(attrs)
-                  classes = set((attrs.get("class") or "").split())
-                  for name in ("home-hero", "home-section", "home-comparison", "home-status", "home-feature-grid", "home-feature", "home-principles"):
-                      if name in classes:
-                          self.nodes.setdefault(name, []).append([parent_classes for _, parent_classes in self.stack])
-                  if classes.intersection({"home-section", "home-comparison", "home-status"}) and any("home-hero" in parent_classes for _, parent_classes in self.stack):
-                      raise AssertionError(f"{classes} is incorrectly nested inside .home-hero")
-                  if tag not in self.VOID:
-                      self.stack.append((tag, classes))
-
-              def handle_endtag(self, tag):
-                  for i in range(len(self.stack) - 1, -1, -1):
-                      if self.stack[i][0] == tag:
-                          del self.stack[i:]
-                          break
-
-          html = Path("site/index.html").read_text(encoding="utf-8")
-          assert "Make architectural drift" in html and "visible." in html, "Expected homepage headline is missing."
-          assert "home-hero" in html and "stylesheets/extra.css" in html, "Homepage hero or custom stylesheet is missing."
-          assert Path("site/assets/brand-mark.svg").is_file(), "Custom brand mark is missing."
-          assert not re.findall(r":(?:material|octicons)-[a-z0-9-]+:", html), "Unrendered Material/Octicons shortcode found on homepage."
-
-          parser = HomepageParser()
-          parser.feed(html)
-          assert len(parser.nodes.get("home-hero", [])) == 1, "Expected exactly one homepage hero."
-          assert len(parser.nodes.get("home-section", [])) == 2, "Homepage sections were not rendered as separate blocks."
-          assert len(parser.nodes.get("home-comparison", [])) == 1, "Expected one comparison block."
-          assert len(parser.nodes.get("home-status", [])) == 1, "Expected one status block."
-          assert len(parser.nodes.get("home-feature", [])) == 6, "Expected six feature cards."
-          assert len(parser.nodes.get("home-principles", [])) == 1, "Expected one principles grid."
-          print("Homepage markup verified: hero, feature grid, comparison, principles and status are separate blocks.")
-          PY
+      - name: Verify React Pages output and compatibility assets
+        run: node scripts/verify-pages-output.mjs
       - name: Validate architecture diagrams
         run: |
           python - <<'PY'
@@ -325,11 +273,10 @@ jobs:
                   assert not (href and href.startswith("../aws-icons/")), (
                       f"{path} must inline its AWS icons; SVG-in-img external icon references are unreliable."
                   )
-          styles = Path("docs/stylesheets/extra.css").read_text(encoding="utf-8")
-          diagram_css = styles.split("/* Architecture diagrams scale", 1)[1].split("/* Swagger UI", 1)[0]
-          assert "width: 100% !important" in diagram_css
-          assert "overflow-x: auto" not in diagram_css
-          assert "width: 1240px" not in diagram_css
+          styles = Path("src/styles.css").read_text(encoding="utf-8")
+          assert ".diagram-viewport" in styles and ".diagram-dialog" in styles
+          assert "max-width: 100%" in styles
+          assert "@media (prefers-reduced-motion: reduce)" in styles
           print(f"Validated {len(diagrams)} SVGs, all relative AWS icon references, and page-fit diagram styling.")
           PY
       - name: Upload Pages artifact
