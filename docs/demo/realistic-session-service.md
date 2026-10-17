@@ -126,4 +126,4 @@ Change set PR-482, revision 9c4c0d8 (synthetic). It updates refresh handling, in
 - **SES-008/009:** attach route binding and cache TTL/timing artifacts before classifying.
 - **SES-010:** rerun against one immutable revision for both probe configuration and handlers.
 
-This specification contains **3 aligned requirements, 2 supported deviations, 2 potential findings, and 2 inconclusive requirements**. This is a teaching aid, not a compliance score.
+This specification contains **4 aligned requirements, 2 supported deviations, 2 potential findings, and 2 inconclusive requirements**. This is a teaching aid, not a compliance score.
