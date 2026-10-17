@@ -86,8 +86,8 @@ jobs:
         run: openapi-spec-validator docs/openapi.yaml
       - name: Run deterministic PoC behavior tests
         run: python -m unittest discover -s .poc/tests -v
-      - name: Run demo explorer browser-core tests
-        run: node --test docs/javascripts/demo-explorer.test.cjs docs/javascripts/diagram-viewer.test.cjs
+      - name: Run site and explorer behavior tests
+        run: node --test docs/javascripts/demo-explorer.test.cjs docs/javascripts/diagram-viewer.test.cjs docs/javascripts/site-experience.test.cjs
       - name: Build documentation site
         run: mkdocs build --strict
       - name: Set static workflow links to this repository

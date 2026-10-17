@@ -86,57 +86,58 @@ extra:
       link: !ENV [ADR_REPO_URL, "https://github.com/tyler-beach/Platform"]
 
 nav:
-  - Overview:
-      - Platform overview: index.md
-      - Project brief: PROJECT_BRIEF.md
-      - Getting started: getting-started.md
-      - Roadmap: ROADMAP.md
-      - Pre-implementation readiness: PRE_IMPLEMENTATION_READINESS.md
-      - MVP decision packet: MVP_DECISION_PACKET.md
-      - Decision log: DECISIONS.md
-      - Open questions: OPEN_QUESTIONS.md
   - Architecture:
+      - Platform overview: index.md
+      - Orientation:
+          - Project brief: PROJECT_BRIEF.md
+          - Getting started: getting-started.md
+          - Roadmap: ROADMAP.md
+          - Pre-implementation readiness: PRE_IMPLEMENTATION_READINESS.md
+          - MVP decision packet: MVP_DECISION_PACKET.md
+          - Decision log: DECISIONS.md
+          - Open questions: OPEN_QUESTIONS.md
       - System architecture and workflows: system-architecture.md
       - Architecture overview: architecture-overview.md
-      - Diagram catalog: diagrams/architecture.md
-      - Diagram sources: diagrams/README.md
-      - Diagram asset attribution: assets/aws-icons/README.md
-      - RPC and Protobuf: RPC_AND_PROTOBUF.md
-      - AI pipeline and token budgets: AI_PIPELINE.md
-      - Functional core: FUNCTIONAL_CORE.md
-  - API:
-      - Interactive API reference: api/index.md
-      - OpenAPI spec: openapi.yaml
-      - API behavior and versioning: contracts/API_CONTRACT.md
-  - Contracts:
-      - Data types and invariants: contracts/CONTRACTS.md
-      - Evidence and provenance: contracts/EVIDENCE.md
-      - Logging, tracing and audit: contracts/LOGGING_AND_AUDIT.md
-      - AI runtime and token budgets: contracts/AI_RUNTIME.md
-      - Existing data model: DATA_MODEL.md
-  - Engineering:
-      - Interactive PoC demo: demo/index.md
+      - Diagrams:
+          - Diagram catalog: diagrams/architecture.md
+          - Diagram sources: diagrams/README.md
+          - Diagram asset attribution: assets/aws-icons/README.md
+      - API and contracts:
+          - Interactive API reference: api/index.md
+          - OpenAPI spec: openapi.yaml
+          - API behavior and versioning: contracts/API_CONTRACT.md
+          - Data types and invariants: contracts/CONTRACTS.md
+          - Evidence and provenance: contracts/EVIDENCE.md
+          - Logging, tracing and audit: contracts/LOGGING_AND_AUDIT.md
+          - AI runtime and token budgets: contracts/AI_RUNTIME.md
+          - Existing data model: DATA_MODEL.md
+          - RPC and Protobuf: RPC_AND_PROTOBUF.md
+      - Engineering reference:
+          - AI pipeline and token budgets: AI_PIPELINE.md
+          - Functional core: FUNCTIONAL_CORE.md
+          - Go tooling: GO_TOOLING.md
+          - How-to guides:
+              - Guide index: how-to/index.md
+              - Add an input source: how-to/add-input-source.md
+              - Add a Go worker: how-to/add-go-worker.md
+              - Add a comparison mode: how-to/add-comparison-mode.md
+          - ADR scope retrieval: ADR_SCOPE_RETRIEVAL.md
+          - Engineering playbook: ENGINEERING_PLAYBOOK.md
+          - OpenSpec workflow: OPEN_SPEC_WORKFLOW.md
+          - Adversarial design review: ADVERSARIAL_DESIGN_REVIEW.md
+          - AI technology selection: AI_TECHNOLOGY_SELECTION.md
+          - AI decision matrix: AI_TECHNOLOGY_DECISION_MATRIX.md
+          - Evaluation and observability: AI_EVALUATION_OBSERVABILITY.md
+          - Security: SECURITY.md
+          - Operations: OPERATIONS.md
+          - Evaluation: EVALUATION.md
+          - Requirements-to-proof matrix: REQUIREMENT_TO_PROOF_MATRIX.md
+          - Evaluation corpus guide: evaluation/README.md
+          - Starter evaluation corpus: evaluation/STARTER_CORPUS.md
+          - Tools and references: TOOLS_AND_REFERENCES.md
+          - Contributing: CONTRIBUTING.md
+  - Demo:
+      - Interactive workflow explorer: demo/index.md
       - Functional analysis demo: functional-analysis-demo.md
       - Executable semantic-analysis PoC: EXECUTABLE_POC.md
-      - Go tooling: GO_TOOLING.md
-      - Enable the internal Pages run explorer: how-to/enable-private-pages-demo.md
-      - How-to guides:
-          - Guide index: how-to/index.md
-          - Add an input source: how-to/add-input-source.md
-          - Add a Go worker: how-to/add-go-worker.md
-          - Add a comparison mode: how-to/add-comparison-mode.md
-      - ADR scope retrieval: ADR_SCOPE_RETRIEVAL.md
-      - Engineering playbook: ENGINEERING_PLAYBOOK.md
-      - OpenSpec workflow: OPEN_SPEC_WORKFLOW.md
-      - Adversarial design review: ADVERSARIAL_DESIGN_REVIEW.md
-      - AI technology selection: AI_TECHNOLOGY_SELECTION.md
-      - AI decision matrix: AI_TECHNOLOGY_DECISION_MATRIX.md
-      - Evaluation and observability: AI_EVALUATION_OBSERVABILITY.md
-      - Security: SECURITY.md
-      - Operations: OPERATIONS.md
-      - Evaluation: EVALUATION.md
-      - Requirements-to-proof matrix: REQUIREMENT_TO_PROOF_MATRIX.md
-      - Evaluation corpus guide: evaluation/README.md
-      - Starter evaluation corpus: evaluation/STARTER_CORPUS.md
-      - Tools and references: TOOLS_AND_REFERENCES.md
-      - Contributing: CONTRIBUTING.md
+      - Enable the internal run explorer: how-to/enable-private-pages-demo.md

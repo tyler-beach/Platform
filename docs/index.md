@@ -34,6 +34,21 @@ hide:
 </div>
 </div>
 
+<section class="experience-switch" aria-label="Choose a platform experience">
+  <a class="experience-card experience-card--architecture" href="./system-architecture/">
+    <span class="experience-card__label">01 / ARCHITECTURE</span>
+    <strong>Understand the system</strong>
+    <span>Architecture, decisions, API contracts, evidence rules, and engineering guidance.</span>
+    <b>Explore the architecture <span aria-hidden="true">↗</span></b>
+  </a>
+  <a class="experience-card experience-card--demo" href="./demo/">
+    <span class="experience-card__label">02 / WORKFLOW DEMO</span>
+    <strong>Explore a real run</strong>
+    <span>Walk through synthetic scenarios, inspect evidence, and browse verified workflow history.</span>
+    <b>Open the workflow explorer <span aria-hidden="true">↗</span></b>
+  </a>
+</section>
+
 <section class="home-section">
 <div class="home-section__head">
 <div><span class="home-section__eyebrow">Explore the platform</span><h2>Designed for engineering rigor.</h2></div>
