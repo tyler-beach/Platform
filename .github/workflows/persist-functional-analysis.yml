@@ -1,0 +1,43 @@
+name: Functional Analysis Audit Persistence
+
+on:
+  workflow_run:
+    workflows: ["Functional Analysis Demo"]
+    types: [completed]
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write
+
+concurrency:
+  group: adr-poc-csv-database-${{ github.repository }}
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  reconcile:
+    name: Validate and persist eligible attempts
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out default-branch writer code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch || github.event.workflow_run.repository.default_branch || github.ref_name }}
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Reconcile bounded Functional Analysis history
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_EVENT_PATH: ${{ github.event_path }}
+        run: >-
+          python .poc/demo/reconcile_functional_analysis.py
+          --repository "$GITHUB_REPOSITORY"
+          --database-dir "$RUNNER_TEMP/functional-analysis-ledger"

@@ -76,6 +76,8 @@ def prepare(args: argparse.Namespace) -> None:
         raise ValueError("Unsupported sample case.")
     if language not in LANGUAGE_EXTENSIONS:
         raise ValueError("Unsupported source language.")
+    if not isinstance(args.run_attempt, int) or args.run_attempt < 1:
+        raise ValueError("Workflow run attempt must be a positive integer.")
 
     selected_case = CASE_DIR[sample]
     artifacts: list[dict[str, Any]] = []
@@ -102,8 +104,9 @@ def prepare(args: argparse.Namespace) -> None:
         copy_input(spec_src, root / "input/technical-spec.md", "ART-SPEC-001", "technical_spec", spec_src.as_posix(), artifacts)
 
     manifest = {
-        "manifest_version": "1.0.0",
+        "manifest_version": "1.1.0",
         "run_id": args.run_id,
+        "run_attempt": args.run_attempt,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "comparison": scenario,
         "sample_case": sample,
@@ -288,7 +291,7 @@ def evidence(args: argparse.Namespace) -> None:
 
     package = {
         "evidence_contract_version": "1.0.0",
-        "job_id": f"demo-{manifest['run_id']}",
+        "job_id": f"demo-{manifest['run_id']}-{manifest['run_attempt']}",
         "comparison": manifest["comparison"],
         "comparison_contract": manifest["comparison_contract"],
         "source_artifacts": manifest["artifacts"],
@@ -667,9 +670,13 @@ def report(args: argparse.Namespace) -> None:
     report_text = "\n".join(lines)
     (root / "functional-analysis-report.md").write_text(report_text, encoding="utf-8")
     save_json(root / "functional-analysis-report.json", {
+        "report_version": "1.0.0",
         "run_id": manifest["run_id"],
+        "run_attempt": manifest["run_attempt"],
         "comparison": manifest["comparison"],
+        "comparison_contract": manifest["comparison_contract"],
         "sample_case": manifest["sample_case"],
+        "language": manifest.get("language", "not_applicable"),
         "status": validation_result["status"],
         "expected_outcome": validation_result["expected_outcome"],
         "actual_outcome": validation_result["candidate_outcome"],
@@ -694,6 +701,7 @@ def main() -> None:
     prep.add_argument("--sample-case", required=True)
     prep.add_argument("--language", choices=sorted(LANGUAGE_EXTENSIONS), default="go")
     prep.add_argument("--run-id", required=True)
+    prep.add_argument("--run-attempt", required=True, type=int)
     prep.add_argument("--output", required=True)
     prep.set_defaults(func=prepare)
     for command, func in [

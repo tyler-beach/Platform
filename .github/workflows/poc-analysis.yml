@@ -79,6 +79,7 @@ permissions:
 concurrency:
   group: adr-poc-csv-database-${{ github.repository }}
   cancel-in-progress: false
+  queue: max
 
 jobs:
   analyze:

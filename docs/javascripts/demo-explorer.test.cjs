@@ -48,6 +48,25 @@ test("merges validated ledger records with server history without duplicating at
   assert.equal(projection.runs[1].ledgerOnly, true);
 });
 
+test("normalizes functional analysis records without fabricating confidence or domain outcomes", () => {
+  const projection = core.historyProjection({
+    api_history_available: false, data_available: true, workflow_runs: [],
+    runs: [{ github_run_id: 789, run_attempt: 2,
+      workflow_url: "https://github.com/example-org/adr-platform/actions/runs/789",
+      comparison: "code-diff", language: "go", status: "complete", outcome: "supported_deviation",
+      functional_analysis: { execution_status: "completed", execution_conclusion: "success",
+        analysis_state: "validated", persistence_state: "validated_result", validation_status: "passed",
+        domain_outcome: "supported_deviation", confidence_status: "unavailable",
+        confidence_reason: "The deterministic fixture oracle is not confidence; this workflow does not provide validated inputs for the evidence-strength algorithm.", source_artifacts: [{ artifact_id: "ART-1", role: "implementation", sha256: "a".repeat(64), path: "input/main.go" }],
+        evidence_refs: [{ evidence_id: "EV-1", artifact_id: "ART-1", source_sha256: "a".repeat(64), line_start: 3, line_end: 3 }],
+        validation_checks: [{ name: "source hashes valid", passed: true }] } }],
+  }, "example-org/adr-platform");
+  assert.equal(projection.runs.length, 1);
+  assert.equal(projection.runs[0].functionalAnalysis.confidenceStatus, "unavailable");
+  assert.equal(projection.runs[0].functionalAnalysis.domainOutcome, "supported_deviation");
+  assert.equal(projection.runs[0].functionalAnalysis.evidenceRefs[0].evidenceId, "EV-1");
+});
+
 test("normalizes only known public run URLs and safe primitive metadata", () => {
   const rows = core.normalizeRuns([{ id: 42, run_number: 8, run_attempt: 1, name: "PoC <img>", event: "workflow_dispatch", status: "completed", conclusion: "success", head_branch: "main", head_sha: "a".repeat(40), html_url: "https://github.com/tyler-beach/Platform/actions/runs/42" }]);
   assert.equal(rows.length, 1);

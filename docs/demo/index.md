@@ -18,7 +18,7 @@ hide:
 
 <div class="demo-trust-note" role="note">
   <strong>Two kinds of data appear here.</strong>
-  <span>The walkthrough is regenerated from a checked-in synthetic Go fixture with the offline mock provider. On internal Pages, <code>PAGES_ACTIONS_HISTORY_ENABLED</code> controls bounded run/job/step history; the separate <code>PAGES_REAL_RUN_DATA_ENABLED</code> switch controls detailed PoC ledger rows. It never publishes prompts, credentials, provider payloads, or raw workflow artifacts; projected source excerpts are redacted and linked to their original artifact hashes.</span>
+  <span>The walkthrough is regenerated from checked-in synthetic fixtures with offline mock providers. On internal Pages, <code>PAGES_ACTIONS_HISTORY_ENABLED</code> controls bounded run/job/step history; the separate <code>PAGES_REAL_RUN_DATA_ENABLED</code> switch controls detailed audit rows. Functional Analysis runs are reconciled from validated Actions artifacts into an additive CSV ledger table. The deterministic fixture oracle is not confidence, so its confidence is explicitly unavailable. Pages publishes allowlisted provenance and evidence locations, never prompts, credentials, provider payloads, raw workflow bundles, or source excerpts.</span>
 </div>
 
 <section class="demo-section" aria-labelledby="demo-walkthrough-heading">
@@ -95,7 +95,7 @@ hide:
   <div id="demo-run-list" class="demo-run-grid"></div>
   <div id="demo-run-jobs" class="demo-run-jobs" aria-live="polite"></div>
   <div id="demo-real-run-record" class="demo-run-record"></div>
-  <p class="demo-muted">Selecting a run shows job and step statuses. In internal-data mode, the matching audit record expands to show real stages, finding, evidence, observations, confidence, and coverage. Use “Open workflow run and artifacts” for the original bundle.</p>
+  <p class="demo-muted">Selecting a run shows job and step statuses. In internal-data mode, PoC audit records show stages, evidence, confidence, and coverage. Functional Analysis records show validated source hashes, evidence locations, checks, and the domain outcome; confidence is labeled unavailable. Use “Open workflow run and artifacts” for the original bundle.</p>
 </section>
 
 <section class="demo-section demo-run-guide" aria-labelledby="demo-launch-heading">

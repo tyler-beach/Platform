@@ -20,6 +20,7 @@ SCHEMAS = {
  "confidence_assessments": ["assessment_id","run_id","algorithm_version","proposed_outcome","accepted_outcome","score_0_to_100","score_0_to_1","score_band","calibrated_probability","model_self_reported_confidence","component_scores_json","caps_json","guardrails_json","principle","evidence_ids_json","created_at"],
  "confidence_components": ["component_id","assessment_id","run_id","dimension","score","weight","weighted_contribution","explanation","evidence_ids_json","details_json","algorithm_version","created_at"],
  "assessment_evidence_links": ["link_id","run_id","finding_id","requirement_evidence_id","observation_evidence_id","relationship","explanation","validation_status","created_at"],
+ "functional_analysis_runs": ["record_schema_version","record_key","record_revision","record_fingerprint","supersedes_fingerprint","repository","workflow_id","workflow_sha","workflow_run_id","run_attempt","trigger_event","head_branch","execution_status","execution_conclusion","analysis_state","persistence_state","persistence_reason","domain_outcome","validation_status","comparison","comparison_contract","language","sample_case","evidence_count","source_artifacts_json","evidence_refs_json","validation_checks_json","confidence_status","confidence_algorithm_version","confidence_reason","actions_artifact_id","actions_artifact_name","actions_artifact_digest"],
 }
 class CsvStore:
     def __init__(self, root: str | Path):

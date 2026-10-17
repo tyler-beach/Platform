@@ -14,6 +14,8 @@ from typing import Any
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from observations import redact_source_text, redact_source_values
+from store import SCHEMAS
+from functional_analysis_ledger import CONFIDENCE_REASON
 
 SCHEMA_VERSION = "adr-demo-run-v1"
 _REPOSITORY_NAME = re.compile(r"[A-Za-z0-9-]{1,39}/[A-Za-z0-9_.-]{1,100}\Z")
@@ -36,6 +38,18 @@ def _rows(db_dir: Path, table: str) -> list[dict[str, str]]:
         raise ValueError(f"missing required run table: {table}")
     with path.open(newline="", encoding="utf-8") as handle:
         return list(csv.DictReader(handle))
+
+
+def _optional_rows(db_dir: Path, table: str) -> list[dict[str, str]]:
+    """Read an additive table when present, validating its versioned CSV header."""
+    path = db_dir / f"{table}.csv"
+    if not path.is_file():
+        return []
+    with path.open(newline="", encoding="utf-8") as handle:
+        reader = csv.DictReader(handle)
+        if reader.fieldnames != SCHEMAS[table]:
+            raise ValueError(f"CSV schema mismatch in {path}")
+        return list(reader)
 
 
 def _json(value: str, *, default: Any = None) -> Any:
@@ -237,6 +251,153 @@ def _display_text(value: str, limit: int = 1000) -> tuple[str, bool]:
     return safe, changed
 
 
+def _positive_csv_integer(value: str, field: str) -> int:
+    if not isinstance(value, str) or not value.isdecimal() or int(value) <= 0:
+        raise ValueError(f"Functional Analysis ledger has invalid {field}")
+    return int(value)
+
+
+def _functional_analysis_records(rows: list[dict[str, str]], repository: str, limit: int) -> list[dict[str, Any]]:
+    """Verify and project only the safe record contract written by the reconciler."""
+    allowed_states = {"execution_only", "unreconciled", "validated_result"}
+    allowed_outcomes = {"", "supported_deviation", "no_deviation_found", "inconclusive"}
+    by_identity: dict[str, list[dict[str, str]]] = {}
+    for row in rows:
+        if row.get("repository") != repository:
+            continue
+        workflow_id = _positive_csv_integer(row.get("workflow_id", ""), "workflow ID")
+        run_id = _positive_csv_integer(row.get("workflow_run_id", ""), "run ID")
+        attempt = _positive_csv_integer(row.get("run_attempt", ""), "run attempt")
+        if row.get("record_schema_version") != "1.0.0" or row.get("record_key") != f"{repository}|{workflow_id}|{run_id}|{attempt}":
+            raise ValueError("Functional Analysis ledger identity is invalid")
+        if not re.fullmatch(r"[a-f0-9]{40}", row.get("workflow_sha", "")):
+            raise ValueError("Functional Analysis ledger workflow SHA is invalid")
+        if row.get("trigger_event") != "workflow_dispatch" or row.get("execution_status") != "completed":
+            raise ValueError("Functional Analysis ledger execution identity is not allowlisted")
+        if row.get("persistence_state") not in allowed_states or row.get("domain_outcome", "") not in allowed_outcomes:
+            raise ValueError("Functional Analysis ledger state or outcome is invalid")
+        if row.get("confidence_status") != "unavailable" or row.get("confidence_reason") != CONFIDENCE_REASON:
+            raise ValueError("Functional Analysis ledger confidence must remain explicitly unavailable")
+        if row.get("persistence_state") == "validated_result":
+            if (row.get("analysis_state") != "validated" or row.get("validation_status") != "passed"
+                    or row.get("domain_outcome") not in allowed_outcomes - {""}):
+                raise ValueError("validated Functional Analysis row is incomplete")
+        elif row.get("domain_outcome") or row.get("validation_status") != "not_run":
+            raise ValueError("execution-only Functional Analysis row must not claim an outcome")
+        try:
+            revision = _positive_csv_integer(row.get("record_revision", ""), "record revision")
+        except ValueError:
+            raise ValueError("Functional Analysis ledger revision is invalid") from None
+        fingerprint = row.get("record_fingerprint", "")
+        fingerprint_input = {key: value for key, value in row.items() if key != "record_fingerprint"}
+        canonical = json.dumps(fingerprint_input, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        if not re.fullmatch(r"[a-f0-9]{64}", fingerprint) or hashlib.sha256(canonical.encode("utf-8")).hexdigest() != fingerprint:
+            raise ValueError("Functional Analysis ledger fingerprint is invalid")
+        sources = _json(row.get("source_artifacts_json", ""), default=None)
+        evidence = _json(row.get("evidence_refs_json", ""), default=None)
+        checks = _json(row.get("validation_checks_json", ""), default=None)
+        if not isinstance(sources, list) or not isinstance(evidence, list) or not isinstance(checks, list):
+            raise ValueError("Functional Analysis ledger provenance is malformed")
+        source_by_id: dict[str, dict[str, str]] = {}
+        for source in sources:
+            if not isinstance(source, dict) or not re.fullmatch(r"ART-[A-Z0-9-]{1,40}", str(source.get("artifact_id", ""))):
+                raise ValueError("Functional Analysis source artifact identity is invalid")
+            path = source.get("path")
+            digest = source.get("sha256")
+            if (source["artifact_id"] in source_by_id or source.get("role") not in {"adr", "implementation", "diff", "technical_spec"}
+                    or not isinstance(path, str) or not re.fullmatch(r"input/[A-Za-z0-9_.-]{1,120}", path)
+                    or not isinstance(digest, str) or not re.fullmatch(r"[a-f0-9]{64}", digest)):
+                raise ValueError("Functional Analysis source artifact provenance is invalid")
+            source_by_id[source["artifact_id"]] = {"artifact_id": source["artifact_id"], "role": source["role"], "path": path, "sha256": digest}
+        if len(sources) > 4 or len(evidence) > 500 or len(checks) > 100:
+            raise ValueError("Functional Analysis ledger projection exceeds its display limit")
+        projected_evidence = []
+        seen_evidence: set[str] = set()
+        for item in evidence:
+            if not isinstance(item, dict):
+                raise ValueError("Functional Analysis evidence reference is malformed")
+            evidence_id = item.get("evidence_id")
+            source = source_by_id.get(item.get("artifact_id"))
+            locator = item.get("locator")
+            if (not isinstance(evidence_id, str) or not re.fullmatch(r"EV-[A-Z0-9-]{1,48}", evidence_id)
+                    or evidence_id in seen_evidence or source is None or item.get("source_path") != source["path"]
+                    or item.get("artifact_version") != "sha256:" + source["sha256"]
+                    or item.get("evidence_type") not in {"architectural_constraint", "syntax_call_site", "change_diff", "technical_requirement"}
+                    or not isinstance(locator, dict)):
+                raise ValueError("Functional Analysis evidence reference is invalid")
+            start, end = locator.get("line_start"), locator.get("line_end")
+            if not isinstance(start, int) or isinstance(start, bool) or not isinstance(end, int) or isinstance(end, bool) or start < 1 or end < start:
+                raise ValueError("Functional Analysis evidence locator is invalid")
+            seen_evidence.add(evidence_id)
+            projected_evidence.append({"evidence_id": evidence_id, "artifact_id": source["artifact_id"],
+                                       "source_sha256": source["sha256"], "source_path": source["path"],
+                                       "evidence_type": item["evidence_type"], "line_start": start, "line_end": end})
+        projected_checks = []
+        for check in checks:
+            if (not isinstance(check, dict) or not isinstance(check.get("name"), str)
+                    or not re.fullmatch(r"[A-Za-z0-9 ._:-]{1,120}", check["name"])
+                    or not isinstance(check.get("passed"), bool)):
+                raise ValueError("Functional Analysis validation check is invalid")
+            projected_checks.append({"name": check["name"], "passed": check["passed"]})
+        by_identity.setdefault(row["record_key"], []).append({**row, "_revision": str(revision),
+            "_sources": source_by_id, "_evidence": projected_evidence, "_checks": projected_checks})
+
+    records = []
+    for identity, revisions in by_identity.items():
+        revisions.sort(key=lambda row: int(row["_revision"]))
+        if len({int(row["_revision"]) for row in revisions}) != len(revisions):
+            raise ValueError("Functional Analysis ledger has duplicate revisions")
+        for previous, current in zip(revisions, revisions[1:]):
+            if (int(current["_revision"]) != int(previous["_revision"]) + 1
+                    or current.get("supersedes_fingerprint") != previous.get("record_fingerprint")):
+                raise ValueError("Functional Analysis ledger revision chain is invalid")
+        row = revisions[-1]
+        run_id = _positive_csv_integer(row["workflow_run_id"], "run ID")
+        attempt = _positive_csv_integer(row["run_attempt"], "run attempt")
+        workflow_id = _positive_csv_integer(row["workflow_id"], "workflow ID")
+        state = row["persistence_state"]
+        conclusion = row["execution_conclusion"]
+        if conclusion not in {"success", "failure", "cancelled", "timed_out", "action_required", "skipped", "neutral"}:
+            raise ValueError("Functional Analysis execution conclusion is invalid")
+        if state == "validated_result":
+            status = "complete"
+        elif conclusion == "cancelled":
+            status = "cancelled"
+        elif state == "execution_only":
+            status = "failed"
+        else:
+            status = "unknown"
+        artifact_id = _positive_csv_integer(row["actions_artifact_id"], "artifact ID") if row.get("actions_artifact_id") else None
+        if state == "validated_result":
+            if not artifact_id or row.get("actions_artifact_name") != f"functional-analysis-demo-{run_id}-{attempt}":
+                raise ValueError("Functional Analysis Actions artifact reference is invalid")
+            if not re.fullmatch(r"sha256:[a-f0-9]{64}", row.get("actions_artifact_digest", "")):
+                raise ValueError("Functional Analysis Actions artifact digest is invalid")
+        records.append({
+            "run_id": row["record_key"], "github_run_id": run_id, "run_attempt": attempt,
+            "workflow_url": f"https://github.com/{repository}/actions/runs/{run_id}",
+            "started_at": "", "completed_at": "", "comparison": row.get("comparison", ""),
+            "language": row.get("language", ""), "provider": "deterministic-mock",
+            "outcome": row.get("domain_outcome", ""), "status": status,
+            "functional_analysis": {
+                "record_key": identity, "record_revision": int(row["_revision"]),
+                "execution_status": row["execution_status"], "execution_conclusion": conclusion,
+                "analysis_state": row["analysis_state"], "persistence_state": state,
+                "persistence_reason": row["persistence_reason"], "domain_outcome": row["domain_outcome"],
+                "validation_status": row["validation_status"], "confidence_status": "unavailable",
+                "confidence_reason": CONFIDENCE_REASON, "workflow_sha": row["workflow_sha"],
+                "comparison_contract": row["comparison_contract"], "sample_case": row["sample_case"],
+                "source_artifacts": sorted(row["_sources"].values(), key=lambda item: item["artifact_id"]),
+                "evidence_refs": row["_evidence"], "validation_checks": row["_checks"],
+                "actions_artifact_id": artifact_id,
+                "actions_artifact_name": row.get("actions_artifact_name", ""),
+                "actions_artifact_digest": row.get("actions_artifact_digest", ""),
+            },
+        })
+    records.sort(key=lambda item: (item["github_run_id"], item["run_attempt"]), reverse=True)
+    return records[:limit]
+
+
 def build_history_snapshot(db_dir: str | Path, limit: int = 20, actions_history: dict[str, Any] | None = None,
                            repository: str | None = None) -> dict[str, Any]:
     """Project a small, redacted run history from CSV tables; never export raw tables."""
@@ -255,6 +416,7 @@ def build_history_snapshot(db_dir: str | Path, limit: int = 20, actions_history:
         for name in ("artifacts", "run_events", "evidence", "observations", "collection_reports",
                      "confidence_assessments", "confidence_components", "assessment_evidence_links", "findings")
     }
+    functional_rows = _optional_rows(db, "functional_analysis_runs")
     runs.sort(key=lambda row: (row.get("completed_at", ""), row.get("started_at", "")), reverse=True)
     projected = []
     for run in runs[:limit]:
@@ -443,6 +605,10 @@ def build_history_snapshot(db_dir: str | Path, limit: int = 20, actions_history:
             "stages": stages, "finding": finding, "confidence": confidence,
             "coverage": coverage, "evidence": evidence, "observations": observations,
         })
+
+    projected.extend(_functional_analysis_records(functional_rows, repository, limit))
+    projected.sort(key=lambda item: (item.get("github_run_id", 0), item.get("run_attempt", 1)), reverse=True)
+    projected = projected[:limit]
 
     api_runs = []
     if actions_history is not None:
