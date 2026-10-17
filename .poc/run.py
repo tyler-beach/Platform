@@ -203,6 +203,26 @@ def main():
         if not isinstance(cand.get("evidence_ids"),list):schema_errors.append("evidence_ids must be a list")
         elif any(x not in valid_ids for x in cand["evidence_ids"]):schema_errors.append("candidate cited evidence not emitted by this run")
         if not isinstance(cand.get("limitations"),list):schema_errors.append("limitations must be a list")
+        if not isinstance(cand.get("evidence_links"),list):
+            schema_errors.append("evidence_links must be an array")
+        else:
+            evidence_lookup={e["evidence_id"]:e for e in evidence}
+            cited_set=set(cand.get("evidence_ids",[])) if isinstance(cand.get("evidence_ids"),list) else set()
+            for link in cand.get("evidence_links",[]):
+                if not isinstance(link,dict):
+                    schema_errors.append("each evidence link must be an object"); continue
+                req_ev=evidence_lookup.get(link.get("requirement_evidence_id"))
+                obs_ev=evidence_lookup.get(link.get("observation_evidence_id"))
+                if req_ev is None or req_ev.get("evidence_type")!="normative_requirement":
+                    schema_errors.append("evidence link requirement_evidence_id must reference a normative requirement")
+                if obs_ev is None or obs_ev.get("evidence_type") not in {"resolved_call_edge","unresolved_call_edge","diff_line"}:
+                    schema_errors.append("evidence link observation_evidence_id must reference a call edge or diff line")
+                if link.get("relationship") not in {"contradicts","consistent_with","uncertain"}:
+                    schema_errors.append("evidence link relationship is invalid")
+                if not isinstance(link.get("explanation"),str) or not link.get("explanation","").strip():
+                    schema_errors.append("evidence link explanation must be non-empty")
+                if link.get("requirement_evidence_id") not in cited_set or link.get("observation_evidence_id") not in cited_set:
+                    schema_errors.append("evidence link endpoints must also appear in evidence_ids")
         try:
             if not 0<=float(cand.get("confidence"))<=1:schema_errors.append("confidence outside [0,1]")
         except (TypeError,ValueError):schema_errors.append("confidence is not numeric")
@@ -212,7 +232,7 @@ def main():
         if schema_errors:
             cand={"outcome":"inconclusive","summary":"Model candidate rejected by deterministic validation","rationale":"Candidate did not pass schema/evidence validation: "+"; ".join(schema_errors),"evidence_ids":[],"limitations":["The model candidate was not accepted by the application validator."],"confidence":0.0}
         score_outcome=model_proposed_outcome if not schema_errors and model_proposed_outcome in OUTCOMES else "inconclusive"
-        confidence_result=confidence.score_assessment(graph=graph,syntax=syntax,evidence=evidence,artifact_rows=artifact_rows,cited_ids=cand.get("evidence_ids",[]),proposed_outcome=score_outcome)
+        confidence_result=confidence.score_assessment(graph=graph,syntax=syntax,evidence=evidence,artifact_rows=artifact_rows,cited_ids=cand.get("evidence_ids",[]),evidence_links=cand.get("evidence_links",[]),proposed_outcome=score_outcome)
         confidence_result["model_self_reported_confidence"]=model_self_confidence if isinstance(model_self_confidence,(int,float)) else None
         confidence_result["proposed_outcome"]=model_proposed_outcome
         if not schema_errors:
@@ -233,6 +253,11 @@ def main():
         store.append("confidence_assessments",{"assessment_id":assessment_id,"run_id":run_id,"algorithm_version":confidence_result["algorithm_version"],"proposed_outcome":model_proposed_outcome,"accepted_outcome":cand["outcome"],"score_0_to_100":confidence_result["score_0_to_100"],"score_0_to_1":confidence_result["score"],"score_band":confidence_result["band"],"calibrated_probability":False,"model_self_reported_confidence":model_self_confidence,"component_scores_json":component_summary,"caps_json":confidence_result["caps"],"guardrails_json":confidence_result["guardrails"],"principle":confidence_result["principle"],"evidence_ids_json":cand.get("evidence_ids",[]),"created_at":now()})
         for item in confidence_result["components"]:
             store.append("confidence_components",{"component_id":assessment_id+":"+item["dimension"],"assessment_id":assessment_id,"run_id":run_id,"dimension":item["dimension"],"score":item["score"],"weight":item["weight"],"weighted_contribution":item["weighted_contribution"],"explanation":item["explanation"],"evidence_ids_json":item["evidence_ids"],"details_json":item["details"],"algorithm_version":confidence_result["algorithm_version"],"created_at":now()})
+        for link_num,link in enumerate(confidence_result["evidence_links"],1):
+            store.append("assessment_evidence_links",{"link_id":assessment_id+":link-%03d"%link_num,"run_id":run_id,"finding_id":run_id+":finding","requirement_evidence_id":link.get("requirement_evidence_id"),"observation_evidence_id":link.get("observation_evidence_id"),"relationship":link.get("relationship"),"explanation":link.get("explanation"),"validation_status":"valid","created_at":now()})
+        for link_num,invalid in enumerate(confidence_result["invalid_evidence_links"],len(confidence_result["evidence_links"])+1):
+            link=invalid.get("link",{})
+            store.append("assessment_evidence_links",{"link_id":assessment_id+":link-%03d"%link_num,"run_id":run_id,"finding_id":run_id+":finding","requirement_evidence_id":link.get("requirement_evidence_id"),"observation_evidence_id":link.get("observation_evidence_id"),"relationship":link.get("relationship"),"explanation":link.get("explanation"),"validation_status":"invalid: "+invalid.get("reason","validation failed"),"created_at":now()})
         store.append("findings",{"finding_id":run_id+":finding","run_id":run_id,"outcome":cand["outcome"],"confidence":confidence_result["score"],"summary":cand["summary"],"rationale":cand["rationale"],"evidence_ids_json":cand.get("evidence_ids",[]),"limitations_json":cand.get("limitations",[]),"validation_status":validation,"created_at":now()})
         status="complete" if not schema_errors else "model_response_rejected";store.append("runs",{"run_id":run_id,"started_at":started,"completed_at":now(),"github_run_id":os.getenv("GITHUB_RUN_ID",""),"repository":a.repository,"comparison":a.comparison,"language":a.language,"source_path":source.relative_to(workspace).as_posix(),"root_function":a.root_function,"model_provider":a.provider,"model":envelope["model"],"result":cand["outcome"],"status":status,"input_hash":input_hash,"workflow_url":a.workflow_url})
         report=["# ADR Deviation Analysis PoC","","- Run ID: "+run_id,"- Comparison: "+a.comparison,"- Language: "+a.language,"- Resolver: "+str(graph.get("resolver","document-only")),"- Entry symbol: "+entry,"- Functions: "+str(len(graph.get("functions",[]))),"- Direct call edges: "+str(len(graph.get("edges",[]))),"- Functions reachable from entry: "+str(len(graph.get("reachable_functions",[]))),"- Evidence items: "+str(len(evidence)),"- Model: "+envelope["provider"]+" / "+envelope["model"],"- Candidate validation: "+validation,"","## Finding","","**Model-proposed outcome:** "+str(model_proposed_outcome),"","**Accepted outcome:** "+cand["outcome"],"","**Summary:** "+cand["summary"],"","**Rationale:** "+cand["rationale"],"","","## Evidence-strength score","","**Score:** "+str(confidence_result["score_0_to_100"])+"/100 ("+confidence_result["band"]+"). This is a deterministic evidence-support score, not a calibrated probability.","","**Model self-reported confidence:** "+str(model_self_confidence)+" (recorded for inspection only; it does not contribute to the evidence-strength score).","","**Scoring algorithm:** "+confidence_result["algorithm_version"],"","| Dimension | Score | Weight | Contribution | Why |","|---|---:|---:|---:|---|"]
@@ -240,8 +265,22 @@ def main():
             report.append("| "+component["dimension"].replace("_"," ")+" | "+str(round(component["score"]*100,1))+" | "+str(round(component["weight"]*100,1))+"% | "+str(round(component["weighted_contribution"]*100,1))+" | "+component["explanation"].replace("|","\\|")+" |")
         if confidence_result["caps"] or confidence_result["guardrails"]:
             report += ["","","### Scoring caps and outcome guardrails",""] + ["- "+x for x in confidence_result["caps"]+confidence_result["guardrails"]]
+        report += ["","","### Requirement-to-observation links",""]
+        evidence_lookup={e["evidence_id"]:e for e in evidence}
+        if confidence_result["evidence_links"]:
+            for link in confidence_result["evidence_links"]:
+                req_ev=evidence_lookup.get(link.get("requirement_evidence_id"),{})
+                obs_ev=evidence_lookup.get(link.get("observation_evidence_id"),{})
+                report.append("- **"+link.get("relationship","uncertain")+"** — requirement "+str(link.get("requirement_evidence_id"))+" ("+str(req_ev.get("path",""))+":"+str(req_ev.get("start_line",""))+"): "+str(req_ev.get("excerpt",""))+"; observation "+str(link.get("observation_evidence_id"))+" ("+str(obs_ev.get("path",""))+":"+str(obs_ev.get("start_line",""))+"): "+str(obs_ev.get("excerpt",""))+". Explanation: "+str(link.get("explanation","")))
+        else:
+            report.append("- No valid requirement-to-observation links were produced.")
         report += ["","","### Evidence cited",""]
         report += ["- "+x for x in cand.get("evidence_ids",[])] or ["- No evidence cited."]
+        report += ["","","### Cited evidence details",""]
+        for eid in cand.get("evidence_ids",[]):
+            ev=evidence_lookup.get(eid)
+            if ev:
+                report.append("- **"+eid+"** ("+str(ev.get("evidence_type"))+") — "+str(ev.get("path"))+":"+str(ev.get("start_line"))+" — "+str(ev.get("claim"))+"; excerpt: "+str(ev.get("excerpt",""))+"; artifact: "+str(ev.get("artifact_id"))+"; excerpt SHA-256: "+str(ev.get("sha256"))+".")
         report += ["","## Limitations",""]+["- "+x for x in cand["limitations"]]+["","","CSV audit tables: "+str(Path(a.db_dir))+"/","Input SHA-256: "+input_hash,""]
         (out/"report.md").write_text("\n".join(report),encoding="utf-8")
         event("report","complete","success",{"outcome":cand["outcome"],"out_dir":str(out)})
