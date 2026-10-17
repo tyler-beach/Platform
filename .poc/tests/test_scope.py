@@ -10,6 +10,7 @@ sys.path.insert(0, str(SCOPE_DIR))
 
 import retrieval
 import run_scope
+import index_catalog
 
 
 class ScopeRetrievalTests(unittest.TestCase):
@@ -18,6 +19,14 @@ class ScopeRetrievalTests(unittest.TestCase):
         cls.catalog = retrieval.load_jsonl(SCOPE_DIR / "adr_catalog.jsonl")
         cls.scenarios = retrieval.load_jsonl(SCOPE_DIR / "scenarios.jsonl")
         cls.by_id = {row["case_id"]: row for row in cls.scenarios}
+
+
+    def test_catalog_fixture_source_hashes_are_real_and_pinned(self):
+        validated = index_catalog.validate_catalog(self.catalog, ROOT)
+        self.assertEqual(len(validated), len(self.catalog))
+        for row in validated:
+            self.assertEqual(len(row["source_sha256"]), 64)
+            self.assertTrue((ROOT / row["source_path"]).is_file())
 
     def test_active_metadata_gate_excludes_retired_adr_even_if_words_match(self):
         event = self.by_id["SCOPE-06"]
