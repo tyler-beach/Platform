@@ -1,6 +1,8 @@
 import com.sun.source.tree.*;
 import com.sun.source.util.*;
 import javax.lang.model.element.*;
+import javax.lang.model.util.Elements;
+import javax.lang.model.util.Types;
 import javax.tools.*;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -19,6 +21,10 @@ public final class CallGraph {
   static final Map<String,String> classOwnerByElement = new HashMap<>();
   static final Map<String,List<String>> interfacesByClass = new HashMap<>();
   static final Map<String,List<String>> concreteMethodsByOwnerAndName = new HashMap<>();
+  static final Map<String,TypeElement> typeElements = new LinkedHashMap<>();
+  static Elements elements;
+  static Types types;
+  static String classpath = "";
   static String currentCaller = null;
   static int edgeNum = 0;
 
@@ -58,6 +64,7 @@ public final class CallGraph {
     for(int i=0;i<args.length;i++) {
       if(args[i].equals("--root")&&i+1<args.length)root=Paths.get(args[++i]).toAbsolutePath().normalize().toString();
       else if(args[i].equals("--out")&&i+1<args.length)outPath=args[++i];
+      else if(args[i].equals("--classpath")&&i+1<args.length)classpath=args[++i];
     }
     if(root==null||outPath==null) throw new IllegalArgumentException("usage: CallGraph --root DIR --out FILE");
     JavaCompiler compiler=ToolProvider.getSystemJavaCompiler();
@@ -70,12 +77,13 @@ public final class CallGraph {
     DiagnosticCollector<JavaFileObject> collector=new DiagnosticCollector<>();
     try(StandardJavaFileManager manager=compiler.getStandardFileManager(collector,Locale.ROOT,StandardCharsets.UTF_8)) {
       Iterable<? extends JavaFileObject> units=manager.getJavaFileObjectsFromPaths(sourcePaths);
-      List<String> options=Arrays.asList("-proc:none","-Xlint:none","-implicit:none");
+      List<String> options=new ArrayList<>(Arrays.asList("-proc:none","-Xlint:none","-implicit:none"));
+      if(!classpath.isBlank()){ options.add("-classpath"); options.add(classpath); }
       JavacTask task=(JavacTask)compiler.getTask(null,manager,collector,options,null,units);
       List<CompilationUnitTree> parsed=new ArrayList<>();
       for(CompilationUnitTree u:task.parse())parsed.add(u);
       try { task.analyze(); } catch(Exception ex) { diagnostics.add(row("code","ANALYZE","message",String.valueOf(ex.getMessage()),"path","","line",0)); }
-      trees=Trees.instance(task);
+      trees=Trees.instance(task); elements=task.getElements(); types=task.getTypes();
       for(Diagnostic<? extends JavaFileObject> d:collector.getDiagnostics()) {
         String p=""; if(d.getSource()!=null)try{p=rel(Paths.get(d.getSource().toUri()));}catch(Exception ignored){}
         diagnostics.add(row("code",d.getCode(),"message",d.getMessage(Locale.ROOT),"path",p,"line",d.getLineNumber(),"kind",d.getKind().toString()));
@@ -85,7 +93,7 @@ public final class CallGraph {
         @Override public Void visitClass(ClassTree n,Void v) {
           TreePath p=getCurrentPath(); Element el=trees.getElement(p);
           if(el instanceof TypeElement) {
-            TypeElement te=(TypeElement)el; String owner=te.getQualifiedName().toString();
+            TypeElement te=(TypeElement)el; String owner=te.getQualifiedName().toString(); typeElements.put(owner,te);
             List<String> impl=new ArrayList<>();
             for(Tree t:n.getImplementsClause())impl.add(t.toString());
             for(Tree t:n.getExtendsClause()==null?Collections.<Tree>emptyList():Collections.singletonList(n.getExtendsClause()))impl.add(t.toString());
@@ -133,6 +141,30 @@ public final class CallGraph {
             }
             int ln=line(u,n); String p="";try{p=rel(Paths.get(u.getSourceFile().toUri()));}catch(Exception ignored){}
             edges.add(row("edge_id","java-edge-"+String.format("%05d",++edgeNum),"caller_symbol_id",currentCaller,"callee_symbol_id",targetId==null?"unresolved:"+currentCaller+":"+ln+":"+targetName:targetId,"caller_qualified_name",functionById.containsKey(currentCaller)?functionById.get(currentCaller).get("qualified_name"):currentCaller,"callee_qualified_name",targetName,"call_expression",n.toString(),"path",p,"line",ln,"resolution_status",status,"resolution_basis",basis,"dispatch_kind",dispatch));
+            // Expand interface calls to concrete project implementations with attributed compiler types.
+            if(el instanceof ExecutableElement) {
+              ExecutableElement invoked=(ExecutableElement)el;
+              Element ownerElement=invoked.getEnclosingElement();
+              if(ownerElement instanceof TypeElement && ((TypeElement)ownerElement).getKind().isInterface()) {
+                TypeElement contract=(TypeElement)ownerElement;
+                for(TypeElement candidate:typeElements.values()) {
+                  if(candidate.getKind()!=ElementKind.CLASS || candidate.getModifiers().contains(Modifier.ABSTRACT)) continue;
+                  boolean implementsContract=false;
+                  try { implementsContract=types.isSubtype(types.erasure(candidate.asType()),types.erasure(contract.asType())); }
+                  catch(Exception ignored) { }
+                  if(!implementsContract) continue;
+                  for(Element member:elements.getAllMembers(candidate)) {
+                    if(!(member instanceof ExecutableElement) || member.getKind()!=ElementKind.METHOD) continue;
+                    ExecutableElement implementation=(ExecutableElement)member;
+                    if(!implementation.getSimpleName().contentEquals(invoked.getSimpleName()) || implementation.getModifiers().contains(Modifier.ABSTRACT)) continue;
+                    String implementationId=elementToId.get(key(implementation));
+                    if(implementationId==null || !functionById.containsKey(implementationId)) continue;
+                    Map<String,Object> target=functionById.get(implementationId);
+                    edges.add(row("edge_id","java-edge-"+String.format("%05d",++edgeNum),"caller_symbol_id",currentCaller,"callee_symbol_id",implementationId,"caller_qualified_name",functionById.containsKey(currentCaller)?functionById.get(currentCaller).get("qualified_name"):currentCaller,"callee_qualified_name",target.get("qualified_name"),"call_expression",n.toString(),"path",p,"line",ln,"resolution_status","resolved_approximate","resolution_basis","jdk_compiler_subtype_dispatch_expansion","dispatch_kind","interface_candidate"));
+                  }
+                }
+              }
+            }
           }
           return super.visitMethodInvocation(n,v);
         }
