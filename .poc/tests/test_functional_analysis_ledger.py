@@ -7,14 +7,17 @@ import sys
 import tempfile
 import unittest
 import zipfile
+import urllib.error
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / ".poc" / "demo"))
 sys.path.insert(0, str(ROOT / ".poc"))
 
 from functional_analysis_ledger import execution_only_record, persist_record, project_bundle
-from reconcile_functional_analysis import reconcile
+import reconcile_functional_analysis as reconciler
+from reconcile_functional_analysis import GitHubAPI, ReconciliationError, reconcile
 from store import CsvStore
 from export_site_snapshot import build_history_snapshot
 
@@ -78,6 +81,111 @@ def expected_context(**updates):
 
 
 class FunctionalAnalysisLedgerTests(unittest.TestCase):
+    def test_api_retry_exhaustion_is_bounded_and_does_not_expose_credentials(self):
+        api = GitHubAPI("sensitive-token", "example-org/adr-platform")
+        with patch("reconcile_functional_analysis.urllib.request.urlopen",
+                   side_effect=urllib.error.URLError("temporary network failure")) as request, \
+             patch("reconcile_functional_analysis.time.sleep") as sleep:
+            with self.assertRaisesRegex(ReconciliationError, "URLError") as raised:
+                api.get_json("/")
+        self.assertEqual(request.call_count, 3)
+        self.assertEqual([call.kwargs["timeout"] for call in request.call_args_list], [12, 12, 12])
+        self.assertEqual(sleep.call_count, 2)
+        self.assertNotIn("sensitive-token", str(raised.exception))
+
+    def test_reconciliation_stops_when_recent_history_exceeds_run_bound(self):
+        class FakeAPI:
+            def __init__(self):
+                self.calls = 0
+
+            def get_json(self, path, query=None):
+                self.calls += 1
+                return {"workflow_runs": [{"id": i} for i in range(100)], "total_count": 501}
+
+        api = FakeAPI()
+        with self.assertRaisesRegex(ReconciliationError, "500-run reconciliation bound"):
+            reconciler._list_recent_runs(api, 44)
+        self.assertEqual(api.calls, 1)
+
+    def test_scheduled_reconciliation_recovers_attempt_missing_from_event_delivery(self):
+        class FakeAPI:
+            def get_json(self, path, query=None):
+                if path == "/":
+                    return {"full_name": "example-org/adr-platform", "default_branch": "main"}
+                if path == "/actions/workflows/functional-analysis-demo.yml":
+                    return {"id": 44, "path": ".github/workflows/functional-analysis-demo.yml"}
+                if path == "/actions/workflows/44/runs":
+                    return {"workflow_runs": [{"id": 789, "run_attempt": 1, "workflow_id": 44,
+                                                "event": "workflow_dispatch", "head_branch": "main",
+                                                "status": "completed", "conclusion": "failure",
+                                                "head_sha": "a" * 40}], "total_count": 1}
+                if path == "/actions/runs/789/attempts/1":
+                    return {"id": 789, "run_attempt": 1, "workflow_id": 44,
+                            "event": "workflow_dispatch", "head_branch": "main", "status": "completed",
+                            "conclusion": "failure", "head_sha": "a" * 40}
+                raise AssertionError(f"unexpected API path: {path}")
+
+        with tempfile.TemporaryDirectory(dir=ROOT / ".poc") as temporary:
+            db_dir = Path(temporary) / "db"
+            summary = reconcile(FakeAPI(), "example-org/adr-platform", db_dir)
+            rows = CsvStore(db_dir).rows("functional_analysis_runs")
+        self.assertEqual(summary["persisted"], 1)
+        self.assertEqual(rows[0]["workflow_run_id"], "789")
+        self.assertEqual(rows[0]["persistence_state"], "execution_only")
+        self.assertEqual(rows[0]["domain_outcome"], "")
+
+    def test_git_non_fast_forward_exhaustion_uses_three_fresh_snapshots(self):
+        with tempfile.TemporaryDirectory(dir=ROOT / ".poc") as temporary:
+            with patch.object(reconciler, "_checkout_branch") as checkout, \
+                 patch.object(reconciler, "reconcile", return_value={
+                     "persisted": 1, "updated": 0, "unreconciled": 0,
+                 }) as run_reconcile, \
+                 patch.object(reconciler, "_persist_branch", return_value=False) as persist, \
+                 patch.object(reconciler.time, "sleep") as sleep, \
+                 patch.object(reconciler.GitHubAPI, "get_json", return_value={
+                     "full_name": "example-org/adr-platform",
+                 }):
+                with patch("sys.argv", ["reconcile_functional_analysis.py", "--repository",
+                                         "example-org/adr-platform", "--database-dir", temporary]), \
+                     patch.dict("os.environ", {"GH_TOKEN": "test-token", "GITHUB_EVENT_NAME": "workflow_dispatch"}):
+                    with self.assertRaisesRegex(ReconciliationError, "after three fresh-snapshot attempts"):
+                        reconciler.main()
+        self.assertEqual(checkout.call_count, 3)
+        self.assertEqual(run_reconcile.call_count, 3)
+        self.assertEqual(persist.call_count, 3)
+        self.assertEqual(sleep.call_count, 2)
+        self.assertEqual(len({call.args[0] for call in checkout.call_args_list}), 3)
+
+    def test_expired_artifact_is_recorded_without_domain_outcome_and_flagged(self):
+        class FakeAPI:
+            def get_json(self, path, query=None):
+                if path == "/":
+                    return {"full_name": "example-org/adr-platform", "default_branch": "main"}
+                if path == "/actions/workflows/functional-analysis-demo.yml":
+                    return {"id": 44, "path": ".github/workflows/functional-analysis-demo.yml"}
+                if path == "/actions/runs/789/attempts/1":
+                    return {"id": 789, "run_attempt": 1, "workflow_id": 44,
+                            "event": "workflow_dispatch", "head_branch": "main", "status": "completed",
+                            "conclusion": "success", "head_sha": "a" * 40}
+                if path == "/actions/runs/789/artifacts":
+                    return {"artifacts": [{"id": 5, "name": "functional-analysis-demo-789-1",
+                                           "expired": True, "workflow_run": {"id": 789}}]}
+                raise AssertionError(f"unexpected API path: {path}")
+
+            def download_artifact(self, *_args):
+                raise AssertionError("expired artifact must not be downloaded")
+
+        with tempfile.TemporaryDirectory(dir=ROOT / ".poc") as temporary:
+            db_dir = Path(temporary) / "db"
+            summary = reconcile(FakeAPI(), "example-org/adr-platform", db_dir, (789, 1))
+            rows = CsvStore(db_dir).rows("functional_analysis_runs")
+        self.assertEqual(summary["unreconciled"], 1)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["persistence_state"], "unreconciled")
+        self.assertEqual(rows[0]["analysis_state"], "unreconciled")
+        self.assertEqual(rows[0]["domain_outcome"], "")
+        self.assertEqual(rows[0]["confidence_status"], "unavailable")
+
     def test_projects_validated_bundle_to_allowlisted_record_without_source_text(self):
         record = project_bundle(make_bundle(), expected_context())
         self.assertEqual(record["domain_outcome"], "supported_deviation")
