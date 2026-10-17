@@ -138,6 +138,42 @@ class ObservationContractTests(unittest.TestCase):
         self.assertNotIn("CANARY-CODE-SECRET", redacted)
         self.assertIn("provider.assess", redacted)
 
+    def test_entropy_redaction_finds_opaque_tokens_without_redacting_symbol_syntax(self):
+        secret = "A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6"
+        surrounding = f"credential candidate {secret} was found"
+        redacted, changed = observations.redact_source_text(surrounding)
+        self.assertTrue(changed)
+        self.assertNotIn(secret, redacted)
+        self.assertIn("credential candidate", redacted)
+        self.assertIn("was found", redacted)
+
+        digest = "a" * 64
+        preserved_digest, digest_changed = observations.redact_source_text(digest)
+        self.assertEqual(preserved_digest, digest)
+        self.assertFalse(digest_changed)
+
+    def test_long_qualified_callgraph_symbols_keep_exact_provenance(self):
+        caller = "(*example.com/adr-poc.HttpHandler).SubmitRequest"
+        callee = "(*example.com/adr-poc.AssessmentProvider).AssessRequest"
+        graph = {
+            "language": "go", "resolver": "go-ssa-cha-v1",
+            "edges": [{
+                "edge_id": "run-1:edge-1", "caller_symbol_id": "run-1:caller", "callee_symbol_id": "run-1:callee",
+                "caller_qualified_name": caller, "callee_qualified_name": callee,
+                "call_expression": "h.Provider.AssessRequest(ctx, req)", "path": "handler.go", "line": 42,
+                "resolution_status": "resolved_approximate", "resolution_basis": "go_types_cha_interface_dispatch",
+                "reachable_from_entry": True,
+            }],
+        }
+        digest = "a" * 64
+        artifact = {"artifact_id": "run-1:artifact-1", "version": "sha256:" + digest, "sha256": digest}
+        result = observations.from_callgraph(graph, {"handler.go": artifact}, run_id="run-1")
+        item = result["observations"][0]
+        self.assertEqual(item["subject"]["name"], caller)
+        self.assertEqual(item["value"]["target"], callee)
+        self.assertEqual(item["source_ref"]["sha256"], digest)
+        self.assertEqual(item["source_ref"]["locator"], {"kind": "line", "start": 42, "end": 42})
+
     def test_credential_shaped_source_line_is_redacted_as_a_whole(self):
         excerpt = 'headers["Authorization"] = "Bearer CANARY-BEARER-TOKEN"'
         redacted, changed = observations.redact_source_text(excerpt)

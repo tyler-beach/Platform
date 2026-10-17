@@ -199,23 +199,40 @@ def _looks_like_secret(value: Any) -> bool:
         return False
     if any(pattern.search(value) for pattern in _SECRET_VALUE_PATTERNS):
         return True
-    if len(value) >= 32:
-        alphabet = set(value)
-        entropy = -sum((value.count(char) / len(value)) * math.log2(value.count(char) / len(value)) for char in alphabet)
-        return entropy >= 4.2
+    # Score opaque token-shaped spans, not the entire expression. Qualified
+    # symbols and call expressions can have high aggregate entropy while still
+    # carrying essential, non-secret provenance. SHA-1/SHA-256 digests are
+    # explicitly preserved as source-version evidence.
+    candidates = re.findall(r"(?<![A-Za-z0-9])[A-Za-z0-9+/_=-]{32,}(?![A-Za-z0-9])", value)
+    for candidate in candidates:
+        if _is_high_entropy(candidate):
+            return True
     return False
 
 
 _QUOTED_LITERAL = re.compile(r'''("""[\s\S]*?"""|''' + "'''[\\s\\S]*?'''" + r'''|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`[^`]*`)''')
 
 
+def _is_high_entropy(candidate: str) -> bool:
+    if len(candidate) in {40, 64} and re.fullmatch(r"[a-fA-F0-9]+", candidate):
+        return False
+    alphabet = set(candidate)
+    entropy = -sum((candidate.count(char) / len(candidate)) * math.log2(candidate.count(char) / len(candidate)) for char in alphabet)
+    return entropy >= 4.2
+
+
 def redact_source_text(value: str) -> tuple[str, bool]:
-    """Remove literal payloads before source excerpts enter prompts or artifacts."""
+    """Remove literal payloads and opaque tokens without erasing structured evidence."""
     if not isinstance(value, str):
         return "", bool(value)
     redacted = _QUOTED_LITERAL.sub('"[redacted literal]"', value)
-    if _looks_like_secret(redacted):
+    if any(pattern.search(redacted) for pattern in _SECRET_VALUE_PATTERNS):
         return "[redacted sensitive source text]", True
+    redacted = re.sub(
+        r"(?<![A-Za-z0-9])[A-Za-z0-9+/_=-]{32,}(?![A-Za-z0-9])",
+        lambda match: "[redacted sensitive token]" if _is_high_entropy(match.group(0)) else match.group(0),
+        redacted,
+    )
     return redacted, redacted != value
 
 
