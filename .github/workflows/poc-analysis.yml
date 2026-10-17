@@ -90,6 +90,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ inputs.head_ref || github.sha }}
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -112,6 +113,34 @@ jobs:
           python -m pip install --disable-pip-version-check -r .poc/requirements.txt
           npm install --prefix .poc/analyzers/typescript --ignore-scripts --no-audit --no-fund
           (cd .poc/analyzers/go && go mod tidy)
+      - name: Install selected Node project dependencies for type resolution
+        if: ${{ inputs.language == 'typescript' || inputs.language == 'javascript' }}
+        env:
+          SOURCE_PATH: ${{ inputs.source_path }}
+        run: |
+          if [[ -f "$SOURCE_PATH/package-lock.json" ]]; then
+            npm ci --prefix "$SOURCE_PATH" --ignore-scripts --no-audit --no-fund
+          elif [[ -f "$SOURCE_PATH/package.json" ]]; then
+            npm install --prefix "$SOURCE_PATH" --ignore-scripts --no-audit --no-fund
+          fi
+
+      - name: Compile selected Java project for semantic dependencies
+        if: ${{ inputs.language == 'java' }}
+        env:
+          SOURCE_PATH: ${{ inputs.source_path }}
+        run: |
+          current="$SOURCE_PATH"
+          while [[ "$current" != "." && "$current" != "/" ]]; do
+            if [[ -f "$current/gradlew" ]]; then
+              (cd "$current" && ./gradlew classes --no-daemon)
+              break
+            elif [[ -f "$current/pom.xml" ]]; then
+              (cd "$current" && mvn -B -q -DskipTests compile)
+              break
+            fi
+            current="$(dirname "$current")"
+          done
+
       - name: Load persistent CSV database tables
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
