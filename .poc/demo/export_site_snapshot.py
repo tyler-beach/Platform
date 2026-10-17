@@ -245,10 +245,22 @@ def build_history_snapshot(db_dir: str | Path, limit: int = 20, actions_history:
     for run in runs[:limit]:
         run_id = run.get("run_id", "")
         artifact_rows = [row for row in tables["artifacts"] if row.get("run_id") == run_id]
-        artifact_hashes = {}
+        artifact_by_id: dict[str, dict[str, str]] = {}
+        artifact_paths: set[str] = set()
         for item in artifact_rows:
+            artifact_id = item.get("artifact_id", "")
+            if not artifact_id:
+                raise ValueError("real run artifact has an empty artifact ID")
+            if artifact_id in artifact_by_id:
+                raise ValueError("real run has a duplicate artifact ID")
             path = _safe_relative_path(item.get("path", ""))
-            artifact_hashes[path] = item.get("sha256", "")
+            if path in artifact_paths:
+                raise ValueError("real run has an ambiguous duplicate artifact path")
+            digest = item.get("sha256", "")
+            if not re.fullmatch(r"[0-9a-f]{64}", digest):
+                raise ValueError("real run artifact has an invalid SHA-256")
+            artifact_paths.add(path)
+            artifact_by_id[artifact_id] = {"path": path, "sha256": digest}
 
         run_events = [row for row in tables["run_events"] if row.get("run_id") == run_id]
         stage_order = []
@@ -275,20 +287,40 @@ def build_history_snapshot(db_dir: str | Path, limit: int = 20, actions_history:
                            "status": terminal.get("status", "unknown"), "event_count": len(rows), "counts": count_data})
 
         evidence = []
+        projected_evidence_ids: set[str] = set()
         for item in tables["evidence"]:
             if item.get("run_id") != run_id:
                 continue
-            path = _safe_relative_path(item["path"]) if item.get("path") else ""
-            claim, claim_redacted = _display_text(item.get("claim", ""), 500)
-            excerpt, excerpt_redacted = _display_text(item.get("excerpt", ""), 1000)
+            artifact_id = item.get("artifact_id", "")
+            artifact = artifact_by_id.get(artifact_id)
+            if artifact is None:
+                raise ValueError("real run evidence references an unknown artifact ID")
+            path = _safe_relative_path(item.get("path", ""))
+            if path != artifact["path"]:
+                raise ValueError("real run evidence path does not match its artifact ID")
+            raw_excerpt = item.get("excerpt", "")
+            evidence_id = item.get("evidence_id", "")
+            if not evidence_id or evidence_id in projected_evidence_ids:
+                raise ValueError("real run evidence has a missing or duplicate evidence ID")
             recorded_hash = item.get("sha256", "")
+            if raw_excerpt:
+                if not re.fullmatch(r"[0-9a-f]{64}", recorded_hash):
+                    raise ValueError("real run evidence has an invalid excerpt SHA-256")
+                if hashlib.sha256(raw_excerpt.encode("utf-8")).hexdigest() != recorded_hash:
+                    raise ValueError("real run evidence excerpt SHA-256 mismatch")
+            elif recorded_hash and not re.fullmatch(r"[0-9a-f]{64}", recorded_hash):
+                raise ValueError("real run evidence has an invalid excerpt SHA-256")
+            claim, claim_redacted = _display_text(item.get("claim", ""), 500)
+            excerpt, excerpt_redacted = _display_text(raw_excerpt, 1000)
             evidence.append({
-                "id": item.get("evidence_id", ""), "type": item.get("evidence_type", ""), "claim": claim,
+                "id": evidence_id, "type": item.get("evidence_type", ""),
+                "artifact_id": artifact_id, "claim": claim,
                 "excerpt": excerpt, "path": path, "line": int(item["start_line"]) if item.get("start_line", "").isdigit() else None,
-                "source_sha256": artifact_hashes.get(path, ""), "recorded_excerpt_sha256": recorded_hash,
+                "source_sha256": artifact["sha256"], "recorded_excerpt_sha256": recorded_hash,
                 "displayed_excerpt_sha256": hashlib.sha256(excerpt.encode("utf-8")).hexdigest() if excerpt else "",
                 "redacted": claim_redacted or excerpt_redacted,
             })
+            projected_evidence_ids.add(evidence_id)
             if len(evidence) >= 200:
                 break
 
@@ -297,16 +329,25 @@ def build_history_snapshot(db_dir: str | Path, limit: int = 20, actions_history:
             if item.get("run_id") != run_id:
                 continue
             source = _json(item.get("source_ref_json", ""), default={})
-            path = _safe_relative_path(source.get("path", "")) if isinstance(source, dict) and source.get("path") else ""
-            if path and path not in artifact_hashes:
-                raise ValueError("real run observation references an unpinned artifact")
+            if not isinstance(source, dict):
+                raise ValueError("real run observation source reference is malformed")
+            artifact_id = source.get("artifact_id", "")
+            artifact = artifact_by_id.get(artifact_id)
+            if artifact is None:
+                raise ValueError("real run observation source reference has an unknown artifact ID")
+            path = _safe_relative_path(source.get("path", ""))
+            if path != artifact["path"]:
+                raise ValueError("real run observation source reference path does not match its artifact ID")
+            if source.get("sha256") != artifact["sha256"]:
+                raise ValueError("real run observation source reference SHA-256 does not match its artifact ID")
             subject, subject_redacted = redact_source_values(_json(item.get("subject_json", ""), default={}))
             value, value_redacted = redact_source_values(_json(item.get("value_json", "")))
             resolution, resolution_redacted = redact_source_values(_json(item.get("resolution_json", ""), default={}))
             observations.append({
-                "id": item.get("observation_id", ""), "predicate": item.get("predicate", ""),
+                "id": item.get("observation_id", ""), "artifact_id": artifact_id,
+                "predicate": item.get("predicate", ""),
                 "subject": subject, "value": value, "source_path": path,
-                "source_sha256": artifact_hashes.get(path, ""),
+                "source_sha256": artifact["sha256"],
                 "locator": source.get("locator", {}) if isinstance(source, dict) else {},
                 "resolution": resolution, "evidence_class": item.get("evidence_class", ""),
                 "redacted": item.get("redacted") == "True" or subject_redacted or value_redacted or resolution_redacted,
@@ -342,11 +383,18 @@ def build_history_snapshot(db_dir: str | Path, limit: int = 20, actions_history:
         finding = None
         if finding_rows:
             item = finding_rows[-1]
+            evidence_ids = _json(item.get("evidence_ids_json", ""), default=[])
+            if not isinstance(evidence_ids, list) or any(not isinstance(value, str) for value in evidence_ids):
+                raise ValueError("real run finding evidence references are malformed")
+            if item.get("outcome", "inconclusive") != "inconclusive" and not evidence_ids:
+                raise ValueError("real run finding evidence references are missing")
+            if any(value not in projected_evidence_ids for value in evidence_ids):
+                raise ValueError("real run finding evidence reference is not included in the projection")
             summary, summary_redacted = _display_text(item.get("summary", ""), 800)
             rationale, rationale_redacted = _display_text(item.get("rationale", ""), 1200)
             finding = {"outcome": item.get("outcome", "inconclusive"), "summary": summary,
                        "rationale": rationale, "redacted": summary_redacted or rationale_redacted,
-                       "validation_status": item.get("validation_status", "")}
+                       "validation_status": item.get("validation_status", ""), "evidence_ids": evidence_ids}
 
         coverage = []
         for item in tables["collection_reports"]:

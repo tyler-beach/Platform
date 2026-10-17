@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 import shutil
 import subprocess
@@ -39,6 +40,18 @@ class PagesSnapshotTests(unittest.TestCase):
 
     def tearDown(self):
         self.temp.cleanup()
+
+    def _rewrite_table(self, name, update):
+        path = self.db / f"{name}.csv"
+        with path.open(newline="", encoding="utf-8") as handle:
+            reader = csv.DictReader(handle)
+            header = reader.fieldnames
+            rows = list(reader)
+        update(rows)
+        with path.open("w", newline="", encoding="utf-8") as handle:
+            writer = csv.DictWriter(handle, fieldnames=header)
+            writer.writeheader()
+            writer.writerows(rows)
 
     def test_snapshot_contains_explorable_allowlisted_demo_outputs(self):
         snapshot = build_snapshot(self.db, self.run_dir, self.fixture)
@@ -153,6 +166,7 @@ class PagesSnapshotTests(unittest.TestCase):
             rows = list(csv.DictReader(handle))
             header = list(rows[0])
         rows[0]["excerpt"] = 'provider.assess("CANARY-PAGES-PRIVATE-LITERAL")'
+        rows[0]["sha256"] = hashlib.sha256(rows[0]["excerpt"].encode("utf-8")).hexdigest()
         evidence_path.write_text(
             ",".join(header) + "\n" + "\n".join(
                 ",".join('"' + row[key].replace('"', '""') + '"' for key in header) for row in rows
@@ -167,6 +181,80 @@ class PagesSnapshotTests(unittest.TestCase):
         self.assertTrue(any(item["redacted"] for item in run["evidence"]))
         self.assertNotIn("CANARY-PAGES-PRIVATE-LITERAL", json.dumps(snapshot))
         self.assertTrue(run["workflow_url"].startswith("https://github.com/tyler-beach/Platform/actions/runs/"))
+
+    def test_real_history_rejects_invalid_or_ambiguous_artifact_provenance(self):
+        mutations = (
+            ("artifacts", lambda rows: rows[0].update(artifact_id=""), "artifact ID"),
+            ("artifacts", lambda rows: rows[0].update(sha256="not-a-digest"), "SHA-256"),
+            ("artifacts", lambda rows: rows.append(dict(rows[0])), "duplicate artifact ID"),
+            ("artifacts", lambda rows: rows.append({**rows[0], "artifact_id": "second-artifact"}), "duplicate artifact path"),
+            ("evidence", lambda rows: rows[0].update(artifact_id="missing-artifact"), "unknown artifact ID"),
+            ("evidence", lambda rows: rows[0].update(path="other/file.go"), "path does not match"),
+            ("evidence", lambda rows: rows[0].update(sha256="not-a-digest"), "excerpt SHA-256"),
+            ("evidence", lambda rows: rows[0].update(sha256="0" * 64), "excerpt SHA-256 mismatch"),
+        )
+        for table, mutation, message in mutations:
+            with self.subTest(table=table, message=message):
+                path = self.db / f"{table}.csv"
+                original = path.read_bytes()
+                try:
+                    self._rewrite_table(table, mutation)
+                    with self.assertRaisesRegex(ValueError, message):
+                        build_history_snapshot(self.db)
+                finally:
+                    path.write_bytes(original)
+
+    def test_real_history_requires_observation_source_ref_to_match_artifact(self):
+        mutations = (
+            lambda source: source.update(artifact_id="missing-artifact"),
+            lambda source: source.update(path="other/file.yaml"),
+            lambda source: source.update(sha256="0" * 64),
+        )
+        for mutation in mutations:
+            with self.subTest(mutation=mutation):
+                path = self.db / "observations.csv"
+                original = path.read_bytes()
+                try:
+                    def corrupt(rows):
+                        source = json.loads(rows[0]["source_ref_json"])
+                        mutation(source)
+                        rows[0]["source_ref_json"] = json.dumps(source, sort_keys=True)
+                    self._rewrite_table("observations", corrupt)
+                    with self.assertRaisesRegex(ValueError, "observation source reference"):
+                        build_history_snapshot(self.db)
+                finally:
+                    path.write_bytes(original)
+
+    def test_real_history_requires_conclusive_findings_to_resolve_cited_evidence(self):
+        mutations = (
+            lambda rows: rows[0].update(outcome="supported_deviation", evidence_ids_json="[]"),
+            lambda rows: rows[0].update(outcome="supported_deviation", evidence_ids_json='["missing-evidence"]'),
+        )
+        path = self.db / "findings.csv"
+        original = path.read_bytes()
+        try:
+            for mutation in mutations:
+                with self.subTest(mutation=mutation):
+                    path.write_bytes(original)
+                    self._rewrite_table("findings", mutation)
+                    with self.assertRaisesRegex(ValueError, "finding evidence"):
+                        build_history_snapshot(self.db)
+        finally:
+            path.write_bytes(original)
+
+    def test_real_history_preserves_exact_source_and_excerpt_hashes(self):
+        snapshot = build_history_snapshot(self.db)
+        run = snapshot["runs"][0]
+        with (self.db / "artifacts.csv").open(newline="", encoding="utf-8") as handle:
+            artifact_by_id = {row["artifact_id"]: row for row in csv.DictReader(handle)}
+        with (self.db / "evidence.csv").open(newline="", encoding="utf-8") as handle:
+            evidence_by_id = {row["evidence_id"]: row for row in csv.DictReader(handle)}
+        evidence_row = next(row for row in run["evidence"] if row["excerpt"])
+        source = artifact_by_id[evidence_by_id[evidence_row["id"]]["artifact_id"]]
+        self.assertEqual(evidence_row["source_sha256"], source["sha256"])
+        self.assertEqual(evidence_row["recorded_excerpt_sha256"], hashlib.sha256(evidence_row["excerpt"].encode()).hexdigest())
+        observation = run["observations"][0]
+        self.assertEqual(observation["source_sha256"], artifact_by_id[observation["artifact_id"]]["sha256"])
 
     def test_real_history_projection_bounds_output_and_refuses_traversal_paths(self):
         with self.assertRaisesRegex(ValueError, "between 1 and 50"):
