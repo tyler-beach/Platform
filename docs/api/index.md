@@ -1,8 +1,8 @@
 # API reference
 
-Interactive Swagger UI for the **proposed REST/JSON v1 façade**. The source typed control-plane contract is Protobuf in the repository.
+Interactive Swagger UI for the **Pathfinder production-target REST/JSON v1 contract**. The typed control-plane contract is Protobuf in the repository; this OpenAPI document defines its REST mapping.
 
-> **Status: design-only.** No production HTTP base URL or deployed service is implied. Swagger request execution is disabled by default because a compatible server and authentication are not deployed by this project yet.
+> **Implementation status:** contract and mock response examples are available for production implementation. A live API server and authentication are not deployed by this documentation site, so Swagger request execution is disabled by default.
 
 <div id="swagger-ui"></div>
 
@@ -24,8 +24,9 @@ window.addEventListener("load", function () {
 });
 </script>
 
-## Related contracts
+## Mock response examples
 
+- [Production-target API response mockups](../demo/api-payload-examples.md) — HTTP 202 job acceptance, lifecycle polling, evidence-linked findings, inconclusive outcome, and 409 idempotency conflict.
 - [API behavior, lifecycle, errors and versioning](../contracts/API_CONTRACT.md)
 - [Data types and invariants](../contracts/CONTRACTS.md)
 - [Evidence and provenance](../contracts/EVIDENCE.md)
@@ -33,4 +34,4 @@ window.addEventListener("load", function () {
 - [Raw OpenAPI file](../openapi.yaml)
 - [Protobuf schema](https://github.com/tyler-beach/Platform/blob/main/proto/adrplatform/v1/platform.proto)
 
-Artifact ingestion, review submission, decision management, audit querying and evidence excerpt download are intentionally omitted from this first public API.
+Artifact ingestion, review submission, decision management, audit querying and evidence excerpt download are intentionally outside the initial API surface.
