@@ -29,3 +29,12 @@ This is a website/demo change only. It does not change the detection engine, pro
 ## Language review
 
 Prefer specific, conversational wording such as “See what the evidence shows” and “What this does not prove.” Avoid inflated claims such as “transformative,” vague automation promises, and internal implementation jargon in the opening screen. Keep technical terminology where it helps an engineer verify a claim.
+
+
+## Pathfinder brand direction
+
+**Name:** Pathfinder. **Tagline:** From intent to reality. **Positioning:** Keep implementation on the paved path set by architecture decisions. Use “paved path” consistently; a potential deviation is a signal to investigate, not an automatic verdict.
+
+**Voice:** clear, grounded, and engineering-native. Prefer “Follow a paved path,” “See what changed,” “What this supports,” and “What it does not prove.” Avoid inflated claims or implying automatic enforcement.
+
+**Palette:** Aurora `#14B8A6`, Pine `#0F766E`, Mist `#A7F3D0`, Night `#081220`, Stone `#334155`, Snow `#F8FAFC`.

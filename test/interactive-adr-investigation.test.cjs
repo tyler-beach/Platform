@@ -27,7 +27,7 @@ test("session TTL ADR defines a 60-minute absolute maximum and renewal semantics
 test("interactive workspace connects decision, evidence, stage trace, and local review", () => {
   const component = read("src/components/DemoExplorer.jsx");
   const styles = read("src/styles.css");
-  for (const phrase of ["DECISION → IMPLEMENTATION", "EVIDENCE TRAIL", "OBSERVED STATE", "CANDIDATE FINDING", "Nothing was written to production"]) {
+  for (const phrase of ["DECISION → IMPLEMENTATION", "EVIDENCE TRAIL", "OBSERVED STATE", "CANDIDATE FINDING", "Your local choice:", "Nothing was written to production"]) {
     assert.ok(component.includes(phrase), `missing UI contract: ${phrase}`);
   }
   assert.match(component, /aria-selected=\{activeKey === item\.key\}/);

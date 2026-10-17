@@ -5,16 +5,16 @@
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
-  --ink: #102038;
-  --ink-soft: #31445d;
-  --muted: #758399;
-  --line: #e0e7ef;
-  --canvas: #f5f7fb;
+  --ink: #081220;
+  --ink-soft: #334155;
+  --muted: #64748b;
+  --line: #dbe3eb;
+  --canvas: #f8fafc;
   --surface: #fff;
-  --navy: #091524;
-  --navy-2: #10243b;
-  --teal: #087f78;
-  --mint: #81e2d1;
+  --navy: #081220;
+  --navy-2: #0f2633;
+  --teal: #0f766e;
+  --mint: #a7f3d0;
   --blue: #6078f5;
   --mono: 'DM Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   --display: 'Manrope', 'DM Sans', sans-serif;
@@ -612,3 +612,12 @@ button { color: inherit; }
 @media (max-width: 760px) {
   .journey-selected-source__checks { grid-template-columns: minmax(0,1fr); }
 }
+
+/* Pathfinder brand system */
+:root { --pathfinder-aurora: #14b8a6; --pathfinder-pine: #0f766e; --pathfinder-mist: #a7f3d0; --pathfinder-night: #081220; --pathfinder-stone: #334155; --pathfinder-snow: #f8fafc; }
+.brand strong { font-size: 14px; letter-spacing: -.035em; }
+.brand small { letter-spacing: .09em; text-transform: uppercase; font-size: 8px; }
+.global-nav__link.is-active { color: var(--pathfinder-pine); background: #e7f7f2; }
+.eyebrow-dot, .nav-live-mark { background: var(--pathfinder-aurora); }
+:focus-visible { outline-color: var(--pathfinder-aurora); }
+::selection { background: #a7f3d0; color: #081220; }
