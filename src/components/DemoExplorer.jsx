@@ -138,15 +138,36 @@ const requirementExamples = {
 };
 
 function RequirementLab() {
-  const [activeKey, setActiveKey] = useState('pdb');
-  const [activeStage, setActiveStage] = useState(2);
-  const [activeEvidence, setActiveEvidence] = useState('E-02');
+  const [activeKey, setActiveKey] = useState('ttl');
+  const [activeStage, setActiveStage] = useState(0);
+  const [activeEvidence, setActiveEvidence] = useState('E-01');
   const [review, setReview] = useState({});
+  const [isPlaying, setIsPlaying] = useState(false);
   const tabRefs = useRef({});
   const example = requirementExamples[activeKey];
   const stage = example.stages[activeStage];
   const selectedEvidence = example.evidence.find(item => item.id === activeEvidence) || example.evidence[0];
-  function chooseExample(key) { setActiveKey(key); setActiveStage(0); setActiveEvidence('E-01'); }
+
+  useEffect(() => {
+    if (!isPlaying) return undefined;
+    if (activeStage >= example.stages.length - 1) {
+      setIsPlaying(false);
+      return undefined;
+    }
+    const timer = window.setTimeout(() => setActiveStage(activeStage + 1), 4200);
+    return () => window.clearTimeout(timer);
+  }, [isPlaying, activeStage, example.stages.length]);
+
+  function chooseExample(key) {
+    setIsPlaying(false);
+    setActiveKey(key);
+    setActiveStage(0);
+    setActiveEvidence('E-01');
+  }
+  function goToStage(index) {
+    setIsPlaying(false);
+    setActiveStage(Math.max(0, Math.min(example.stages.length - 1, index)));
+  }
   function handleTabKeyDown(event, index) {
     const keys = Object.keys(requirementExamples);
     let nextIndex = index;
@@ -161,36 +182,91 @@ function RequirementLab() {
     tabRefs.current[nextKey]?.focus();
   }
 
-  return <section className="requirement-lab" aria-labelledby="requirement-lab-title">
+  const stepNames = ['Decision', 'Scope', 'Evidence', 'Assessment', 'Review'];
+  const progress = ((activeStage + 1) / example.stages.length) * 100;
+
+  return <section className="requirement-lab journey-lab" aria-labelledby="requirement-lab-title">
     <header className="requirement-lab__topbar">
-      <div className="requirement-lab__brand"><span className="requirement-lab__brand-mark"><Workflow size={18}/></span><span><strong>ADR / FIELDNOTES</strong><small>DECISION VALIDATION WORKSPACE</small></span></div>
+      <div className="requirement-lab__brand"><span className="requirement-lab__brand-mark"><Workflow size={18}/></span><span><strong>ADR / FIELDNOTES</strong><small>GUIDED INVESTIGATION · ABOUT 60 SECONDS</small></span></div>
       <span className="requirement-lab__mode"><i/> SYNTHETIC ENVIRONMENT</span>
     </header>
-    <div className="requirement-lab__intro">
-      <div><span className="demo-label">DECISION → IMPLEMENTATION</span><h2 id="requirement-lab-title">See where the system<br/><em>drifts from the decision.</em></h2><p>Choose a policy. Follow the evidence. Inspect the gap. This is the core ADR investigation loop—not a language-specific code demo.</p></div>
-      <nav className="requirement-lab__switcher" role="tablist" aria-label="Select an architectural decision">
-        {Object.values(requirementExamples).map((item, index) => <button key={item.key} ref={node => { tabRefs.current[item.key] = node; }} id={`adr-tab-${item.key}`} tabIndex={activeKey === item.key ? 0 : -1} type="button" role="tab" aria-controls="requirement-lab-panel" aria-selected={activeKey === item.key} className={activeKey === item.key ? 'is-active' : ''} onKeyDown={event => handleTabKeyDown(event, index)} onClick={() => chooseExample(item.key)}><span className="requirement-lab__switcher-index">{item.key === 'pdb' ? '01' : '02'}</span><span><strong>{item.key === 'pdb' ? 'Pod disruption budget' : 'Session lifetime'}</strong><small>{item.key === 'pdb' ? 'AVAILABILITY' : 'IDENTITY SECURITY'}</small></span><ArrowUpRight size={14}/></button>)}
-      </nav>
+
+    <div className="journey-intro">
+      <div className="journey-intro__copy">
+        <span className="demo-label">FROM DECISION TO EVIDENCE</span>
+        <h2 id="requirement-lab-title">A decision is only useful<br/>if the system <em>follows it.</em></h2>
+        <p>Watch one architectural rule move through scope, evidence, and review. No security background required.</p>
+      </div>
+      <div className="journey-intro__actions">
+        <button type="button" className="journey-primary" onClick={() => { if (activeStage === example.stages.length - 1) setActiveStage(0); setIsPlaying(true); }}><Play size={15} fill="currentColor"/> {isPlaying ? 'Journey playing' : activeStage === example.stages.length - 1 ? 'Replay journey' : 'Watch investigation'} <ArrowRight size={15}/></button>
+        <span>5 steps · source-linked · human reviewed</span>
+      </div>
     </div>
-    <div className="requirement-lab__surface" id="requirement-lab-panel" role="tabpanel" aria-labelledby={`adr-tab-${activeKey}`} tabIndex={0}>
-      <div className="requirement-lab__surface-head"><div><span className="demo-label">{example.eyebrow}</span><h3>{example.title}</h3></div><span className="requirement-lab__scope"><span/> POLICY SCOPE · DEFINED</span></div>
-      <div className="requirement-lab__rule"><span className="requirement-lab__rule-tag">DECISION</span><p>{example.requirement}</p><button type="button" className="requirement-lab__rule-link" onClick={() => {setActiveStage(1);setActiveEvidence('E-01');}}>Inspect requirement <ArrowRight size={14}/></button></div>
-      <div className="requirement-lab__journey">
-        <div className="requirement-lab__journey-line" aria-hidden="true"><span style={{width: ((activeStage / (example.stages.length - 1)) * 100) + '%'}}/></div>
-        {example.stages.map((item, index) => <button key={item[0]} type="button" className={'requirement-lab__journey-step ' + (activeStage === index ? 'is-active' : '') + (index < activeStage ? ' is-complete' : '')} aria-current={activeStage === index ? 'step' : undefined} onClick={() => setActiveStage(index)}><span className="requirement-lab__journey-number">{index < activeStage ? <CheckCircle2 size={15}/> : String(index + 1).padStart(2, '0')}</span><strong>{item[0]}</strong></button>)}
+
+    <nav className="journey-scenarios" role="tablist" aria-label="Choose an example investigation">
+      {Object.values(requirementExamples).map((item, index) => <button key={item.key} ref={node => { tabRefs.current[item.key] = node; }} id={\`adr-tab-\${item.key}\`} tabIndex={activeKey === item.key ? 0 : -1} type="button" role="tab" aria-controls="journey-panel" aria-selected={activeKey === item.key} className={activeKey === item.key ? 'is-active' : ''} onKeyDown={event => handleTabKeyDown(event, index)} onClick={() => chooseExample(item.key)}><span className="journey-scenarios__number">0{index + 1}</span><span><strong>{item.key === 'ttl' ? 'Session lifetime' : 'Pod availability'}</strong><small>{item.key === 'ttl' ? 'IDENTITY SECURITY' : 'KUBERNETES · RESILIENCE'}</small></span><ArrowUpRight size={15}/></button>)}
+    </nav>
+
+    <div className="journey-workspace" id="journey-panel" role="tabpanel" aria-labelledby={\`adr-tab-\${activeKey}\`}>
+      <aside className="journey-rail" aria-label="Investigation progress">
+        <div className="journey-rail__heading"><span className="demo-label">INVESTIGATION</span><strong>{String(activeStage + 1).padStart(2, '0')} <small>/ 05</small></strong></div>
+        <div className="journey-rail__track" aria-hidden="true"><span style={{height: progress + '%'}}/></div>
+        {example.stages.map((item, index) => <button key={item[0]} type="button" className={'journey-rail__step' + (index === activeStage ? ' is-active' : '') + (index < activeStage ? ' is-complete' : '')} aria-current={index === activeStage ? 'step' : undefined} onClick={() => goToStage(index)}><span>{index < activeStage ? <CheckCircle2 size={15}/> : String(index + 1).padStart(2, '0')}</span><span><strong>{stepNames[index]}</strong><small>{item[0]}</small></span><ChevronRight size={14}/></button>)}
+        <div className="journey-rail__note"><ShieldCheck size={15}/><span>Evidence first.<br/>Human decision.</span></div>
+      </aside>
+
+      <div className="journey-scene" aria-live="polite">
+        <div className="journey-scene__top"><span className="demo-label">STEP {String(activeStage + 1).padStart(2, '0')} · {stepNames[activeStage].toUpperCase()}</span><span className="journey-scene__state"><i/>{isPlaying ? 'PLAYING' : activeStage === 4 ? 'READY FOR REVIEW' : 'GUIDED MODE'}</span></div>
+        {activeStage === 0 && <div className="journey-scene__content journey-scene__content--decision">
+          <span className="journey-overline">THE ARCHITECTURE DECISION</span>
+          <h3>{example.title}</h3>
+          <blockquote>{example.requirement}</blockquote>
+          <div className="journey-explain"><span className="journey-explain__icon"><CircleHelp size={17}/></span><p><strong>In plain English</strong>{activeKey === 'ttl' ? 'A session must end within one hour. Clicking around or refreshing a token must not keep the same session alive longer.' : 'When a service has three replicas and needs two available, its disruption policy must not allow too many to be taken offline at once.'}</p></div>
+          <p className="journey-scene__hint">First, the system needs to know which services and components this rule applies to.</p>
+        </div>}
+        {activeStage === 1 && <div className="journey-scene__content">
+          <span className="journey-overline">STEP 02 · FIND WHAT THE RULE COVERS</span>
+          <h3>Which parts of the system are in scope?</h3>
+          <p className="journey-lede">{example.stages[0][1]}</p>
+          <div className="journey-map">
+            <div className="journey-map__node journey-map__node--decision"><FileCode2 size={17}/><span><strong>Approved decision</strong><small>{activeKey === 'ttl' ? 'Maximum 60 minutes' : 'At least 2 replicas available'}</small></span><CheckCircle2 size={16}/></div>
+            <div className="journey-map__connector"><span/></div>
+            <div className="journey-map__node"><GitBranch size={17}/><span><strong>{activeKey === 'ttl' ? 'Authentication & session services' : 'Workload & disruption policy'}</strong><small>{activeKey === 'ttl' ? 'Session creation · refresh · validation' : 'Replica count · selector · availability budget'}</small></span><span className="journey-tag">SCOPE</span></div>
+            <div className="journey-map__caption">Scope is resolved before the system compares settings. A matching file name alone is not enough.</div>
+          </div>
+        </div>}
+        {activeStage === 2 && <div className="journey-scene__content">
+          <span className="journey-overline">STEP 03 · COLLECT SOURCE-LINKED EVIDENCE</span>
+          <h3>What does the implementation actually say?</h3>
+          <p className="journey-lede">The demo compares the decision with observed configuration and identifies what still needs verification.</p>
+          <div className="journey-evidence-list">{example.evidence.map((item, index) => <button key={item.id} type="button" className={'journey-evidence-row' + (activeEvidence === item.id ? ' is-active' : '')} onClick={() => setActiveEvidence(item.id)}><span className="journey-evidence-row__id">{item.id}</span><span className="journey-evidence-row__copy"><strong>{item.title}</strong><small>{item.detail}</small><code>{item.source}</code></span><span className="journey-evidence-row__mark">{index === 0 ? 'RULE' : index === 1 ? 'OBSERVED' : 'CHECK'}</span></button>)}</div>
+          <div className="journey-selected-source"><FileCode2 size={17}/><div><span className="demo-label">SELECTED EVIDENCE</span><strong>{selectedEvidence.title}</strong><p>{selectedEvidence.detail}</p><small>{selectedEvidence.source}</small></div></div>
+        </div>}
+        {activeStage === 3 && <div className="journey-scene__content">
+          <span className="journey-overline">STEP 04 · COMPARE REQUIREMENT WITH EVIDENCE</span>
+          <h3>The values do not line up.</h3>
+          <p className="journey-lede">The observed setting conflicts with the stated limit. That is a signal to investigate—not an automatic enforcement action.</p>
+          <div className="journey-comparison">
+            <div className="journey-comparison__cell"><span>REQUIRED</span><strong>{activeKey === 'ttl' ? '60 min' : '2 available'}</strong><small>{activeKey === 'ttl' ? 'Absolute session lifetime' : 'Minimum available replicas'}</small></div>
+            <div className="journey-comparison__operator">≠</div>
+            <div className="journey-comparison__cell journey-comparison__cell--observed"><span>OBSERVED</span><strong>{activeKey === 'ttl' ? '90 min' : '2 unavailable'}</strong><small>{activeKey === 'ttl' ? 'Configured maximum' : 'Permitted disruption'}</small></div>
+          </div>
+          <div className="journey-assessment-note"><ShieldCheck size={17}/><p><strong>What the evidence supports</strong>{activeKey === 'ttl' ? 'The configured maximum is 30 minutes above the decision. Refresh and server-side acceptance behavior still need checking.' : 'The observed budget may permit more disruption than the availability objective allows. Selector and environment identity must be verified.'}</p></div>
+        </div>}
+        {activeStage === 4 && <div className="journey-scene__content">
+          <span className="journey-overline">STEP 05 · HUMAN REVIEW</span>
+          <div className="journey-outcome"><span className="journey-outcome__icon"><ShieldCheck size={21}/></span><div><span className="journey-overline">CANDIDATE OUTCOME</span><h3>{example.outcome}</h3></div><span className="journey-outcome__badge">NOT ENFORCED</span></div>
+          <p className="journey-lede">{activeKey === 'ttl' ? 'The configuration conflicts with the 60-minute rule. Before confirming a deviation, verify token refresh behavior and that the server rejects sessions past the absolute boundary.' : 'The budget may conflict with the approved availability objective. Before confirming a deviation, verify that its selector targets the intended workload and that all values come from the same environment.'}</p>
+          <div className="journey-review-gap"><CircleHelp size={17}/><div><strong>Still needs evidence</strong><p>{example.gaps}</p></div></div>
+          <div className="journey-review-actions"><span>YOUR REVIEW</span>{['confirm', 'dismiss', 'inconclusive'].map(value => <button key={value} type="button" className={review[activeKey] === value ? 'is-active' : ''} aria-pressed={review[activeKey] === value} onClick={() => setReview(previous => ({...previous, [activeKey]: value}))}>{value === 'confirm' ? 'Confirm finding' : value === 'dismiss' ? 'Dismiss' : 'Need more evidence'}</button>)}</div>
+          {review[activeKey] && <p className="journey-review-result" role="status">Local demo choice: {review[activeKey]}. Nothing was written to production.</p>}
+        </div>}
+        <footer className="journey-controls">
+          <div className="journey-controls__left"><span>{activeStage + 1} of {example.stages.length}</span><span className="journey-controls__dots" aria-label={\`Step \${activeStage + 1} of 5\`}>{example.stages.map((item, index) => <i key={item[0]} className={index === activeStage ? 'is-active' : index < activeStage ? 'is-complete' : ''}/>)}</span></div>
+          <div className="journey-controls__buttons"><button type="button" className="journey-secondary" disabled={activeStage === 0} onClick={() => goToStage(activeStage - 1)}>Back</button><button type="button" className="journey-next" onClick={() => { if (activeStage === example.stages.length - 1) { setIsPlaying(false); setActiveStage(0); } else goToStage(activeStage + 1); }}>{activeStage === example.stages.length - 1 ? 'Start again' : 'Next step'} <ArrowRight size={15}/></button></div>
+        </footer>
       </div>
-      <div className="requirement-lab__stage-focus" aria-live="polite"><div className="requirement-lab__stage-copy"><span className="demo-label">STEP {String(activeStage + 1).padStart(2, '0')} / 0{example.stages.length}</span><h4>{stage[0]}<span>.</span></h4><p>{stage[1]}</p></div><div className="requirement-lab__stage-controls"><button type="button" aria-label="Previous stage" disabled={activeStage === 0} onClick={() => setActiveStage(value => Math.max(0, value - 1))}><ArrowRight size={15} className="requirement-lab__back-arrow"/></button><button type="button" aria-label="Next stage" disabled={activeStage === example.stages.length - 1} onClick={() => setActiveStage(value => Math.min(example.stages.length - 1, value + 1))}><span>Next step</span><ArrowRight size={15}/></button></div></div>
-      <div className="requirement-lab__signal-grid">
-        <article className="requirement-lab__signal requirement-lab__signal--observation"><div className="requirement-lab__signal-head"><span className="requirement-lab__signal-icon"><GitBranch size={15}/></span><span className="demo-label">OBSERVED STATE</span><span className="requirement-lab__signal-index">02</span></div><p>{example.observation}</p><button type="button" onClick={() => {setActiveEvidence('E-02');setActiveStage(2);}}>Inspect source evidence <ArrowRight size={13}/></button></article>
-        <article className="requirement-lab__signal requirement-lab__signal--finding"><div className="requirement-lab__signal-head"><span className="requirement-lab__signal-icon"><ShieldCheck size={15}/></span><span className="demo-label">CANDIDATE FINDING</span><span className="requirement-lab__signal-index">03</span></div><p><strong>{example.outcome}</strong> — verify the workload/session scope, source freshness, and counterevidence before deciding.</p><span className="requirement-lab__finding-note">NOT AN ENFORCEMENT ACTION</span></article>
-      </div>
-      <div className="requirement-lab__evidence-strip">
-        <div className="requirement-lab__evidence-title"><span className="demo-label">EVIDENCE TRAIL</span><strong>What supports the finding?</strong><small>{example.evidence.length} illustrative references</small></div>
-        <div className="requirement-lab__evidence-select">{example.evidence.map(item => <button key={item.id} type="button" className={activeEvidence === item.id ? 'is-active' : ''} aria-pressed={activeEvidence === item.id} onClick={() => setActiveEvidence(item.id)}><span>{item.id}</span><strong>{item.title}</strong><ArrowUpRight size={14}/></button>)}</div>
-        <div className="requirement-lab__source-view" aria-live="polite"><FileCode2 size={17}/><div><span className="demo-label">SELECTED SOURCE</span><strong>{selectedEvidence.title}</strong><p>{selectedEvidence.detail} <span>·</span> {selectedEvidence.source}</p></div><span className="requirement-lab__pinned">SYNTHETIC REF</span></div>
-      </div>
-      <footer className="requirement-lab__review-bar"><div className="requirement-lab__gap-inline"><CircleHelp size={16}/><span><strong>Open evidence question</strong><small>{example.gaps}</small></span></div><div className="requirement-lab__review-actions"><span>REVIEW</span>{['confirm', 'dismiss', 'inconclusive'].map(value => <button key={value} type="button" className={review[activeKey] === value ? 'is-active' : ''} aria-pressed={review[activeKey] === value} onClick={() => setReview(previous => ({...previous, [activeKey]: value}))}>{value === 'confirm' ? 'Confirm' : value === 'dismiss' ? 'Dismiss' : 'Inconclusive'}</button>)}</div>{review[activeKey] && <p className="requirement-lab__review-state" role="status">Local demo choice: {review[activeKey]}. Nothing was written to production.</p>}</footer>
     </div>
-    <div className="requirement-lab__footnote"><span><ShieldCheck size={14}/> Synthetic fixture · no live infrastructure queried</span><span>Assessment is evidence-led, reviewable, and reversible.</span></div>
+    <div className="journey-footnote"><span><ShieldCheck size={14}/> Synthetic fixture · no live infrastructure queried</span><span>Illustrative evidence · deterministic PoC · human decides</span></div>
   </section>;
 }
