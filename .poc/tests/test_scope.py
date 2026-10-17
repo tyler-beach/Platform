@@ -82,12 +82,21 @@ class ScopeRetrievalTests(unittest.TestCase):
         self.assertTrue(findings[0]["source_observations"][0]["excerpt_sha256"])
 
     def test_no_current_adr_found_is_not_claimed_as_compliance(self):
-        event = self.by_id["SCOPE-06"]
+        event = self.by_id["SCOPE-09"]
         result = run_scope.evaluate_event(event, self.catalog, top_k=5, in_scope_threshold=0.28,
                                           review_threshold=0.14, backend="local")
         self.assertEqual(result["scope"]["disposition"], "not_in_scope")
         self.assertEqual(result["triage"]["supported_deviation_count"], 0)
         self.assertEqual(result["triage"]["status"], "no_retrieved_adr")
+
+    def test_relevant_superseded_adr_causes_uncertain_not_silent_exclusion(self):
+        event = self.by_id["SCOPE-06"]
+        result = run_scope.evaluate_event(event, self.catalog, top_k=5, in_scope_threshold=0.28,
+                                          review_threshold=0.14, backend="local")
+        self.assertEqual(result["scope"]["disposition"], "uncertain")
+        self.assertFalse(result["scope"]["selected_adrs"])
+        self.assertTrue(result["scope"]["inactive_near_matches"])
+        self.assertEqual(result["scope"]["inactive_near_matches"][0]["adr_id"], "ADR-006")
 
 
 if __name__ == "__main__":
