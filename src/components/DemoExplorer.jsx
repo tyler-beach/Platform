@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, ArrowUpRight, CheckCircle2, ChevronRight, CircleHelp, Clock3, ExternalLink, FileCode2, GitBranch, Pause, Play, RefreshCw, ShieldCheck, Workflow } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, Braces, CheckCircle2, ChevronRight, CircleHelp, Clock3, ExternalLink, FileCode2, GitBranch, Pause, Play, RefreshCw, ShieldCheck, Workflow } from 'lucide-react';
 import { BASE_URL } from '../content.js';
 
 const repository = document.querySelector('meta[name="adr-repository"]')?.content || 'tyler-beach/Platform';
@@ -30,6 +30,70 @@ export default function DemoExplorer() {
     <div className="demo-trust-banner"><div className="demo-trust-banner__icon"><ShieldCheck size={19} /></div><div><strong>This walkthrough uses example data</strong><p>The guided scenarios are synthetic and do not inspect a live system. You can open the separate PoC workflow and inspect its run artifacts when you want to see the underlying implementation.</p></div><Link to="/architecture/SECURITY">How trust is handled <ArrowRight size={14} /></Link></div>
 
     <RequirementLab />
+
+    <section className="technical-trace" aria-labelledby="technical-trace-title">
+      <div className="technical-trace__heading">
+        <div><span className="demo-label">IMPLEMENTATION TRACE · SYNTHETIC EXAMPLE</span><h2 id="technical-trace-title">Inspect the data path, not just the finding</h2></div>
+        <p>The scanner and evidence contract are checked into this repository. This is representative output from the current PoC contract, not a live repository scan.</p>
+      </div>
+      <div className="technical-trace__grid">
+        <article className="technical-trace__panel">
+          <div className="technical-trace__panel-title"><Braces size={17} /><div><strong>01 / AST observation</strong><small>Tree-sitter · source-level syntax</small></div></div>
+          <p className="technical-trace__explain">The scanner parses source into a syntax tree, walks call-expression nodes, and emits stable source spans. It does not claim type resolution or runtime behavior.</p>
+          <pre aria-label="Example AST observation JSON"><code>{JSON.stringify({
+  scanner: "tree-sitter-language-pack",
+  language: "python",
+  source_path: "src/session.py",
+  source_sha256: "sha256:<digest-of-source-bytes>",
+  parse_status: "parsed",
+  root_has_error: false,
+  syntax_error_count: 0,
+  observations: [{
+    observation_id: "TS-001",
+    enclosing_function: "validate_session",
+    line: 42,
+    column: 9,
+    end_line: 42,
+    end_column: 39,
+    call: "anthropic_client.assess",
+    expression: "anthropic_client.assess(request)",
+    receiver_expression: "anthropic_client",
+    method_name: "assess",
+    classification: "synchronous_provider_call",
+    classification_basis: "syntactic_heuristic"
+  }]
+}, null, 2)}</code></pre>
+          <ul className="technical-trace__notes"><li>Byte offsets and line/column spans bind observations to exact source.</li><li>Classification is heuristic; receiver names can be misleading.</li><li>Parse errors fail the scan and are retained with source locations.</li></ul>
+          <a href={`https://github.com/${repository}/blob/main/.github/demo/ast_scan.py`} target="_blank" rel="noreferrer">Read the AST scanner <ArrowUpRight size={13} /></a>
+        </article>
+        <article className="technical-trace__panel">
+          <div className="technical-trace__panel-title"><ShieldCheck size={17} /><div><strong>02 / Evidence item</strong><small>Immutable source reference · claim relation</small></div></div>
+          <p className="technical-trace__explain">Evidence is version-bound and validated before a finding can rely on it. Excerpts are review data, not general-purpose logs; model output cannot invent evidence IDs or locations.</p>
+          <pre aria-label="Example evidence item JSON"><code>{JSON.stringify({
+  evidenceId: "ev-001",
+  jobId: "job-example-0042",
+  artifactId: "repo:service/session.py",
+  artifactVersionId: "git:4f8c…",
+  artifactKind: "source_file",
+  contentSha256: "<sha256-of-canonical-source>",
+  path: "src/session.py",
+  startLine: 42,
+  endLine: 42,
+  symbolOrSection: "validate_session",
+  locatorPrecision: "EXACT",
+  excerptSha256: "<sha256-of-exact-excerpt>",
+  relationToClaim: "CONTRADICTS",
+  retrievalMethod: "path_symbol_v1",
+  selectionRationale: "Contains the configured absolute lifetime check",
+  sourceIntegrity: "VERIFIED",
+  collectedAt: "2026-10-17T12:00:00Z"
+}, null, 2)}</code></pre>
+          <ul className="technical-trace__notes"><li>Artifact version, source digest, and inclusive line range must agree.</li><li>Each factual claim must cite evidence in the same immutable job package.</li><li>Missing, stale, contradictory, or weak evidence downgrades the result to potential or inconclusive.</li></ul>
+          <a href={`https://github.com/${repository}/blob/main/docs/contracts/EVIDENCE.md`} target="_blank" rel="noreferrer">Read the evidence contract <ArrowUpRight size={13} /></a>
+        </article>
+      </div>
+      <div className="technical-trace__boundary"><strong>Boundary:</strong> AST facts are deterministic syntax observations. Semantic applicability, runtime behavior, and whether a deviation is confirmed require additional evidence and human review. The JSON above is illustrative; hashes and IDs are placeholders, not verifiable artifact identities.</div>
+    </section>
 
     <details ref={supportingDetailsRef} id="demo-supporting-details" className="demo-supporting-details"><summary>Go deeper: scenarios, PoC runs, and evidence <span>Technical details for closer inspection</span></summary><div className="demo-supporting-details__body">
     <DemoSection id="demo-gallery-heading" kicker="SCENARIO LIBRARY" title="Compare spec, code, and change" icon={<LayersIcon />} badge="9 CURATED CASES">
@@ -235,7 +299,7 @@ function RequirementLab() {
           <h3>What does the implementation actually say?</h3>
           <p className="journey-lede">The demo compares the decision with observed configuration and identifies what still needs verification.</p>
           <div className="journey-evidence-list">{example.evidence.map((item, index) => <button key={item.id} type="button" aria-pressed={activeEvidence === item.id} className={'journey-evidence-row' + (activeEvidence === item.id ? ' is-active' : '')} onClick={() => { setIsPlaying(false); setActiveEvidence(item.id); }}><span className="journey-evidence-row__id">{item.id}</span><span className="journey-evidence-row__copy"><strong>{item.title}</strong><small>{item.detail}</small><code>{item.source}</code></span><span className="journey-evidence-row__mark">{index === 0 ? 'RULE' : index === 1 ? 'OBSERVED' : 'CHECK'}</span></button>)}</div>
-          <div className="journey-selected-source"><FileCode2 size={17}/><div className="journey-selected-source__body"><span className="demo-label">EVIDENCE INSPECTOR · {selectedEvidence.id}</span><strong>{selectedEvidence.title}</strong><p>{selectedEvidence.detail}</p><small>{selectedEvidence.location}</small><pre className="journey-selected-source__excerpt">{selectedEvidence.excerpt}</pre><div className="journey-selected-source__checks"><p><strong>What this supports</strong>{selectedEvidence.supports}</p><p><strong>What it does not prove</strong>{selectedEvidence.limits}</p></div></div></div>
+          <div className="journey-selected-source"><FileCode2 size={17}/><div className="journey-selected-source__body"><span className="demo-label">SYNTHETIC REF · EVIDENCE INSPECTOR · {selectedEvidence.id}</span><strong>{selectedEvidence.title}</strong><p>{selectedEvidence.detail}</p><small>{selectedEvidence.location}</small><pre className="journey-selected-source__excerpt">{selectedEvidence.excerpt}</pre><div className="journey-selected-source__checks"><p><strong>What this supports</strong>{selectedEvidence.supports}</p><p><strong>What it does not prove</strong>{selectedEvidence.limits}</p></div></div></div>
         </div>}
         {activeStage === 3 && <div className="journey-scene__content">
           <span className="journey-overline">STEP 04 · COMPARE REQUIREMENT WITH EVIDENCE</span>
