@@ -46,6 +46,7 @@ def _observation_units(event: dict[str, Any]) -> list[dict[str, Any]]:
             "caller_qualified_name": obs.get("caller_qualified_name", ""),
             "callee_qualified_name": obs.get("callee_qualified_name", ""),
             "resolution_status": obs.get("resolution_status", ""),
+            "claim": obs.get("claim", ""),
             "excerpt_sha256": sha(excerpt),
         })
     for i, line in enumerate(event.get("diff_lines", []), start=1):
@@ -217,6 +218,8 @@ def evaluate_event(event: dict[str, Any], catalog: list[dict[str, Any]], top_k: 
         overall_result = "uncertain"
     elif aligned:
         overall_result = "aligned"
+    elif retrieval_result["disposition"] == "uncertain":
+        overall_result = "uncertain"
     else:
         overall_result = "no_applicable_adr"
     return {
@@ -257,7 +260,18 @@ def metric_summary(results: list[dict[str, Any]]) -> dict[str, Any]:
                 if with_expected_adrs else None
             ),
         }
-    false_in_scope = sum(r["scope"]["disposition"] == "in_scope" for r in results if r.get("gold_disposition") == "out_of_scope")
+    false_in_scope = sum(
+        r["scope"]["disposition"] == "in_scope"
+        for r in results if r.get("gold_disposition") == "out_of_scope"
+    )
+    comparison_cases = [r for r in results if r.get("gold_comparison")]
+    comparison_labels = ("deviation", "aligned", "uncertain", "no_applicable_adr")
+    confusion = {gold: {pred: 0 for pred in comparison_labels} for gold in comparison_labels}
+    for row in comparison_cases:
+        gold, pred = row["gold_comparison"], row["comparison"]["overall_result"]
+        if gold in confusion and pred in comparison_labels:
+            confusion[gold][pred] += 1
+    exact = sum(r["comparison"]["overall_result"] == r["gold_comparison"] for r in comparison_cases)
     return {
         "scenario_count": total,
         "retrieval_backend": results[0]["scope"]["backend"] if results else "local_lexical_baseline",
@@ -265,10 +279,17 @@ def metric_summary(results: list[dict[str, Any]]) -> dict[str, Any]:
         "expected_adr_recall_on_in_scope_cases": sum(recall_per_case) / len(recall_per_case) if recall_per_case else None,
         "false_in_scope_cases": false_in_scope,
         "scope_disposition_by_expected_label": by_label,
-        "potential_deviation_flags": sum(r["triage"]["potential_deviation_count"] for r in results),
-        "caveat": "Metrics are from a small synthetic fixture set and lexical baseline; not production retrieval performance or violation probability.",
+        "comparison_case_count": len(comparison_cases),
+        "comparison_exact_agreement": exact / len(comparison_cases) if comparison_cases else None,
+        "comparison_confusion_matrix": confusion,
+        "comparison_counts": {
+            "deviation": sum(r["comparison"]["overall_result"] == "deviation" for r in results),
+            "aligned": sum(r["comparison"]["overall_result"] == "aligned" for r in results),
+            "uncertain": sum(r["comparison"]["overall_result"] == "uncertain" for r in results),
+            "no_applicable_adr": sum(r["comparison"]["overall_result"] == "no_applicable_adr" for r in results),
+        },
+        "caveat": "Metrics are from small synthetic fixtures and a lexical retrieval/cue-rule comparison baseline; not production model performance or calibrated probabilities.",
     }
-
 
 def fmt(value: Any) -> str:
     return "n/a" if value is None else f"{value:.1%}"
@@ -276,60 +297,71 @@ def fmt(value: Any) -> str:
 
 def render_report(results: list[dict[str, Any]], metrics: dict[str, Any]) -> str:
     lines = [
-        "# ADR Scope Retrieval and Deviation Triage — Simulation", "",
+        "# ADR Matches and Alignment/Deviation Report — Simulation", "",
         f"- Scenarios: {metrics['scenario_count']}",
         f"- Backend: {metrics['retrieval_backend']}",
-        f"- Expected ADR recall (in-scope cases): {fmt(metrics['expected_adr_recall_on_in_scope_cases'])}",
-        f"- False in-scope dispositions on expected out-of-scope cases: {metrics['false_in_scope_cases']}",
-        f"- Potential-deviation cues flagged: {metrics['potential_deviation_flags']}", "",
-        "> This is a reproducible local lexical baseline, not Bedrock vector search. ADR applicability metadata is a hard gate before relevance ranking. Cue matches produce review candidates only; no result is promoted to supported_deviation without the main pipeline's evidence-link, citation, and provenance guards.",
+        f"- Expected ADR recall (in-scope scenarios): {fmt(metrics['expected_adr_recall_on_in_scope_cases'])}",
+        f"- Comparison exact agreement on labeled cases: {fmt(metrics['comparison_exact_agreement'])}",
+        f"- Matched ADR comparison counts: {json.dumps(metrics['comparison_counts'], sort_keys=True)}", "",
+        "> The local baseline ranks active ADRs, then compares source-backed excerpts to transparent versioned cues. Each ADR result is aligned, deviation, or uncertain. A cue-based deviation is a review candidate, not an automatically accepted enforcement finding.",
         "", "## Scenario results", "",
-        "| Scenario | Expected scope | Retrieval disposition | Selected ADRs | Potential flags | Triage |",
-        "|---|---|---|---|---:|---|",
+        "| Scenario | Expected comparison | Retrieval disposition | Active ADR matches | Overall comparison |",
+        "|---|---|---|---|---|",
     ]
     for r in results:
-        ids = ", ".join(f"{a['adr_id']} v{a['version']} ({a['score']:.2f})" for a in r["scope"]["selected_adrs"]) or "—"
+        ids = ", ".join(
+            f"{a['adr_id']} v{a['version']} ({a['score']:.2f})"
+            for a in r["scope"]["selected_adrs"]
+        ) or "—"
         lines.append(
-            f"| {r['event_id']} — {r['event_summary']} | {r.get('gold_disposition', '—')} | "
-            f"{r['scope']['disposition']} | {ids} | {r['triage']['potential_deviation_count']} | {r['triage']['status']} |"
+            f"| {r['event_id']} — {r['event_summary']} | {r.get('gold_comparison', '—')} | "
+            f"{r['scope']['disposition']} | {ids} | {r['comparison']['overall_result']} |"
         )
-    lines += ["", "## Candidate ADR evidence trails", ""]
+    lines += ["", "## Per-ADR comparisons and evidence", ""]
     for r in results:
         lines += [f"### {r['event_id']}: {r['event_summary']}", ""]
-        if not r["scope"]["selected_adrs"]:
-            lines += [f"**Scope reason:** {r['scope']['reason']}", ""]
+        if not r["adr_matches"]:
+            lines += [f"**Comparison:** {r['comparison']['overall_result']}. {r['scope']['reason']}", ""]
             if r["scope"]["review_candidates"]:
-                lines.append("Review-only candidates: " + ", ".join(f"{a['adr_id']} ({a['score']:.2f})" for a in r["scope"]["review_candidates"]))
-                lines.append("")
-            if r["scope"].get("inactive_near_matches"):
-                lines.append("Lifecycle-excluded near matches (not used as governing ADRs):")
-                for inactive in r["scope"]["inactive_near_matches"]:
-                    lines.append(f"- {inactive['adr_id']} v{inactive['version']} — similarity {inactive['score']:.2f}; excluded because " + "; ".join(inactive["reasons"]))
-                lines.append("Human review is required to determine whether a replacement ADR or an explicit exception applies.")
+                lines.append("Active ADRs available for review (not treated as confirmed matches): " +
+                             ", ".join(f"{a['adr_id']} ({a['score']:.2f})" for a in r["scope"]["review_candidates"]))
                 lines.append("")
             continue
-        for candidate in r["candidate_assessments"]:
-            rel_score = next((a["score"] for a in r["scope"]["selected_adrs"] if a["adr_id"] == candidate["adr_id"]), 0)
-            lines.append(f"- **{candidate['adr_id']} v{candidate['adr_version']} — {candidate['finding_disposition']}** (relevance {rel_score:.2f}; control {candidate['control_id']})")
-            lines.append(f"  Requirement: {candidate['requirement_excerpt']}")
-            lines.append(f"  Violation cues: {', '.join(candidate['matched_violation_cues']) or 'none'}")
-            lines.append(f"  Alignment cues: {', '.join(candidate['matched_alignment_cues']) or 'none'}")
-            lines.append(f"  Explanation: {candidate['candidate_explanation']}")
-            lines.append(f"  ADR provenance: {candidate['adr_source']['path']} sha256={candidate['adr_source']['sha256']} chunk={candidate['adr_source']['chunk_id']}")
-            for ev in candidate["source_observations"]:
-                lines.append(f"  Observation: {ev['path']}:{ev['line']} — {ev['excerpt']} (sha256={ev['excerpt_sha256']})")
+        for match in r["adr_matches"]:
+            relevance = next(
+                (a["score"] for a in r["scope"]["selected_adrs"] if a["adr_id"] == match["adr_id"]), 0
+            )
+            lines.append(
+                f"- **{match['adr_id']} v{match['adr_version']} — {match['comparison_result']}** "
+                f"(active ADR match; retrieval similarity {relevance:.2f}; control {match['control_id']})"
+            )
+            lines.append(f"  Normative requirement ({match['requirement_evidence']['evidence_id']}): {match['requirement_evidence']['excerpt']}")
+            lines.append(f"  Explanation: {match['candidate_explanation']}")
+            lines.append(f"  ADR provenance: {match['adr_source']['path']} sha256={match['adr_source']['sha256']} chunk={match['adr_source']['chunk_id']}")
+            if not match["evidence_links"]:
+                lines.append("  Evidence links: none; current observations did not trigger a comparison cue.")
+            for link in match["evidence_links"]:
+                lines.append(
+                    f"  Evidence link: {link['relationship']} — requirement {link['requirement_evidence_id']} "
+                    f"to observation {link['observation_evidence_id']} via {link['rule']}: {link['explanation']}"
+                )
+            for ev in match["source_observations"]:
+                lines.append(
+                    f"  Observation: {ev.get('path')}:{ev.get('line')} — {ev['excerpt']} "
+                    f"(evidence={ev['evidence_id']}; sha256={ev['excerpt_sha256']})"
+                )
         lines.append("")
     lines += [
         "## Interpretation", "",
-        "1. Scope detection is separate from deviation detection. Lifecycle and repository/service/domain/language constraints exclude ADRs before similarity ranking.",
-        "2. Retrieval relevance is not truth. Scores rank lexical overlap against tags and normative text; they are not probabilities and should be replaced by hybrid vector+lexical relevance when wired to Aurora/pgvector.",
-        "3. Flags are candidates. A cue match yields potential_deviation, not a supported finding. A no-match does not prove compliance.",
-        "4. Provenance travels with the candidate: ADR ID/version/chunk/source hash plus source path/line/excerpt/hash references.",
-        "5. Production next step: embed versioned ADR chunks with Bedrock, store vectors plus applicability metadata in Aurora PostgreSQL/pgvector, retrieve top-k with bound SQL parameters and metadata filters, then pass retrieved normative text to the existing structured assessment/evidence-link pipeline.",
+        "1. Retrieval only decides which active ADRs are candidate matches. The comparison result is emitted per matched ADR.",
+        "2. Deviation means a source-backed excerpt matched a contradiction cue; aligned means alignment cues matched without contradictory cues; uncertain means evidence is missing, conflicting, or not decisive.",
+        "3. Exact source excerpts are used for comparison cues. Change summaries and retrieval terms help search, but cannot by themselves trigger an alignment/deviation result.",
+        "4. A provider call from a known worker is not treated as a deviation of the asynchronous-provider ADR. If caller identity is missing, the result remains uncertain.",
+        "5. Retired/superseded ADRs are filtered before lexical/vector ranking. They do not produce matches, evidence links, or influence the comparison result.",
+        "6. In production, replace deterministic cues with structured semantic assessment while preserving the per-ADR result schema, requirement-to-observation links, source hashes and lifecycle filters.",
         "",
     ]
     return "\n".join(lines)
-
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -356,8 +388,8 @@ def main() -> None:
         missing = [field for field in required_fields if not event.get(field)]
         if missing:
             parser.error("event JSON is missing required field(s): " + ", ".join(missing))
-        if not event.get("source_observations") and not event.get("call_edges") and not event.get("diff_summary"):
-            parser.error("event JSON must include source_observations, call_edges, or diff_summary evidence")
+        if not event.get("source_observations") and not event.get("diff_lines"):
+            parser.error("event JSON must include source_observations or exact diff_lines; summaries alone are not comparison evidence")
         scenarios = [event]
     else:
         scenarios = load_jsonl(args.scenarios)
