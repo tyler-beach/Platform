@@ -116,16 +116,24 @@ def retrieve(
         raise ValueError("thresholds must satisfy 0 <= review <= in-scope <= 1")
     query = build_query(event)
     query_tokens = tokens(query)
-    candidates, exclusions = [], []
+    candidates, exclusions, inactive_near_matches = [], [], []
     for adr in catalog:
         eligible, exclusion_reasons = applicability_gate(adr, event)
         if not eligible:
-            exclusions.append({
+            excluded = {
                 "adr_id": adr.get("adr_id"),
                 "version": adr.get("version"),
                 "title": adr.get("title"),
                 "reasons": exclusion_reasons,
-            })
+            }
+            non_lifecycle_exclusions = [x for x in exclusion_reasons if not x.startswith("inactive lifecycle state:")]
+            if not non_lifecycle_exclusions and exclusion_reasons:
+                inactive_rank = _relevance(adr, query_tokens)
+                excluded.update(inactive_rank)
+                excluded["lifecycle_near_match"] = inactive_rank["score"] >= review_threshold
+                if inactive_rank["score"] >= review_threshold:
+                    inactive_near_matches.append(excluded)
+            exclusions.append(excluded)
             continue
         rank = _relevance(adr, query_tokens)
         candidates.append({
@@ -155,12 +163,17 @@ def retrieve(
     if selected:
         disposition = "in_scope"
         reason = f"{len(selected)} active ADR candidate(s) passed metadata filters and lexical relevance threshold."
-    elif review:
+    elif review or inactive_near_matches:
         disposition = "uncertain"
-        reason = "One or more eligible ADRs have weak lexical support; require review rather than calling them in scope."
+        if review and inactive_near_matches:
+            reason = "Current ADR candidates are weak and one or more highly similar ADRs are inactive/superseded; human review is required."
+        elif inactive_near_matches:
+            reason = "A highly similar ADR is inactive or superseded and cannot govern automatically; human review is required."
+        else:
+            reason = "One or more eligible ADRs have weak lexical support; require review rather than calling them in scope."
     else:
         disposition = "not_in_scope"
-        reason = "No active, metadata-eligible ADR met the review relevance threshold."
+        reason = "No active or inactive near-match ADR met the review relevance threshold."
     return {
         "retrieval_version": RETRIEVAL_VERSION,
         "event_id": event.get("case_id", event.get("event_id", "unknown")),
@@ -176,6 +189,8 @@ def retrieve(
         "candidate_count_after_metadata_filters": len(candidates),
         "excluded_adrs": exclusions,
         "excluded_inactive_or_out_of_scope_count": len(exclusions),
+        "inactive_near_match_count": len(inactive_near_matches),
+        "inactive_near_matches": inactive_near_matches,
         "audit": {
             "catalog_chunk_ids": [x.get("chunk_id") for x in catalog],
             "catalog_hash": sha("\n".join(json.dumps(x, sort_keys=True) for x in catalog)),
