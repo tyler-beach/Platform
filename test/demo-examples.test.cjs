@@ -86,6 +86,8 @@ test("interactive demo labels and renders a contract-shaped mock API response", 
   assert.ok(component.includes("HTTP 200"));
   assert.ok(component.includes("FINDING_OUTCOME_DEVIATION_SUPPORTED"));
   assert.ok(component.includes("production-target contract"));
+  assert.ok(component.includes("demo/evidence-lineage-example/"));
+  assert.ok(component.includes("Separate the machine-generated finding from the human review event"));
 });
 
 test("API docs describe the production target without claiming the service is deployed", () => {
