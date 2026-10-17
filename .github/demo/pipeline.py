@@ -24,6 +24,7 @@ CASE_DIR = {"deviation": "deviation", "aligned": "aligned", "insufficient-eviden
 DEMO_MAX_INPUT_TOKENS = 8000
 DEMO_MAX_OUTPUT_TOKENS = 600
 DEMO_MAX_CALLS = 1
+LANGUAGE_EXTENSIONS = {"go": ".go", "python": ".py", "javascript": ".js", "typescript": ".ts", "java": ".java"}
 
 
 def digest(path: Path) -> str:
@@ -68,11 +69,13 @@ def prepare(args: argparse.Namespace) -> None:
     if root.exists():
         shutil.rmtree(root)
     (root / "input").mkdir(parents=True)
-    scenario, sample = args.comparison, args.sample_case
+    scenario, sample, language = args.comparison, args.sample_case, args.language
     if scenario not in {"code-diff", "technical-spec", "spec-vs-implementation"}:
         raise ValueError("Unsupported comparison mode.")
     if sample not in EXPECTED:
         raise ValueError("Unsupported sample case.")
+    if language not in LANGUAGE_EXTENSIONS:
+        raise ValueError("Unsupported source language.")
 
     selected_case = CASE_DIR[sample]
     artifacts: list[dict[str, Any]] = []
@@ -80,17 +83,17 @@ def prepare(args: argparse.Namespace) -> None:
     copy_input(adr_src, root / "input/adr.md", "ART-ADR-001", "adr", adr_src.as_posix(), artifacts)
 
     if scenario in {"code-diff", "spec-vs-implementation"}:
-        code_case = selected_case
-        code_dir = FIXTURES / "code-diff" / code_case
-        code_src = code_dir / "handler.go"
+        code_dir = FIXTURES / "code-diff" / selected_case / language
+        code_src = code_dir / ("handler" + LANGUAGE_EXTENSIONS[language])
         diff_src = code_dir / "change.diff"
-        copy_input(code_src, root / "input/handler.go", "ART-CODE-001", "implementation", code_src.as_posix(), artifacts)
+        if not code_src.is_file() or not diff_src.is_file():
+            raise ValueError(f"Missing {language} fixture for sample case {sample}.")
+        copy_input(code_src, root / "input" / code_src.name, "ART-CODE-001", "implementation", code_src.as_posix(), artifacts)
         copy_input(diff_src, root / "input/change.diff", "ART-DIFF-001", "diff", diff_src.as_posix(), artifacts)
 
     if scenario == "technical-spec":
         spec_src = FIXTURES / "technical-spec" / (selected_case + ".md")
     elif scenario == "spec-vs-implementation":
-        # The design requires asynchronous work; the selected code fixture varies.
         spec_src = FIXTURES / "technical-spec/aligned.md"
     else:
         spec_src = None
@@ -104,6 +107,7 @@ def prepare(args: argparse.Namespace) -> None:
         "created_at": datetime.now(timezone.utc).isoformat(),
         "comparison": scenario,
         "sample_case": sample,
+        "language": language,
         "comparison_contract": {
             "code-diff": "implementation_vs_adr",
             "technical-spec": "technical_spec_vs_adr",
@@ -122,6 +126,7 @@ def prepare(args: argparse.Namespace) -> None:
     write_summary("1 · Admit and pin inputs", [
         f"- **Comparison:** `{scenario}`",
         f"- **Sample case:** `{sample}`",
+        f"- **Source language:** `{language}`" if scenario != "technical-spec" else "- **Source language:** not applicable to this spec-only comparison",
         f"- **Source artifacts pinned:** {len(artifacts)}",
         "- Each input has a SHA-256 version recorded in `input-manifest.json`.",
         "- The oracle is kept separate from the evidence package and is not read by the mock-model stage.",
@@ -185,9 +190,11 @@ def analyze(args: argparse.Namespace) -> None:
         "scope_note": "No implementation file is part of the selected comparison; the deterministic document pass is used.",
     }
     if "implementation" in artifacts and ast.get("parse_status") != "parsed":
-        raise ValueError("Implementation input exists but the Go AST scanner did not produce a parsed result.")
+        raise ValueError("Implementation input did not produce a clean Tree-sitter parse.")
+    if "implementation" in artifacts and ast.get("language") != manifest.get("language"):
+        raise ValueError("Tree-sitter grammar does not match the selected source language.")
     if "implementation" in artifacts and ast.get("source_sha256") != artifacts["implementation"]["sha256"]:
-        raise ValueError("Go AST scanner hash does not match the pinned implementation bytes.")
+        raise ValueError("Tree-sitter source hash does not match the pinned implementation bytes.")
 
     diff = input_dir / "change.diff"
     diff_added = []
@@ -204,7 +211,7 @@ def analyze(args: argparse.Namespace) -> None:
         "requirements": requirements,
         "diff_added_lines": diff_added,
         "analysis_notes": [
-            "AST findings are observations of parsed call sites, not complete call-graph or runtime proofs.",
+            "Tree-sitter findings are source-spanned syntax observations with heuristic call labels, not type-resolved call-graph or runtime proofs.",
             "Markdown requirement extraction is deterministic and rule-based; ambiguity remains a valid result.",
             "No external model has been called.",
         ],
@@ -235,14 +242,14 @@ def evidence(args: argparse.Namespace) -> None:
     items: list[dict[str, Any]] = []
 
     def add(eid: str, role: str, line_start: int, line_end: int, locator_kind: str,
-            evidence_type: str, fact: str, excerpt: str) -> None:
+            evidence_type: str, fact: str, excerpt: str, locator_details: dict[str, Any] | None = None) -> None:
         artifact = artifact_by_role[role]
         items.append({
             "evidence_id": eid,
             "artifact_id": artifact["artifact_id"],
             "artifact_version": artifact["version"],
             "source_path": artifact["path"],
-            "locator": {"kind": locator_kind, "line_start": line_start, "line_end": line_end},
+            "locator": {"kind": locator_kind, "line_start": line_start, "line_end": line_end, **(locator_details or {})},
             "evidence_type": evidence_type,
             "fact": fact,
             "excerpt": excerpt,
@@ -256,8 +263,13 @@ def evidence(args: argparse.Namespace) -> None:
     if "implementation" in artifact_by_role:
         ast = analysis["static_analysis"]
         for idx, item in enumerate(ast.get("observations", [])):
-            add(f"EV-AST-{idx+1:03d}", "implementation", item["line"], item["line"], "source-line",
-                "ast_call_site", item["classification"] + ": " + item["reason"], item["call"])
+            add(
+                f"EV-AST-{idx+1:03d}", "implementation", item["line"], item.get("end_line", item["line"]),
+                "tree-sitter-node", "ast_call_site",
+                item["classification"] + ": " + item["reason"], item["expression"],
+                {"start_byte": item["start_byte"], "end_byte": item["end_byte"],
+                 "start_column": item.get("column"), "end_column": item.get("end_column")},
+            )
         if "diff" in artifact_by_role:
             diff_lines = (root / artifact_by_role["diff"]["path"]).read_text(encoding="utf-8").splitlines()
             added = [(n, line[1:].strip()) for n, line in enumerate(diff_lines, 1)
@@ -463,8 +475,17 @@ def validate(args: argparse.Namespace) -> None:
         source_path = root / item.get("source_path", "")
         if not source_path.is_file():
             return False
-        lines = source_path.read_text(encoding="utf-8").splitlines()
+        raw_bytes = source_path.read_bytes()
+        lines = raw_bytes.decode("utf-8", errors="replace").splitlines()
         loc = item.get("locator", {})
+        if loc.get("kind") == "tree-sitter-node":
+            start_byte, end_byte = loc.get("start_byte"), loc.get("end_byte")
+            if not isinstance(start_byte, int) or not isinstance(end_byte, int):
+                return False
+            if start_byte < 0 or end_byte <= start_byte or end_byte > len(raw_bytes):
+                return False
+            actual = raw_bytes[start_byte:end_byte].decode("utf-8", errors="replace")
+            return actual == item.get("excerpt", "")
         start, end = loc.get("line_start"), loc.get("line_end")
         if not isinstance(start, int) or not isinstance(end, int) or start < 1 or end < start or end > len(lines):
             return False
@@ -512,8 +533,14 @@ def validate(args: argparse.Namespace) -> None:
 
     if "implementation" in source_by_id:
         ast = analysis["static_analysis"]
-        ast_ok = ast.get("parse_status") == "parsed" and ast.get("source_sha256") == source_by_id["ART-CODE-001"]["sha256"]
-        check("AST pass corresponds to pinned implementation", ast_ok, "AST results must be from the exact code bytes in the manifest.")
+        ast_ok = (
+            ast.get("parse_status") == "parsed"
+            and ast.get("source_sha256") == source_by_id["ART-CODE-001"]["sha256"]
+            and ast.get("language") == manifest.get("language")
+            and ast.get("scanner") == "tree-sitter-language-pack"
+        )
+        check("Tree-sitter result matches pinned implementation and grammar", ast_ok,
+              "Parse metadata, language selection and source hash must match the pinned implementation.")
     oracle_matches = candidate.get("outcome") == oracle.get("expected_outcome")
     check("Candidate matches selected fixture oracle", oracle_matches,
           f"Expected {oracle.get('expected_outcome')}; got {candidate.get('outcome')}.")
@@ -564,7 +591,7 @@ def report(args: argparse.Namespace) -> None:
         "| Stage | What it did | Result |",
         "|---|---|---|",
         "| 1. Admit and pin inputs | Copied synthetic inputs and SHA-256 versioned them | PASS |",
-        f"| 2. Deterministic analysis | Go AST parse + diff scan + Markdown requirement extraction | {len(obs)} AST call site(s), {len(analysis['requirements'])} requirement(s) |",
+        f"| 2. Deterministic analysis | Tree-sitter parse-tree analysis + diff scan + Markdown requirement extraction | {len(obs)} AST call site(s), {len(analysis['requirements'])} requirement(s) |",
         f"| 3. Evidence contract | Built version-bound evidence records | {len(evidence['items'])} items |",
         f"| 4. Budget gate | Character-based mock request estimate; no provider call | {'ALLOW' if budget_result['within_budget'] else 'DENY'} ({budget_result['estimated_input_tokens']} estimated input tokens) |",
         f"| 5. Mock model | Deterministic fixture response; no network request | {model['candidate']['outcome']} |",
@@ -623,12 +650,12 @@ def report(args: argparse.Namespace) -> None:
         "",
         "## Artifacts included",
         "",
-        "The downloadable workflow artifact includes the exact synthetic input files, source manifest, AST scan, normalized analysis, evidence package, budget decision, mock-model response, validation results, and this report.",
+        "The downloadable workflow artifact includes the exact synthetic input files, source manifest, Tree-sitter scan, normalized analysis, evidence package, budget decision, mock-model response, validation results, and this report.",
         "",
         "## What this demo proves",
         "",
         "- The user-selected comparison mode determines which inputs are admitted.",
-        "- Go source is parsed with `go/parser` / `go/ast`; specs are parsed deterministically.",
+        "- Code fixtures are parsed with Tree-sitter grammars for the selected language; Markdown requirements are extracted deterministically.",
         "- Evidence references bind to immutable input hashes and explicit line locators.",
         "- The mock-model output is a candidate, and a separate validator rejects invalid references or outcomes.",
         "- An inconclusive case remains inconclusive when source evidence does not justify a stronger claim.",
@@ -662,6 +689,7 @@ def main() -> None:
     prep = sub.add_parser("prepare")
     prep.add_argument("--comparison", required=True)
     prep.add_argument("--sample-case", required=True)
+    prep.add_argument("--language", choices=sorted(LANGUAGE_EXTENSIONS), default="go")
     prep.add_argument("--run-id", required=True)
     prep.add_argument("--output", required=True)
     prep.set_defaults(func=prepare)
