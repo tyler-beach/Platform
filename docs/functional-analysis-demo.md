@@ -6,7 +6,9 @@
 
 Run the <a id="functional-analysis-workflow" href="https://github.com/tyler-beach/Platform/actions/workflows/functional-analysis-demo.yml">Functional Analysis Demo workflow</a> to follow a synthetic analysis from input selection through parsing, evidence assembly, budget preflight, a mock assessment, validation and a final report.
 
-On an organization-owned repository with internal or private Pages access configured, set `PAGES_ACTIONS_HISTORY_ENABLED=true` to show completed runs with bounded job and step status in the Pages explorer. This does not publish the downloadable workflow artifact or source files. The separate `PAGES_REAL_RUN_DATA_ENABLED=true` setting adds validated CSV-backed audit details. Pull-request runs do not trigger a Pages refresh.
+The analysis workflow is read-only and uploads a 14-day synthetic run artifact. A separate **Functional Analysis Audit Persistence** workflow checks the source run against the repository's default branch, validates the artifact and evidence hashes, and appends an idempotent row to the `functional_analysis_runs` CSV table. A daily bounded reconciliation repairs missed deliveries while artifacts are retained. Pull-request and non-default-branch runs are not imported.
+
+On an organization-owned repository with internal or private Pages access configured, set `PAGES_ACTIONS_HISTORY_ENABLED=true` to show completed runs with bounded job and step status in the Pages explorer. This does not publish the downloadable workflow artifact or source files. The separate `PAGES_REAL_RUN_DATA_ENABLED=true` setting adds validated CSV-backed audit details. Functional Analysis history shows outcome, provenance hashes, evidence locations and validation checks. Its confidence is explicitly unavailable because the deterministic fixture oracle is not a confidence measure.
 
 ## Run a scenario
 

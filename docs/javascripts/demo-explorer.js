@@ -83,20 +83,75 @@
       const id = Number(record.github_run_id);
       const url = safeRunUrl(record.workflow_url, id, repository);
       if (!positiveId(id) || !url) return [];
-      const status = ["complete", "failed", "model_response_rejected", "unknown"].includes(record.status) ? record.status : "unknown";
+      const status = ["complete", "failed", "cancelled", "model_response_rejected", "unknown"].includes(record.status) ? record.status : "unknown";
       const attempt = positiveId(record.run_attempt) ? record.run_attempt : 1;
       const comparison = plain(record.comparison, 80);
       const outcome = plain(record.outcome, 80);
+      const functionalAnalysis = record.functional_analysis ? normalizeFunctionalAnalysis(record.functional_analysis) : null;
+      if (record.functional_analysis && !functionalAnalysis) return [];
+      if (outcome && !["supported_deviation", "no_deviation_found", "inconclusive"].includes(outcome)) return [];
       return [{
         id, number: id, attempt,
-        name: `PoC audit · ${comparison || "analysis"} · ${outcome || "inconclusive"}`,
+        name: functionalAnalysis ? `Functional Analysis · ${comparison || "analysis"} · ${outcome || functionalAnalysis.persistenceState}` : `PoC audit · ${comparison || "analysis"} · ${outcome || "inconclusive"}`,
         event: "PoC ledger record", status: "completed", conclusion: "",
         branch: "", sha: "", created: plain(record.started_at, 40), updated: plain(record.completed_at, 40),
         url, workflowName: "PoC analysis", jobs: [], ledgerOnly: true,
         ledgerStatus: status, ledgerOutcome: outcome, ledgerLanguage: plain(record.language, 40),
-        ledgerProvider: plain(record.provider, 40),
+        ledgerProvider: plain(record.provider, 40), functionalAnalysis,
       }];
     });
+  }
+
+  function normalizeFunctionalAnalysis(record) {
+    const states = new Set(["execution_only", "unreconciled", "validated_result"]);
+    const outcomes = new Set(["", "supported_deviation", "no_deviation_found", "inconclusive"]);
+    const types = new Set(["architectural_constraint", "syntax_call_site", "change_diff", "technical_requirement"]);
+    if (!record || typeof record !== "object" || !states.has(record.persistence_state) ||
+        !["completed"].includes(record.execution_status) || typeof record.execution_conclusion !== "string" ||
+        !outcomes.has(record.domain_outcome) || record.confidence_status !== "unavailable" ||
+        record.confidence_reason !== "The deterministic fixture oracle is not confidence; this workflow does not provide validated inputs for the evidence-strength algorithm." ||
+        !Array.isArray(record.source_artifacts) || record.source_artifacts.length > 4 ||
+        !Array.isArray(record.evidence_refs) || record.evidence_refs.length > 500 ||
+        !Array.isArray(record.validation_checks) || record.validation_checks.length > 100) return null;
+    const artifacts = new Map();
+    for (const item of record.source_artifacts) {
+      if (!item || typeof item.artifact_id !== "string" || !/^ART-[A-Z0-9-]{1,40}$/.test(item.artifact_id) ||
+          artifacts.has(item.artifact_id) || !["adr", "implementation", "diff", "technical_spec"].includes(item.role) ||
+          typeof item.sha256 !== "string" || !/^[a-f0-9]{64}$/.test(item.sha256) ||
+          typeof item.path !== "string" || !/^input\/[A-Za-z0-9_.-]{1,120}$/.test(item.path)) return null;
+      artifacts.set(item.artifact_id, item);
+    }
+    const evidenceRefs = [];
+    const evidenceIds = new Set();
+    for (const item of record.evidence_refs) {
+      const artifact = item && artifacts.get(item.artifact_id);
+      if (!item || typeof item.evidence_id !== "string" || !/^EV-[A-Z0-9-]{1,48}$/.test(item.evidence_id) ||
+          evidenceIds.has(item.evidence_id) || !artifact || item.source_sha256 !== artifact.sha256 ||
+          item.evidence_type && !types.has(item.evidence_type) ||
+          !Number.isSafeInteger(item.line_start) || item.line_start < 1 ||
+          !Number.isSafeInteger(item.line_end) || item.line_end < item.line_start) return null;
+      evidenceIds.add(item.evidence_id);
+      evidenceRefs.push({ evidenceId: item.evidence_id, artifactId: item.artifact_id, sourceSha256: artifact.sha256,
+        path: artifact.path, evidenceType: item.evidence_type || "", lineStart: item.line_start, lineEnd: item.line_end });
+    }
+    const checks = [];
+    for (const item of record.validation_checks) {
+      if (!item || typeof item.name !== "string" || !/^[A-Za-z0-9 ._:-]{1,120}$/.test(item.name) || typeof item.passed !== "boolean") return null;
+      checks.push({ name: item.name, passed: item.passed });
+    }
+    if (record.persistence_state === "validated_result" &&
+        (record.analysis_state !== "validated" || record.validation_status !== "passed" || !record.domain_outcome || checks.length === 0 || checks.some(item => !item.passed))) return null;
+    if (record.persistence_state !== "validated_result" && (record.domain_outcome || record.validation_status !== "not_run" || evidenceRefs.length || artifacts.size)) return null;
+    return {
+      executionStatus: record.execution_status, executionConclusion: record.execution_conclusion,
+      analysisState: plain(record.analysis_state, 40), persistenceState: record.persistence_state,
+      persistenceReason: plain(record.persistence_reason, 180), domainOutcome: record.domain_outcome,
+      validationStatus: plain(record.validation_status, 40), confidenceStatus: "unavailable",
+      confidenceReason: record.confidence_reason, workflowSha: /^[a-f0-9]{40}$/i.test(record.workflow_sha || "") ? record.workflow_sha : "",
+      comparisonContract: plain(record.comparison_contract, 80), sampleCase: plain(record.sample_case, 80),
+      sourceArtifacts: Array.from(artifacts.values()).map(item => ({ artifactId: item.artifact_id, role: item.role, path: item.path, sha256: item.sha256 })),
+      evidenceRefs, validationChecks: checks,
+    };
   }
 
   function historyProjection(history, repository = `${OWNER}/${REPOSITORY}`) {
@@ -362,7 +417,12 @@
         historyNode.appendChild(el("p", "demo-empty", "No runs were returned for these workflows yet."));
         return;
       }
-      runs.sort((a, b) => Date.parse(b.updated || b.created) - Date.parse(a.updated || a.created));
+      runs.sort((a, b) => {
+        const left = Date.parse(a.updated || a.created);
+        const right = Date.parse(b.updated || b.created);
+        if (Number.isFinite(left) && Number.isFinite(right)) return right - left;
+        return b.id - a.id || b.attempt - a.attempt;
+      });
       runs.slice(0, MAX_RUNS).forEach((run) => {
         const card = el("article", "demo-run-card");
         const button = el("button", "demo-run-select", `#${run.number} · ${run.name}`);
@@ -371,7 +431,9 @@
         card.appendChild(button);
         const label = run.ledgerOnly ? run.ledgerStatus : statusText(run);
         card.appendChild(el("span", `demo-status demo-status--${label.replace(/[^a-z_]/g, "")}`, label.replaceAll("_", " ")));
-        const metadata = run.ledgerOnly
+        const metadata = run.functionalAnalysis
+          ? `${run.functionalAnalysis.executionStatus} · ${run.functionalAnalysis.persistenceState} · outcome ${run.functionalAnalysis.domainOutcome || "not recorded"}`
+          : run.ledgerOnly
           ? `${run.ledgerLanguage || "language unavailable"} · ${run.ledgerProvider || "provider unavailable"} · outcome ${run.ledgerOutcome || "inconclusive"}`
           : `${run.event || "workflow"} · ${run.branch || "branch unavailable"} · ${run.sha || "commit unavailable"}`;
         card.appendChild(el("p", "", metadata));
@@ -444,6 +506,10 @@
         panel.appendChild(el("p", "demo-empty", realHistory.data_available ? "No matching CSV run record was included in this Pages build." : "Detailed run records are disabled in this deployment; the synthetic walkthrough above shows the complete evidence trail."));
         return;
       }
+      if (record.functional_analysis && run.functionalAnalysis) {
+        renderFunctionalAnalysisRecord(panel, run, run.functionalAnalysis);
+        return;
+      }
       const details = el("details", "demo-real-record");
       details.open = true;
       details.appendChild(el("summary", "", `PoC audit record · ${record.comparison} · ${record.outcome.replaceAll("_", " ")}`));
@@ -472,6 +538,39 @@
       const coverage = el("ul", "demo-coverage-list");
       record.coverage.forEach((item) => coverage.appendChild(el("li", "", `${item.source_type}: ${item.complete ? "complete" : "partial"} · ${item.emitted}/${item.inspected} observations · ${item.unresolved} unresolved · ${item.unsupported_count} unsupported`)));
       details.appendChild(coverage);
+      const open = addLink(details, run.url, "Open original GitHub Actions run");
+      open.className = "md-button";
+      panel.appendChild(details);
+    }
+
+    function renderFunctionalAnalysisRecord(panel, run, record) {
+      const details = el("details", "demo-real-record");
+      details.open = true;
+      details.appendChild(el("summary", "", `Functional Analysis audit · ${record.persistenceState.replaceAll("_", " ")}`));
+      details.appendChild(el("p", "", `Execution: ${record.executionStatus} / ${record.executionConclusion} · analysis: ${record.analysisState} · persistence: ${record.persistenceState}`));
+      details.appendChild(el("p", "", `Domain outcome: ${record.domainOutcome || "not recorded"} · validation: ${record.validationStatus}`));
+      details.appendChild(el("h4", "", "Confidence"));
+      details.appendChild(el("p", "demo-muted", `Unavailable — ${record.confidenceReason}`));
+      if (record.persistenceReason) details.appendChild(el("p", "demo-muted", record.persistenceReason));
+      if (record.workflowSha) details.appendChild(el("p", "", `Workflow source SHA: ${record.workflowSha}`));
+      if (record.sourceArtifacts.length) {
+        details.appendChild(el("h4", "", "Pinned source artifacts"));
+        const sources = el("ul", "demo-real-stages");
+        record.sourceArtifacts.forEach(item => sources.appendChild(el("li", "", `${item.artifactId} · ${item.role} · ${item.path} · SHA-256 ${item.sha256}`)));
+        details.appendChild(sources);
+      }
+      if (record.evidenceRefs.length) {
+        details.appendChild(el("h4", "", "Evidence references"));
+        const refs = el("ul", "demo-real-stages");
+        record.evidenceRefs.forEach(item => refs.appendChild(el("li", "", `${item.evidenceId} · ${item.evidenceType.replaceAll("_", " ")} · ${item.path}:${item.lineStart}-${item.lineEnd} · SHA-256 ${item.sourceSha256}`)));
+        details.appendChild(refs);
+      }
+      if (record.validationChecks.length) {
+        details.appendChild(el("h4", "", "Validation checks"));
+        const checks = el("ul", "demo-real-stages");
+        record.validationChecks.forEach(item => checks.appendChild(el("li", "", `${item.passed ? "PASS" : "FAIL"} · ${item.name}`)));
+        details.appendChild(checks);
+      }
       const open = addLink(details, run.url, "Open original GitHub Actions run");
       open.className = "md-button";
       panel.appendChild(details);

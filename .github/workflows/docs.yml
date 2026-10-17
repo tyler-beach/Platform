@@ -10,6 +10,7 @@ on:
       - ".github/workflows/poc-analysis.yml"
       - ".github/workflows/poc-evaluation.yml"
       - ".github/workflows/functional-analysis-demo.yml"
+      - ".github/workflows/persist-functional-analysis.yml"
       - "docs/javascripts/**"
       - ".github/workflows/docs.yml"
       - "proto/**"
@@ -23,11 +24,12 @@ on:
       - ".github/workflows/poc-analysis.yml"
       - ".github/workflows/poc-evaluation.yml"
       - ".github/workflows/functional-analysis-demo.yml"
+      - ".github/workflows/persist-functional-analysis.yml"
       - "docs/javascripts/**"
       - ".github/workflows/docs.yml"
       - "proto/**"
   workflow_run:
-    workflows: ["ADR Deviation PoC Analysis", "ADR Deviation Labeled Evaluation", "Functional Analysis Demo"]
+    workflows: ["ADR Deviation PoC Analysis", "ADR Deviation Labeled Evaluation", "Functional Analysis Demo", "Functional Analysis Audit Persistence"]
     types: [completed]
   workflow_dispatch:
 

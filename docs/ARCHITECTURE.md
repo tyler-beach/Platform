@@ -79,4 +79,3 @@ The price/model settings and prompt/schema versions are recorded as configuratio
 | Provenance | Immutable artifact versions and evidence locators | Findings point to the exact inputs analyzed |
 | Business audit | Durable job/review/audit records | Tracing is operational telemetry, not the business record |
 | Publication | Validated application path | Freshness, authorization, review policy and idempotency must hold |
-

@@ -41,6 +41,7 @@ jobs:
                   --sample-case "$sample_case" \
                   --language "$language" \
                   --run-id "pull-request-smoke-test" \
+          --run-attempt 1 \
                   --output run-data
 
                 if [[ "$comparison" != "technical-spec" ]]; then
