@@ -1,0 +1,57 @@
+from __future__ import annotations
+
+import sys
+import unittest
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / ".poc"))
+
+from evaluation import evaluate
+
+
+class LabeledEvaluationTests(unittest.TestCase):
+    def test_dataset_contains_all_three_gold_labels_and_unique_ids(self):
+        cases = evaluate.load_cases()
+        ids = [case["case_id"] for case in cases]
+        self.assertEqual(len(ids), len(set(ids)))
+        self.assertEqual({case["gold_label"] for case in cases}, {"deviation", "no_deviation", "ambiguous"})
+        self.assertGreaterEqual(len(cases), 12)
+
+    def test_case_builder_pins_excerpt_hashes_and_links_edges(self):
+        case = next(c for c in evaluate.load_cases() if c["case_id"] == "D-01")
+        context, artifacts = evaluate.build_case_context(case)
+        artifact_ids = {row["artifact_id"] for row in artifacts}
+        for ev in context["evidence"]:
+            self.assertIn(ev["artifact_id"], artifact_ids)
+            self.assertEqual(ev["sha256"], evaluate.sha(ev["excerpt"]))
+        edge_ids = {edge["edge_id"] for edge in context["graph"]["edges"]}
+        cited_edge_ids = {ev["edge_id"] for ev in context["evidence"] if ev.get("edge_id")}
+        self.assertEqual(cited_edge_ids, edge_ids)
+
+    def test_supported_finding_below_gate_is_not_counted_as_actionable(self):
+        results = [
+            {
+                "case_id": "D1", "gold_label": "deviation", "predicted_label": "deviation",
+                "accepted_outcome": "supported_deviation", "score_0_to_100": 72.0,
+            },
+            {
+                "case_id": "N1", "gold_label": "no_deviation", "predicted_label": "no_deviation",
+                "accepted_outcome": "no_deviation_found", "score_0_to_100": 92.0,
+            },
+            {
+                "case_id": "A1", "gold_label": "ambiguous", "predicted_label": "ambiguous",
+                "accepted_outcome": "potential_deviation", "score_0_to_100": 55.0,
+            },
+        ]
+        metrics = evaluate.compute_metrics(results)
+        sweep = {row["threshold"]: row for row in metrics["review_gate_threshold_sweep"]}
+        self.assertEqual(sweep[70]["actionable_findings"], 1)
+        self.assertEqual(sweep[80]["actionable_findings"], 0)
+        self.assertEqual(sweep[80]["fn"], 1)
+        self.assertEqual(metrics["ambiguous_case_escalation_rate"], 1.0)
+        self.assertIn("not probabilities", metrics["interpretation"])
+
+
+if __name__ == "__main__":
+    unittest.main()
