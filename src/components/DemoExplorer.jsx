@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, ArrowUpRight, CheckCircle2, CircleHelp, Clock3, ExternalLink, GitBranch, Play, RefreshCw, ShieldCheck, Workflow } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, CheckCircle2, ChevronRight, CircleHelp, Clock3, ExternalLink, FileCode2, GitBranch, Play, RefreshCw, ShieldCheck, Workflow } from 'lucide-react';
 import { BASE_URL } from '../content.js';
 
 const repository = document.querySelector('meta[name="adr-repository"]')?.content || 'tyler-beach/Platform';
