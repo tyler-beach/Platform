@@ -13,4 +13,4 @@
 
 - [x] 3.1 Demonstrate RED then GREEN for the new redaction behavior tests.
 - [x] 3.2 Run the Go fixture and verify the exact provider callee remains reachable in the audit graph.
-- [ ] 3.3 Run the complete deterministic test suite and GitHub Actions language-validation matrix.
+- [x] 3.3 Run the complete deterministic test suite and GitHub Actions language-validation matrix.
