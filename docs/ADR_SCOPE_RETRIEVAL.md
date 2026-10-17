@@ -33,7 +33,7 @@ No AWS resources, credentials, database, or additional dependencies are required
 It reads:
 
 - `.poc/scope/adr_catalog.jsonl`: eight versioned ADR chunks with lifecycle and applicability metadata plus transparent demo control cues.
-- `.poc/scope/scenarios.jsonl`: eight labeled events with repository/service/domain/language, changed paths, change summary and illustrative source observations.
+- `.poc/scope/scenarios.jsonl`: nine labeled events with repository/service/domain/language, changed paths, change summary and illustrative source observations.
 - `.poc/scope/retrieval.py`: hard metadata filters followed by a lexical ranking baseline.
 - `.poc/scope/run_scope.py`: retrieval plus conservative, cue-based triage; generates Markdown and JSON reports. It also accepts a single real event via `--event-json`.
 - `.poc/scope/event-template.json`: example envelope for passing repository/service scope and source line/call-edge/diff evidence into retrieval.
@@ -74,7 +74,7 @@ Split long ADRs into chunks around individual decisions/invariants, not arbitrar
 
 1. **Hard applicability gate first:** approved/current lifecycle; date validity; repository, service, domain and language. A high vector score cannot override an exclusion.
 2. **Hybrid candidate generation:** query embedding from a compact summary of the change, technical-spec section, changed-file diff and resolved call-path evidence. Use pgvector top-K plus lexical/tag matches. Reciprocal-rank fusion or an explicit calibrated reranker is preferable to assuming cosine similarity and keyword scores share a scale.
-3. **Applicability triage:** return `in_scope`, `uncertain`, or `not_in_scope` with reasons, matched metadata and ranked chunks. Keep the uncertain bucket. Similarity thresholds in this PoC are provisional routing controls, not probabilities.
+3. **Applicability triage:** return `in_scope`, `uncertain`, or `not_in_scope` with reasons, matched metadata and ranked chunks. Keep the uncertain bucket. Similarity thresholds in this PoC are provisional routing controls, not probabilities. A retired/superseded ADR with strong similarity is excluded from governing context but retained as an audited near-match and forces `uncertain` when no current ADR passes the threshold.
 4. **Assessment per candidate ADR:** provide only the selected normative text and the minimum source/diff/call-graph evidence needed. Require typed links from requirement evidence IDs to observation evidence IDs, with `contradicts`, `consistent_with`, or `uncertain` plus an explanation.
 5. **Validate before flagging:** verify ADR version/status, source hashes, evidence artifact IDs and excerpt hashes, line ranges, call-edge reachability/resolution, typed evidence links, and required normative language. Preserve unresolved/dynamic edges as uncertainty.
 6. **No applicable ADR is not proof of compliance:** report that retrieval found no sufficiently supported ADR; retain the event and retrieval audit so corpus/scope metadata can be corrected.
@@ -98,9 +98,9 @@ The optional adapter is in `.poc/scope/aurora_backend.py`. It uses the AWS SDK c
 
    The indexer verifies each chunk's source hash, embeds changed chunks only, upserts metadata/vectors transactionally, and marks older database versions superseded when a newer active version is present in the manifest. Review this versioning behavior against the real ADR lifecycle before production use.
 5. Run retrieval from a network location that can reach the private Aurora endpoint. Configure `AWS_REGION`, `ADR_PGHOST`, `ADR_PGDATABASE`, `ADR_PGUSER`, and the RDS CA trust bundle via `PGSSLROOTCERT`. Grant the workload role only the required Bedrock model invocation permission and database connect/read permissions. IAM database authentication needs the matching database role grants.
-5. Install `pip install -r .poc/scope/requirements-aws.txt` and run:
+6. Run retrieval with a one-event JSON envelope:
 
-       python .poc/scope/run_scope.py --backend aurora --output-dir /tmp/adr-scope-live
+       python .poc/scope/run_scope.py --backend aurora --event-json /path/to/change-event.json --output-dir /tmp/adr-scope-live
 
 The live path makes real Bedrock and Aurora requests and can incur AWS charges. Keep it opt-in; PR CI should stay offline by default. The adapter returns a vector similarity score, which is logged as retrieval similarity—not model confidence, applicability probability, or violation likelihood.
 
