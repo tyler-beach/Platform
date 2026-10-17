@@ -173,6 +173,9 @@ def retrieve_from_aurora(
         score = float(row.pop("similarity"))
         row["version"] = row["adr_version"]
         row["normative_text"] = row.get("normative_text") or row.get("chunk_text") or ""
+        for key, value in list(row.items()):
+            if hasattr(value, "isoformat"):
+                row[key] = value.isoformat()
         row["score"] = round(score, 4)
         row["backend"] = "aurora_pgvector_bedrock"
         row["tag_matches"] = []
