@@ -31,7 +31,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Run evaluation unit tests
-        run: python -m unittest .poc.tests.test_evaluation -v
+        run: python -m unittest discover -s .poc/tests -p "test_evaluation.py" -v
       - name: Execute labeled cases
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
