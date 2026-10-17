@@ -79,7 +79,7 @@ def count_input_tokens(provider:str,context:dict[str,Any]) -> dict[str,Any]:
     if provider=="mock":
         count=(len(prompt)+3)//4
         return {"input_tokens":count,"method":"local_character_estimate","request_id":"","prompt_sha256":hashlib.sha256(prompt.encode()).hexdigest(),"input_chars":len(prompt),"duration_ms":round((time.monotonic()-started)*1000),"created_at":created,"model":"deterministic-rules-v1"}
-    model_name=os.getenv("ANTHROPIC_MODEL","claude-sonnet-5")
+    model_name=(os.getenv("ANTHROPIC_MODEL") or "claude-sonnet-5-5")
     body=api_base(context,model_name)
     # The token-count endpoint takes the same context/tool schema as the Messages request.
     payload,request_id=request_anthropic("messages/count_tokens",body)
