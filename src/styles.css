@@ -621,3 +621,30 @@ button { color: inherit; }
 .eyebrow-dot, .nav-live-mark { background: var(--pathfinder-aurora); }
 :focus-visible { outline-color: var(--pathfinder-aurora); }
 ::selection { background: #a7f3d0; color: #081220; }
+
+
+/* Technical demo trace: prioritize inspectable data over decorative marketing UI. */
+.technical-trace { margin: 34px 0 42px; padding: clamp(20px, 3vw, 38px); border: 1px solid #d5dee8; border-radius: 14px; background: #fff; color: #12243a; }
+.technical-trace__heading { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin-bottom: 22px; }
+.technical-trace__heading h2 { margin: 8px 0 0; font: 750 clamp(22px, 2.7vw, 31px)/1.15 var(--display); letter-spacing: -.035em; }
+.technical-trace__heading > p { max-width: 430px; margin: 0; color: #52637a; font-size: 13px; line-height: 1.65; }
+.technical-trace__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.technical-trace__panel { min-width: 0; padding: 18px; border: 1px solid #dce4ed; border-radius: 10px; background: #f8fafc; }
+.technical-trace__panel-title { display: flex; align-items: center; gap: 11px; color: #0f766e; }
+.technical-trace__panel-title > div { display: grid; gap: 3px; }
+.technical-trace__panel-title strong { color: #14253a; font-size: 13px; }
+.technical-trace__panel-title small { color: #64748b; font: 10px/1.4 var(--mono); }
+.technical-trace__explain { margin: 14px 0; color: #52637a; font-size: 12px; line-height: 1.65; }
+.technical-trace pre { max-height: 440px; overflow: auto; margin: 0; padding: 15px; border: 1px solid #24364b; border-radius: 7px; background: #0b1726; color: #d8e6f4; font: 11px/1.65 var(--mono); tab-size: 2; white-space: pre; overscroll-behavior-inline: contain; }
+.technical-trace pre code { color: inherit; font: inherit; }
+.technical-trace__notes { display: grid; gap: 7px; padding-left: 18px; margin: 15px 0; color: #52637a; font-size: 11px; line-height: 1.55; }
+.technical-trace__panel > a { display: inline-flex; align-items: center; gap: 6px; color: #0f766e; font-size: 12px; font-weight: 700; text-decoration: none; }
+.technical-trace__panel > a:hover { text-decoration: underline; }
+.technical-trace__boundary { margin-top: 16px; padding: 13px 15px; border-left: 3px solid #0f766e; background: #edf7f6; color: #42566c; font-size: 12px; line-height: 1.6; }
+.technical-trace__boundary strong { color: #0f514d; }
+@media (max-width: 760px) {
+  .technical-trace__heading { align-items: start; flex-direction: column; gap: 10px; }
+  .technical-trace__grid { grid-template-columns: minmax(0, 1fr); }
+  .technical-trace__panel { padding: 13px; }
+  .technical-trace pre { max-height: 340px; font-size: 10px; }
+}
