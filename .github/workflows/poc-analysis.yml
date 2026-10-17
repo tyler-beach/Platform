@@ -1,0 +1,218 @@
+name: ADR Deviation PoC Analysis
+run-name: PoC / ${{ inputs.comparison }} / ${{ inputs.language }} / ${{ inputs.model_provider }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      comparison:
+        description: Comparison to execute
+        required: true
+        type: choice
+        default: spec-vs-implementation
+        options: [code-diff, technical-spec, spec-vs-implementation]
+      language:
+        description: Language-specific semantic resolver
+        required: true
+        type: choice
+        default: go
+        options: [go, python, javascript, typescript, java]
+      source_path:
+        description: Project/source directory inside this checkout
+        required: true
+        default: .poc/fixtures/go
+        type: string
+      root_function:
+        description: Entry function/method used for transitive reachability
+        required: true
+        default: Submit
+        type: string
+      model_provider:
+        description: Mock is offline; Anthropic requires ANTHROPIC_API_KEY secret
+        required: true
+        type: choice
+        default: mock
+        options: [mock, anthropic]
+      adr_path:
+        description: ADR Markdown file inside this checkout
+        required: true
+        default: .poc/fixtures/go/ADR-001.md
+        type: string
+      spec_path:
+        description: Technical specification Markdown file inside this checkout
+        required: true
+        default: .poc/fixtures/go/technical-spec.md
+        type: string
+      diff_path:
+        description: Optional diff file; blank uses source_path/change.diff or generates one from base/head refs
+        required: false
+        default: ""
+        type: string
+      base_ref:
+        description: Optional base ref for a real git diff if no diff file exists
+        required: false
+        default: ""
+        type: string
+      head_ref:
+        description: Optional head ref for a real git diff; defaults to the selected workflow ref
+        required: false
+        default: ""
+        type: string
+      max_input_tokens:
+        description: Conservative estimated prompt-input budget
+        required: true
+        default: "12000"
+        type: string
+      max_output_tokens:
+        description: Provider output-token limit
+        required: true
+        default: "1000"
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: adr-poc-csv-database-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  analyze:
+    name: Parse, resolve, assess, and audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GITHUB_REPOSITORY: ${{ github.repository }}
+      GITHUB_WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      GITHUB_RUN_ID: ${{ github.run_id }}
+      GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
+    steps:
+      - name: Check out source repository with history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Set up Go semantic toolchain
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.x"
+      - name: Set up Node.js compiler API
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Set up Java semantic toolchain
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Install pinned analysis dependencies
+        run: |
+          python -m pip install --disable-pip-version-check -r .poc/requirements.txt
+          npm install --prefix .poc/analyzers/typescript --ignore-scripts --no-audit --no-fund
+      - name: Load persistent CSV database tables
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/poc-db"
+          if git ls-remote --exit-code "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" refs/heads/poc-database >/dev/null 2>&1; then
+            git clone --quiet --depth 1 --single-branch --branch poc-database \
+              "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$RUNNER_TEMP/poc-db"
+            for table in .poc-db/*.csv; do
+              name="$(basename "$table")"
+              if [[ -f "$RUNNER_TEMP/poc-db/.poc-db/$name" ]]; then
+                cp "$RUNNER_TEMP/poc-db/.poc-db/$name" "$table"
+              fi
+            done
+          fi
+      - name: Run end-to-end PoC
+        id: run_poc
+        env:
+          SOURCE_PATH: ${{ inputs.source_path }}
+          LANGUAGE: ${{ inputs.language }}
+          COMPARISON: ${{ inputs.comparison }}
+          ROOT_FUNCTION: ${{ inputs.root_function }}
+          MODEL_PROVIDER: ${{ inputs.model_provider }}
+          SPEC_PATH: ${{ inputs.spec_path }}
+          ADR_PATH: ${{ inputs.adr_path }}
+          DIFF_PATH: ${{ inputs.diff_path }}
+          BASE_REF: ${{ inputs.base_ref }}
+          HEAD_REF: ${{ inputs.head_ref }}
+          MAX_INPUT_TOKENS: ${{ inputs.max_input_tokens }}
+          MAX_OUTPUT_TOKENS: ${{ inputs.max_output_tokens }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL }}
+        run: |
+          set +e
+          if [[ -z "$DIFF_PATH" && -f "$SOURCE_PATH/change.diff" ]]; then
+            DIFF_PATH="$SOURCE_PATH/change.diff"
+          fi
+          if [[ -z "$DIFF_PATH" && -n "$BASE_REF" ]]; then
+            HEAD_REF="${HEAD_REF:-${GITHUB_SHA}}"
+            git diff --no-ext-diff --unified=15 "${BASE_REF}...${HEAD_REF}" -- "$SOURCE_PATH" > "$RUNNER_TEMP/selected-change.diff"
+            if [[ -s "$RUNNER_TEMP/selected-change.diff" ]]; then
+              cp "$RUNNER_TEMP/selected-change.diff" run-data-selected-change.diff
+              DIFF_PATH="run-data-selected-change.diff"
+            fi
+          fi
+          args=(
+            --language "$LANGUAGE"
+            --source "$SOURCE_PATH"
+            --root-function "$ROOT_FUNCTION"
+            --comparison "$COMPARISON"
+            --provider "$MODEL_PROVIDER"
+            --run-id "${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+            --db-dir .poc-db
+            --out-dir run-data
+            --adr-path "$ADR_PATH"
+            --spec-path "$SPEC_PATH"
+            --max-input-tokens "$MAX_INPUT_TOKENS"
+            --max-output-tokens "$MAX_OUTPUT_TOKENS"
+          )
+          if [[ -n "$DIFF_PATH" ]]; then args+=(--diff-path "$DIFF_PATH"); fi
+          python .poc/run.py "${args[@]}"
+          rc=$?
+          echo "poc_exit_code=$rc" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Publish report and CSV audit snapshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: adr-deviation-poc-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            run-data/${{ github.run_id }}-${{ github.run_attempt }}/
+            .poc-db/*.csv
+            run-data-selected-change.diff
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Persist CSV tables to poc-database branch
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          mkdir -p "$RUNNER_TEMP/poc-db-snapshot"
+          cp .poc-db/*.csv "$RUNNER_TEMP/poc-db-snapshot/"
+          REMOTE="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          if git ls-remote --exit-code "$REMOTE" refs/heads/poc-database >/dev/null 2>&1; then
+            git clone --quiet --depth 1 --single-branch --branch poc-database "$REMOTE" "$RUNNER_TEMP/poc-db-write"
+          else
+            mkdir "$RUNNER_TEMP/poc-db-write"
+            git -C "$RUNNER_TEMP/poc-db-write" init --quiet --initial-branch=poc-database
+            git -C "$RUNNER_TEMP/poc-db-write" remote add origin "$REMOTE"
+          fi
+          mkdir -p "$RUNNER_TEMP/poc-db-write/.poc-db"
+          cp "$RUNNER_TEMP/poc-db-snapshot/"*.csv "$RUNNER_TEMP/poc-db-write/.poc-db/"
+          git -C "$RUNNER_TEMP/poc-db-write" config user.name "github-actions[bot]"
+          git -C "$RUNNER_TEMP/poc-db-write" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C "$RUNNER_TEMP/poc-db-write" add .poc-db/*.csv
+          if git -C "$RUNNER_TEMP/poc-db-write" diff --cached --quiet; then
+            echo "CSV database already matches this run."
+          else
+            git -C "$RUNNER_TEMP/poc-db-write" commit --quiet -m "chore(poc-db): record analysis ${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+            git -C "$RUNNER_TEMP/poc-db-write" push origin HEAD:poc-database
+          fi
+      - name: Fail the workflow if analysis failed
+        if: always() && steps.run_poc.outputs.poc_exit_code != '0'
+        run: exit 1

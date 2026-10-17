@@ -106,6 +106,7 @@ nav:
       - Existing data model: DATA_MODEL.md
   - Engineering:
       - Functional analysis demo: functional-analysis-demo.md
+      - Executable semantic-analysis PoC: EXECUTABLE_POC.md
       - Engineering playbook: ENGINEERING_PLAYBOOK.md
       - OpenSpec workflow: OPEN_SPEC_WORKFLOW.md
       - Adversarial design review: ADVERSARIAL_DESIGN_REVIEW.md
