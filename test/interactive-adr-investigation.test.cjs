@@ -35,6 +35,11 @@ test("interactive workspace connects decision, evidence, stage trace, and local 
   assert.match(component, /event\.key === 'ArrowRight'/);
   assert.match(component, /role="tabpanel" aria-labelledby/);
   assert.match(component, /SYNTHETIC REF/);
+  assert.match(component, /technical-trace-title/);
+  assert.match(component, /AST observation/);
+  assert.match(component, /artifactVersionId/);
+  assert.match(component, /sourceIntegrity/);
+  assert.match(component, /does not claim type resolution or runtime behavior/);
   assert.match(component, /aria-pressed=\{activeEvidence === item\.id\}/);
   assert.match(styles, /@media \(max-width: 600px\)/);
 });
