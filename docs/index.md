@@ -9,7 +9,7 @@ hide:
 <h1>Make architectural drift <em>visible.</em></h1>
 <p class="home-hero__lede">Connect architectural decisions, plain-English technical specifications, and implementation changes. Surface potential divergence with traceable evidence—not unsupported AI opinions.</p>
 <div class="home-hero__actions">
-<a class="md-button md-button--primary" href="./architecture/">Explore the architecture</a>
+<a class="md-button md-button--primary" href="./system-architecture/">Explore the architecture</a>
 <a class="md-button md-button--primary" href="./demo/">Run the interactive PoC demo</a>
 <a class="md-button" href="./ENGINEERING_PLAYBOOK/">Engineering playbook</a>
 </div>
@@ -40,7 +40,7 @@ hide:
 <p class="home-section__intro">Start with the system shape, then go deeper into the contracts and practices that make the proposed platform safe to build and operate.</p>
 </div>
 <div class="home-feature-grid">
-<article class="home-feature"><span class="home-feature__index">01</span><h3>System architecture</h3><p>Understand component ownership, trust boundaries, asynchronous orchestration, storage and model-provider integration.</p><a href="./architecture/">Explore architecture →</a></article>
+<article class="home-feature"><span class="home-feature__index">01</span><h3>System architecture</h3><p>Understand component ownership, trust boundaries, asynchronous orchestration, storage and model-provider integration.</p><a href="./system-architecture/">Explore architecture →</a></article>
 <article class="home-feature"><span class="home-feature__index">02</span><h3>API and data contracts</h3><p>Review proposed operations, lifecycle semantics, compatibility rules and invariants for jobs, findings and evidence.</p><a href="./contracts/API_CONTRACT/">Explore contracts →</a></article>
 <article class="home-feature"><span class="home-feature__index">03</span><h3>Evidence and provenance</h3><p>Follow a claim back to immutable source versions, precise locators, hashes and the supporting or contradicting evidence.</p><a href="./contracts/EVIDENCE/">Explore evidence →</a></article>
 <article class="home-feature"><span class="home-feature__index">04</span><h3>AI runtime controls</h3><p>See how token budgets, spend limits, prompt versions, output validation and redacted telemetry fit into the harness.</p><a href="./contracts/AI_RUNTIME/">Explore AI controls →</a></article>

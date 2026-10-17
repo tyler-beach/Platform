@@ -87,6 +87,7 @@ extra:
 nav:
   - Overview:
       - Platform overview: index.md
+      - Project brief: PROJECT_BRIEF.md
       - Getting started: getting-started.md
       - Roadmap: ROADMAP.md
       - Pre-implementation readiness: PRE_IMPLEMENTATION_READINESS.md
@@ -97,6 +98,8 @@ nav:
       - System architecture and workflows: system-architecture.md
       - Architecture overview: architecture-overview.md
       - Diagram catalog: diagrams/architecture.md
+      - Diagram sources: diagrams/README.md
+      - Diagram asset attribution: assets/aws-icons/README.md
       - RPC and Protobuf: RPC_AND_PROTOBUF.md
       - AI pipeline and token budgets: AI_PIPELINE.md
       - Functional core: FUNCTIONAL_CORE.md
@@ -114,7 +117,13 @@ nav:
       - Interactive PoC demo: demo/index.md
       - Functional analysis demo: functional-analysis-demo.md
       - Executable semantic-analysis PoC: EXECUTABLE_POC.md
+      - Go tooling: GO_TOOLING.md
       - Enable the internal Pages run explorer: how-to/enable-private-pages-demo.md
+      - How-to guides:
+          - Guide index: how-to/index.md
+          - Add an input source: how-to/add-input-source.md
+          - Add a Go worker: how-to/add-go-worker.md
+          - Add a comparison mode: how-to/add-comparison-mode.md
       - ADR scope retrieval: ADR_SCOPE_RETRIEVAL.md
       - Engineering playbook: ENGINEERING_PLAYBOOK.md
       - OpenSpec workflow: OPEN_SPEC_WORKFLOW.md

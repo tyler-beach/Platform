@@ -17,7 +17,7 @@ The documentation source is in the docs folder and is built with MkDocs Material
 - [AI runtime and token budget contract](https://tyler-beach.github.io/Platform/contracts/AI_RUNTIME/)
 - [Engineering playbook](https://tyler-beach.github.io/Platform/ENGINEERING_PLAYBOOK/)
 - [Adversarial design review](https://tyler-beach.github.io/Platform/ADVERSARIAL_DESIGN_REVIEW/)
-- [Architecture diagrams](https://tyler-beach.github.io/Platform/architecture/)
+- [Architecture diagrams](https://tyler-beach.github.io/Platform/diagrams/architecture/)
 - [PoC analysis workflow (GitHub Actions)](https://github.com/tyler-beach/Platform/actions/workflows/poc-analysis.yml)
 - [Executable semantic-analysis PoC](https://tyler-beach.github.io/Platform/EXECUTABLE_POC/)
 
