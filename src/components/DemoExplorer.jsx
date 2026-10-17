@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, ArrowUpRight, CheckCircle2, CircleHelp, Clock3, ExternalLink, GitBranch, Play, RefreshCw, ShieldCheck, Workflow } from 'lucide-react';
 import { BASE_URL } from '../content.js';
@@ -33,6 +33,8 @@ export default function DemoExplorer() {
     </section>
 
     <div className="demo-trust-banner"><div className="demo-trust-banner__icon"><ShieldCheck size={19} /></div><div><strong>Synthetic examples, source-bound evidence</strong><p>The scenario library and walkthrough use checked-in fixtures and an offline mock provider. Recent live artifact text appears only after run identity, digests, input hashes, evidence, and synthetic fixture paths are verified. This is not a calibrated model-quality claim.</p></div><Link to="/architecture/SECURITY">Trust boundaries <ArrowRight size={14} /></Link></div>
+
+    <RequirementLab />
 
     <DemoSection id="demo-gallery-heading" kicker="SCENARIO LIBRARY" title="Compare spec, code, and change" icon={<LayersIcon />} badge="9 CURATED CASES">
       <div className="demo-section__inner demo-gallery-surface">
@@ -84,4 +86,91 @@ function LayersIcon() { return <span className="layers-icon"><Workflow size={18}
 
 function DemoSection({ id, kicker, title, icon, badge, badgeId, action, children }) {
   return <section className="demo-section" aria-labelledby={id}><div className="demo-section-heading"><div className="demo-section-heading__title"><span className="demo-section-heading__icon">{icon}</span><div><span className="demo-label">{kicker}</span><h2 id={id}>{title}</h2></div></div><div className="demo-section-heading__action">{badgeId ? <span id={badgeId} className="demo-badge">{badge}</span> : badge && <span className="demo-badge">{badge}</span>}{action}</div></div>{children}</section>;
+}
+
+
+
+const requirementExamples = {
+  pdb: {
+    key: 'pdb', title: 'Preserve availability during voluntary disruption', eyebrow: 'PLATFORM POLICY · KUBERNETES WORKLOADS',
+    requirement: 'Availability-sensitive workloads MUST maintain an effective disruption budget consistent with their approved availability objective and replica topology.',
+    context: 'The budget must select the intended workload. Resource presence alone is not proof of compliance.',
+    expected: 'The effective budget constrains voluntary disruptions to the service’s approved availability objective.',
+    observation: 'A workload has three replicas and requires at least two available, but the observed budget permits two to be voluntarily unavailable.',
+    outcome: 'Potential deviation',
+    evidence: [
+      { id: 'E-01', title: 'Availability objective', detail: 'Service contract · minimum two available replicas', source: 'service-availability-policy.md · lines 12–18' },
+      { id: 'E-02', title: 'Workload topology', detail: 'Desired replicas: 3', source: 'workload specification · replicas field' },
+      { id: 'E-03', title: 'Effective disruption budget', detail: 'Maximum unavailable: 2', source: 'disruption budget · selector and availability constraint' },
+    ],
+    gaps: 'Confirm the budget selector resolves to the intended workload and that the replica count is from the same environment and source version.',
+    stages: [
+      ['Scope', 'Resolve workload ownership and availability classification.'],
+      ['Requirements', 'Extract the minimum availability invariant.'],
+      ['Evidence', 'Bind workload, objective, and effective budget to source versions.'],
+      ['Assessment', 'Compare the configured disruption allowance with the objective.'],
+      ['Validation', 'Check selector identity, freshness, and evidence completeness.'],
+    ],
+  },
+  ttl: {
+    key: 'ttl', title: 'Limit authenticated session lifetime to 60 minutes', eyebrow: 'IDENTITY POLICY · AUTHENTICATED SESSIONS',
+    requirement: 'The maximum permitted session lifetime MUST be 60 minutes from session establishment. Activity MUST NOT extend the existing session beyond this absolute maximum.',
+    context: 'The rule applies regardless of language, framework, cookie, token format, or session storage. A timeout setting alone is insufficient if another component renews the session.',
+    expected: 'The session is rejected at or before 60 minutes; renewal requires a new authentication event or explicitly approved reauthentication.',
+    observation: 'The session configuration permits a 90-minute absolute lifetime.',
+    outcome: 'Potential deviation',
+    evidence: [
+      { id: 'E-01', title: 'Session lifetime requirement', detail: 'Maximum absolute lifetime: 60 minutes', source: 'ADR-PLATFORM-002 · Decision' },
+      { id: 'E-02', title: 'Effective session setting', detail: 'Absolute lifetime: 90 minutes', source: 'identity configuration · session lifetime field' },
+      { id: 'E-03', title: 'Renewal semantics', detail: 'Verify refresh and server-side acceptance behavior', source: 'refresh flow and session validation path' },
+    ],
+    gaps: 'Inspect refresh-token behavior and server-side session acceptance. A 60-minute token claim does not prove the system rejects a refreshed or otherwise accepted session after the absolute boundary.',
+    stages: [
+      ['Scope', 'Identify the authentication components and session types covered.'],
+      ['Requirements', 'Extract the 60-minute absolute lifetime invariant.'],
+      ['Evidence', 'Inspect configured expiration, token claims, and renewal behavior.'],
+      ['Assessment', 'Compare the effective maximum with the requirement.'],
+      ['Validation', 'Verify expiry rejection and that activity cannot extend the same session indefinitely.'],
+    ],
+  },
+};
+
+function RequirementLab() {
+  const [activeKey, setActiveKey] = useState('pdb');
+  const [activeStage, setActiveStage] = useState(2);
+  const [activeEvidence, setActiveEvidence] = useState('E-02');
+  const [review, setReview] = useState({});
+  const example = requirementExamples[activeKey];
+  const stage = example.stages[activeStage];
+  const selectedEvidence = example.evidence.find(item => item.id === activeEvidence) || example.evidence[0];
+  function chooseExample(key) { setActiveKey(key); setActiveStage(0); setActiveEvidence('E-01'); }
+
+  return <section className="requirement-lab" aria-labelledby="requirement-lab-title">
+    <div className="requirement-lab__heading"><div><span className="demo-label">INTERACTIVE INVESTIGATION</span><h2 id="requirement-lab-title">Explore a requirement, not a language</h2><p>Switch between two architecture decisions, follow the evidence chain, and inspect what a reviewer would need before reaching a conclusion.</p></div><span className="requirement-lab__status"><span /> SYNTHETIC EXAMPLE</span></div>
+    <div className="requirement-lab__tabs" role="tablist" aria-label="Example architectural decisions">
+      {Object.values(requirementExamples).map(item => <button key={item.key} type="button" role="tab" aria-selected={activeKey === item.key} className={activeKey === item.key ? 'is-active' : ''} onClick={() => chooseExample(item.key)}><span>{item.key === 'pdb' ? '01' : '02'}</span><strong>{item.key === 'pdb' ? 'Pod disruption budgets' : '60-minute session TTL'}</strong><small>{item.key === 'pdb' ? 'Availability invariant' : 'Session security invariant'}</small></button>)}
+    </div>
+    <div className="requirement-lab__workspace">
+      <div className="requirement-lab__main">
+        <div className="requirement-lab__decision"><span className="demo-label">{example.eyebrow}</span><h3>{example.title}</h3><p className="requirement-lab__requirement">{example.requirement}</p><p>{example.context}</p></div>
+        <div className="requirement-lab__flow" aria-label="Interactive evidence chain">
+          <div className="requirement-lab__flow-node requirement-lab__flow-node--requirement"><span className="requirement-lab__node-icon">01</span><div><small>DECISION</small><strong>Required behavior</strong><p>{example.expected}</p></div></div>
+          <div className="requirement-lab__connector"><span /></div>
+          <div className="requirement-lab__flow-node requirement-lab__flow-node--observation"><span className="requirement-lab__node-icon">02</span><div><small>OBSERVATION</small><strong>What the evidence suggests</strong><p>{example.observation}</p></div></div>
+          <div className="requirement-lab__connector"><span /></div>
+          <div className="requirement-lab__flow-node requirement-lab__flow-node--finding"><span className="requirement-lab__node-icon"><ShieldCheck size={16}/></span><div><small>ASSESSMENT · NOT ENFORCEMENT</small><strong>{example.outcome}</strong><p>Candidate finding only. A reviewer must verify scope, evidence freshness, and relevant counterevidence.</p></div><span className="requirement-lab__risk-mark">!</span></div>
+        </div>
+        <div className="requirement-lab__evidence"><div className="requirement-lab__subheading"><div><span className="demo-label">SOURCE-BOUND EVIDENCE</span><h4>Choose a piece of evidence</h4></div><span>{example.evidence.length} references</span></div>
+          <div className="requirement-lab__evidence-list">{example.evidence.map(item => <button key={item.id} type="button" className={activeEvidence === item.id ? 'is-active' : ''} aria-pressed={activeEvidence === item.id} onClick={() => setActiveEvidence(item.id)}><span className="requirement-lab__evidence-id">{item.id}</span><span><strong>{item.title}</strong><small>{item.detail}</small></span><ArrowRight size={15}/></button>)}</div>
+          <div className="requirement-lab__evidence-detail" aria-live="polite"><FileCode2 size={16}/><div><strong>{selectedEvidence.title}</strong><p>{selectedEvidence.source}</p></div><span>PINNED REFERENCE</span></div>
+        </div>
+      </div>
+      <aside className="requirement-lab__rail"><div className="requirement-lab__rail-heading"><span className="demo-label">ANALYSIS TRACE</span><strong>Follow the reasoning</strong><p>Choose a stage to see its purpose and the evidence it should produce.</p></div>
+        <ol className="requirement-lab__stages">{example.stages.map((item, index) => <li key={item[0]}><button type="button" className={activeStage === index ? 'is-active' : ''} aria-current={activeStage === index ? 'step' : undefined} onClick={() => setActiveStage(index)}><span>{String(index + 1).padStart(2, '0')}</span><strong>{item[0]}</strong><i><ChevronRight size={14}/></i></button></li>)}</ol>
+        <div className="requirement-lab__stage-detail"><span>STAGE {String(activeStage + 1).padStart(2, '0')}</span><h4>{stage[0]}</h4><p>{stage[1]}</p></div>
+        <div className="requirement-lab__gap"><CircleHelp size={16}/><div><strong>Evidence gap to resolve</strong><p>{example.gaps}</p></div></div>
+        <div className="requirement-lab__review"><span className="demo-label">HUMAN REVIEW</span><strong>What is your assessment?</strong><p>This choice is local to the demo and is not persisted as an official decision.</p><div className="requirement-lab__review-actions">{['confirm', 'dismiss', 'inconclusive'].map(value => <button key={value} type="button" className={review[activeKey] === value ? 'is-active' : ''} aria-pressed={review[activeKey] === value} onClick={() => setReview(previous => ({...previous, [activeKey]: value}))}>{value === 'confirm' ? 'Confirm finding' : value === 'dismiss' ? 'Dismiss' : 'Inconclusive'}</button>)}</div>{review[activeKey] && <p className="requirement-lab__review-state" role="status">Demo review: {review[activeKey]}. No production record was changed.</p>}</div>
+      </aside>
+    </div>
+  </section>;
 }
