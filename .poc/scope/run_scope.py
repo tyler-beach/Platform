@@ -139,12 +139,13 @@ def metric_summary(results: list[dict[str, Any]]) -> dict[str, Any]:
     by_label = {}
     for label in ("in_scope", "out_of_scope", "uncertain"):
         subset = [r for r in results if r.get("gold_disposition") == label]
+        with_expected_adrs = [r for r in subset if r.get("gold_adr_ids")]
         by_label[label] = {
             "cases": len(subset),
             "cases_with_any_retrieved_adr": sum(bool(r["scope"]["selected_adrs"]) for r in subset),
             "expected_adr_recall": (
-                sum(set(r.get("gold_adr_ids", [])) <= {a["adr_id"] for a in r["scope"]["selected_adrs"]} for r in subset) / len(subset)
-                if subset else None
+                sum(set(r.get("gold_adr_ids", [])) <= {a["adr_id"] for a in r["scope"]["selected_adrs"]} for r in with_expected_adrs) / len(with_expected_adrs)
+                if with_expected_adrs else None
             ),
         }
     false_in_scope = sum(r["scope"]["disposition"] == "in_scope" for r in results if r.get("gold_disposition") == "out_of_scope")
@@ -190,6 +191,12 @@ def render_report(results: list[dict[str, Any]], metrics: dict[str, Any]) -> str
             lines += [f"**Scope reason:** {r['scope']['reason']}", ""]
             if r["scope"]["review_candidates"]:
                 lines.append("Review-only candidates: " + ", ".join(f"{a['adr_id']} ({a['score']:.2f})" for a in r["scope"]["review_candidates"]))
+                lines.append("")
+            if r["scope"].get("inactive_near_matches"):
+                lines.append("Lifecycle-excluded near matches (not used as governing ADRs):")
+                for inactive in r["scope"]["inactive_near_matches"]:
+                    lines.append(f"- {inactive['adr_id']} v{inactive['version']} — similarity {inactive['score']:.2f}; excluded because " + "; ".join(inactive["reasons"]))
+                lines.append("Human review is required to determine whether a replacement ADR or an explicit exception applies.")
                 lines.append("")
             continue
         for candidate in r["candidate_assessments"]:
