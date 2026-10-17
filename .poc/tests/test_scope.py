@@ -36,6 +36,8 @@ class ScopeRetrievalTests(unittest.TestCase):
         excluded = {row["adr_id"]: row for row in result["excluded_adrs"]}
         self.assertIn("ADR-006", excluded)
         self.assertTrue(any("inactive lifecycle" in x for x in excluded["ADR-006"]["reasons"]))
+        self.assertNotIn("score", excluded["ADR-006"])
+        self.assertNotIn("lifecycle_near_match", excluded["ADR-006"])
 
     def test_service_and_domain_metadata_gate_is_enforced_before_ranking(self):
         event = dict(self.by_id["SCOPE-01"])
@@ -89,14 +91,15 @@ class ScopeRetrievalTests(unittest.TestCase):
         self.assertEqual(result["triage"]["supported_deviation_count"], 0)
         self.assertEqual(result["triage"]["status"], "no_retrieved_adr")
 
-    def test_relevant_superseded_adr_causes_uncertain_not_silent_exclusion(self):
+    def test_retired_adr_does_not_match_or_affect_scope_disposition(self):
         event = self.by_id["SCOPE-06"]
         result = run_scope.evaluate_event(event, self.catalog, top_k=5, in_scope_threshold=0.28,
                                           review_threshold=0.14, backend="local")
-        self.assertEqual(result["scope"]["disposition"], "uncertain")
+        self.assertEqual(result["scope"]["disposition"], "not_in_scope")
         self.assertFalse(result["scope"]["selected_adrs"])
-        self.assertTrue(result["scope"]["inactive_near_matches"])
-        self.assertEqual(result["scope"]["inactive_near_matches"][0]["adr_id"], "ADR-006")
+        self.assertFalse(result["scope"]["review_candidates"])
+        self.assertEqual(result["triage"]["status"], "no_retrieved_adr")
+        self.assertEqual(result["triage"]["supported_deviation_count"], 0)
 
 
 if __name__ == "__main__":
