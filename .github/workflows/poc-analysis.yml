@@ -132,10 +132,27 @@ jobs:
           current="$SOURCE_PATH"
           while [[ "$current" != "." && "$current" != "/" ]]; do
             if [[ -f "$current/gradlew" ]]; then
-              (cd "$current" && ./gradlew classes --no-daemon)
+              cat > "$RUNNER_TEMP/poc-print-classpath.gradle" <<'GRADLE'
+          gradle.projectsEvaluated {
+            rootProject.tasks.register('pocPrintMainCompileClasspath') {
+              doLast {
+                rootProject.allprojects.each { p ->
+                  if (p.plugins.hasPlugin('java')) println(p.sourceSets.main.compileClasspath.asPath)
+                }
+              }
+            }
+          }
+          GRADLE
+              (cd "$current" && ./gradlew classes -I "$RUNNER_TEMP/poc-print-classpath.gradle" --no-daemon)
+              (cd "$current" && ./gradlew -q pocPrintMainCompileClasspath -I "$RUNNER_TEMP/poc-print-classpath.gradle" --no-daemon > "$RUNNER_TEMP/poc-java-classpath.txt")
+              cp_entries="$(find "$current" -type d -path '*/build/classes/java/main' -print | paste -sd: -)"
+              dep_entries="$(tr '\n' ':' < "$RUNNER_TEMP/poc-java-classpath.txt")"
+              echo "JAVA_POC_CLASSPATH=$cp_entries:$dep_entries" >> "$GITHUB_ENV"
               break
             elif [[ -f "$current/pom.xml" ]]; then
-              (cd "$current" && mvn -B -q -DskipTests compile)
+              if [[ -x "$current/mvnw" ]]; then MVN="$current/mvnw"; else MVN="mvn"; fi
+              (cd "$current" && "$MVN" -B -q -DskipTests compile dependency:build-classpath "-Dmdep.outputFile=$RUNNER_TEMP/poc-java-dependencies.cp")
+              echo "JAVA_POC_CLASSPATH=$current/target/classes:$(cat "$RUNNER_TEMP/poc-java-dependencies.cp")" >> "$GITHUB_ENV"
               break
             fi
             current="$(dirname "$current")"
