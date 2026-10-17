@@ -38,42 +38,56 @@ export default function DemoExplorer() {
       </div>
       <div className="technical-trace__grid">
         <article className="technical-trace__panel">
-          <div className="technical-trace__panel-title"><Braces size={17} /><div><strong>01 / AST observation</strong><small>Tree-sitter · source-level syntax</small></div></div>
-          <p className="technical-trace__explain">The scanner parses source into a syntax tree, walks call-expression nodes, and emits stable source spans. It does not claim type resolution or runtime behavior.</p>
-          <pre aria-label="Example AST observation JSON"><code>{JSON.stringify({
-  scanner: "tree-sitter-language-pack",
-  language: "python",
-  source_path: "src/session.py",
-  source_sha256: "sha256:<digest-of-source-bytes>",
-  parse_status: "parsed",
-  root_has_error: false,
-  syntax_error_count: 0,
-  observations: [{
-    observation_id: "TS-001",
-    enclosing_function: "validate_session",
-    line: 42,
-    column: 9,
-    end_line: 42,
-    end_column: 39,
-    call: "anthropic_client.assess",
-    expression: "anthropic_client.assess(request)",
-    receiver_expression: "anthropic_client",
-    method_name: "assess",
-    classification: "synchronous_provider_call",
-    classification_basis: "syntactic_heuristic"
-  }]
+          <div className="technical-trace__panel-title"><Braces size={17} /><div><strong>01 / AST observation</strong><small>Language-specific AST / SSA · static call graph</small></div></div>
+          <p className="technical-trace__explain">Collectors are language-specific: Python uses <code>ast</code> plus scope/import/type-hint indexes; Go uses <code>go/packages</code>, <code>go/types</code>, SSA and CHA; TypeScript/JavaScript use a dedicated call-graph collector. A normalizer emits source-bound observations. This is not one universal Tree-sitter pass.</p>
+          <pre aria-label="Example normalized code observation JSON"><code>{JSON.stringify({
+  schema_version: "source-observation-v1",
+  observation_id: "obs:<sha256-of-canonical-observation>",
+  predicate: "code.call_edge",
+  subject: {
+    id: "py:src/session.py:42:validate_session",
+    kind: "function",
+    name: "service.session.validate_session"
+  },
+  value: {
+    target: "service.providers.assess",
+    call_expression: "provider.assess(request)",
+    edge_id: "edge:<collector-edge-id>",
+    reachable_from_entry: true,
+    dispatch_kind: "static"
+  },
+  source_ref: {
+    artifact_id: "artifact:<run-bound-id>",
+    version: "git:<immutable-revision>",
+    sha256: "<64-character-source-digest>",
+    path: "src/session.py",
+    locator: { kind: "line", start: 42, end: 42 }
+  },
+  collector: {
+    name: "language-callgraph",
+    version: "callgraph-observations-v1",
+    language: "python",
+    resolver: "Python AST + scope/import/type-hint/constructor index",
+    run_id: "run-example-0042"
+  },
+  resolution: {
+    status: "resolved",
+    source_status: "resolved_static",
+    basis: "scope_import_index"
+  },
+  evidence_class: "static_code_observation"
 }, null, 2)}</code></pre>
-          <ul className="technical-trace__notes"><li>Byte offsets and line/column spans bind observations to exact source.</li><li>Classification is heuristic; receiver names can be misleading.</li><li>Parse errors fail the scan and are retained with source locations.</li></ul>
-          <a href={`https://github.com/${repository}/blob/main/.github/demo/ast_scan.py`} target="_blank" rel="noreferrer">Read the AST scanner <ArrowUpRight size={13} /></a>
+          <ul className="technical-trace__notes"><li>PoC observations use one-based line locators plus immutable artifact version and SHA-256; the Python collector also records symbol line ranges.</li><li>Resolution varies by language and resolver. “Resolved” is static-analysis status, not runtime proof.</li><li>Unresolved / approximate edges and collector diagnostics remain explicit; coverage gaps must not be interpreted as absence.</li></ul>
+          <a href={`https://github.com/${repository}/blob/main/.poc/analyzers/python_callgraph.py`} target="_blank" rel="noreferrer">Read the Python AST collector <ArrowUpRight size={13} /></a>
         </article>
         <article className="technical-trace__panel">
           <div className="technical-trace__panel-title"><ShieldCheck size={17} /><div><strong>02 / Evidence item</strong><small>Immutable source reference · claim relation</small></div></div>
-          <p className="technical-trace__explain">Evidence is version-bound and validated before a finding can rely on it. Excerpts are review data, not general-purpose logs; model output cannot invent evidence IDs or locations.</p>
+          <p className="technical-trace__explain">This is the proposed internal EvidenceItem contract in docs/contracts/EVIDENCE.md. It is distinct from the PoC’s persisted source-observation envelope shown next to it. Excerpts are review data, not general-purpose logs; model output cannot invent evidence IDs or locations.</p>
           <pre aria-label="Example evidence item JSON"><code>{JSON.stringify({
   evidenceId: "ev-001",
   jobId: "job-example-0042",
   artifactId: "repo:service/session.py",
-  artifactVersionId: "git:4f8c…",
+  artifactVersionId: "git:<full-immutable-revision>",
   artifactKind: "source_file",
   contentSha256: "<sha256-of-canonical-source>",
   path: "src/session.py",
@@ -86,7 +100,7 @@ export default function DemoExplorer() {
   retrievalMethod: "path_symbol_v1",
   selectionRationale: "Contains the configured absolute lifetime check",
   sourceIntegrity: "VERIFIED",
-  collectedAt: "2026-10-17T12:00:00Z"
+  collectedAt: "<UTC timestamp from collection>"
 }, null, 2)}</code></pre>
           <ul className="technical-trace__notes"><li>Artifact version, source digest, and inclusive line range must agree.</li><li>Each factual claim must cite evidence in the same immutable job package.</li><li>Missing, stale, contradictory, or weak evidence downgrades the result to potential or inconclusive.</li></ul>
           <a href={`https://github.com/${repository}/blob/main/docs/contracts/EVIDENCE.md`} target="_blank" rel="noreferrer">Read the evidence contract <ArrowUpRight size={13} /></a>
