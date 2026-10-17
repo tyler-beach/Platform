@@ -130,7 +130,7 @@ jobs:
           SOURCE_PATH: ${{ inputs.source_path }}
         run: |
           current="$SOURCE_PATH"
-          while [[ "$current" != "." && "$current" != "/" ]]; do
+          while true; do
             if [[ -f "$current/gradlew" ]]; then
               cat > "$RUNNER_TEMP/poc-print-classpath.gradle" <<'GRADLE'
           gradle.projectsEvaluated {
@@ -155,7 +155,10 @@ jobs:
               echo "JAVA_POC_CLASSPATH=$current/target/classes:$(cat "$RUNNER_TEMP/poc-java-dependencies.cp")" >> "$GITHUB_ENV"
               break
             fi
-            current="$(dirname "$current")"
+            [[ "$current" == "." ]] && break
+            parent="$(dirname "$current")"
+            [[ "$parent" == "$current" ]] && break
+            current="$parent"
           done
 
       - name: Load persistent CSV database tables
