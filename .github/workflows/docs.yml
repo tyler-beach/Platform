@@ -81,6 +81,8 @@ jobs:
           python -m pip install -r docs-requirements.txt -r .poc/requirements.txt
       - name: Validate OpenAPI contract
         run: openapi-spec-validator docs/openapi.yaml
+      - name: Generate Markdown doc index for Pages
+        run: node scripts/generate-doc-index.mjs
       - name: Run deterministic PoC behavior tests
         run: python -m unittest discover -s .poc/tests -v
       - name: Run site and explorer behavior tests

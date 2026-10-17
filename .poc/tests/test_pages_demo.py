@@ -168,6 +168,7 @@ class PagesSnapshotTests(unittest.TestCase):
         self.assertIn("public: false", guide)
         self.assertIn("workflow_run", workflow)
         self.assertIn("contents: write", analysis)
+        subprocess.run(["node", "scripts/generate-doc-index.mjs"], cwd=ROOT, check=True)
         self.assertIn("how-to/enable-private-pages-demo.md", (ROOT / "src/generated-doc-index.json").read_text(encoding="utf-8"))
 
     def test_real_history_projection_includes_run_events_and_redacts_evidence_literals(self):
