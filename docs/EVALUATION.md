@@ -24,3 +24,17 @@ Schema and evidence reference validation are hard gates. Critical security/tenan
 
 ## Observability
 Trace ingress, normalization, retrieval, deterministic analysis, each Anthropic call, validation, persistence and publication. Correlate by job ID/trace ID. Record model/prompt/schema version, evidence IDs, token usage, latency, retries and validation result. Avoid logging raw private source by default.
+
+## Current PoC labeled evaluation
+
+The executable baseline lives in `.poc/evaluation/cases.jsonl` and runs with:
+
+    python .poc/evaluation/evaluate.py --provider mock --output-dir /tmp/adr-evaluation
+
+The suite has 14 synthetic scenarios split across three expected dispositions: clear deviations, clear non-deviations, and ambiguous cases that should remain open to review. It deliberately tests boundaries that naive call-name heuristics can get wrong: helper methods that block on providers, a queue followed by a worker call, local validators named `Assess`, explicitly permitted synchronous calls, unresolved dynamic dispatch, conditional fallbacks, and approximate CHA edges.
+
+The runner executes the current assessment adapter, applies the versioned evidence score and outcome guardrails, and writes both `evaluation.md` and `evaluation.json`. It reports three-way accuracy and confusion matrix, binary precision/recall/F1 on clear cases, escalation on ambiguous cases, and a score-threshold sweep that gates which model-proposed findings are sent forward as actionable. The sweep does not use score alone to predict whether a violation exists.
+
+The default `mock` provider is offline and deterministic. It is useful for regression testing the harness and can expose limitations in the rules, but it is not evidence of live model quality. To evaluate live model behavior, run `--provider anthropic` only when the API key, expected cost, and test-data handling are explicitly approved.
+
+**Dataset status:** the cases are initial, hand-authored expected dispositions, not independently adjudicated ground truth. Architecture reviewers should review the expected labels and evidence spans, add realistic repositories and real-world false-positive/false-negative examples, and version those changes before tuning operational thresholds. The evidence-strength score remains an explainable support rating—not a calibrated probability—and no unattended merge blocking is enabled.
