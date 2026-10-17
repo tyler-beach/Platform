@@ -64,7 +64,7 @@ jobs:
           retention-days: 7
 
   deterministic-analysis:
-    name: "2 · AST and document analysis"
+    name: "2 · Tree-sitter and document analysis"
     needs: admit
     runs-on: ubuntu-latest
     steps:
@@ -91,10 +91,10 @@ jobs:
             --language "${{ inputs.language }}" \
             --source "run-data/$SOURCE_PATH" \
             --out run-data/ast-analysis.json
-      - name: Explain why AST is not applicable
+      - name: Explain why syntax parsing is not applicable
         if: ${{ inputs.comparison == 'technical-spec' }}
         run: |
-          echo "This path compares a Markdown technical specification with an ADR, so Go AST parsing is not applicable." >> "$GITHUB_STEP_SUMMARY"
+          echo "This path compares a Markdown technical specification with an ADR, so Tree-sitter parsing is not applicable." >> "$GITHUB_STEP_SUMMARY"
           echo "The next step extracts requirement statements and classifies their explicit execution constraints." >> "$GITHUB_STEP_SUMMARY"
       - name: Normalize deterministic observations
         run: python .github/demo/pipeline.py analyze --output run-data
