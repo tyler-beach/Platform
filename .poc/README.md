@@ -29,7 +29,7 @@ Every edge carries a resolution status and basis; unresolved calls are retained 
 
 .poc-db/ is the human-auditable database directory. Each table is one append-only CSV file, with a stable header and IDs linking records across tables. CSV itself has no worksheets, so each CSV corresponds to one table/sheet when opened or imported into a workbook. Workflow runs also upload the complete bundle as a GitHub Actions artifact and persist table updates to the dedicated poc-database branch. Source payloads are not copied into the database; hashes, paths, spans, evidence excerpts and transaction metadata are recorded.
 
-Tables: runs, run_events, artifacts, symbols, call_edges, evidence, budget_reservations, llm_transactions, and findings.
+Tables: runs, run_events, artifacts, symbols, call_edges, evidence, budget_reservations, llm_transactions, findings, confidence_assessments, confidence_components, and assessment_evidence_links.
 
 ## Limits
 
