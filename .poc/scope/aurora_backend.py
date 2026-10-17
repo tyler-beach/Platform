@@ -20,13 +20,15 @@ SEARCH_SQL = """
 SELECT
     chunk_id, adr_id, adr_version, title, chunk_text, normative_text, owner, status, review_state,
     effective_from, effective_until, repositories, services, domains, languages, tags, deviation_check,
-    source_path, source_sha256,
+    source_path, source_sha256, embedding_model_id, embedding_dimensions,
     1.0 - (embedding <=> %(query_embedding)s::vector) AS similarity
 FROM adr_chunks
 WHERE status IN ('accepted', 'approved', 'active')
   AND review_state IN ('current', 'active', 'approved')
   AND (effective_from IS NULL OR effective_from <= now())
   AND (effective_until IS NULL OR effective_until > now())
+  AND embedding_model_id = %(embedding_model_id)s
+  AND embedding_dimensions = %(embedding_dimensions)s
   AND ('*' = ANY(repositories) OR %(repository)s = ANY(repositories))
   AND ('*' = ANY(services) OR %(service)s = ANY(services))
   AND ('*' = ANY(domains) OR %(domain)s = ANY(domains))
@@ -155,6 +157,8 @@ def retrieve_from_aurora(
         "service": str(event.get("service", "")),
         "domain": str(event.get("domain", "")),
         "language": str(event.get("language", "*")).lower(),
+        "embedding_model_id": model_id,
+        "embedding_dimensions": EMBEDDING_DIMENSIONS,
         "top_k": top_k,
     }
     try:
