@@ -112,6 +112,7 @@ nav:
       - Interactive PoC demo: demo/index.md
       - Functional analysis demo: functional-analysis-demo.md
       - Executable semantic-analysis PoC: EXECUTABLE_POC.md
+      - Enable the internal Pages run explorer: how-to/enable-private-pages-demo.md
       - ADR scope retrieval: ADR_SCOPE_RETRIEVAL.md
       - Engineering playbook: ENGINEERING_PLAYBOOK.md
       - OpenSpec workflow: OPEN_SPEC_WORKFLOW.md

@@ -133,6 +133,20 @@ class PagesSnapshotTests(unittest.TestCase):
         self.assertIn("ADR_REPO_URL", (ROOT / "mkdocs.yml").read_text(encoding="utf-8"))
         self.assertIn("ADR_REPO_NAME", workflow)
 
+    def test_internal_pages_runbook_matches_the_workflow_gates(self):
+        guide = (ROOT / "docs/how-to/enable-private-pages-demo.md").read_text(encoding="utf-8")
+        workflow = (ROOT / ".github/workflows/docs.yml").read_text(encoding="utf-8")
+        analysis = (ROOT / ".github/workflows/poc-analysis.yml").read_text(encoding="utf-8")
+        self.assertIn("GitHub Enterprise Cloud", guide)
+        self.assertIn("PAGES_REAL_RUN_DATA_ENABLED", guide)
+        self.assertIn("select the default branch (`main`)", guide)
+        self.assertIn("poc-database", guide)
+        self.assertIn('repository_visibility not in {"private", "internal"}', (ROOT / ".poc/demo/pages_visibility.py").read_text(encoding="utf-8"))
+        self.assertIn("public: false", guide)
+        self.assertIn("workflow_run", workflow)
+        self.assertIn("contents: write", analysis)
+        self.assertIn("how-to/enable-private-pages-demo.md", (ROOT / "mkdocs.yml").read_text(encoding="utf-8"))
+
     def test_static_workflow_links_follow_clone_repository_and_validate_name(self):
         site = self.base / "site"
         demo = site / "demo"
