@@ -7,6 +7,12 @@ This directory contains an executable vertical slice, not just a visual demo. It
     python -m pip install -r .poc/requirements.txt
     python .poc/run.py --language go --source .poc/fixtures/go --root-function Submit --comparison spec-vs-implementation --provider mock --run-id local-001
 
+## Run the labeled evaluation set
+
+    python .poc/evaluation/evaluate.py --provider mock --output-dir /tmp/adr-evaluation
+
+The labeled evaluation suite runs 14 synthetic boundary cases, records outcome metrics and a review-gate threshold sweep, and emits both Markdown and JSON reports. Labels are provisional until architecture reviewers independently adjudicate them. The evidence-strength score is not a probability. See docs/EVALUATION.md for scope, metrics, limits, and how to opt into live-model evaluation.
+
 For TypeScript/JavaScript, Node.js 20+ and the pinned TypeScript compiler are required. For Go, Go 1.24+ is required. For Java, JDK 21+ is required. Python uses the standard-library AST and scope/index resolver, in addition to shared Tree-sitter syntax diagnostics.
 
 ## Enable Anthropic
