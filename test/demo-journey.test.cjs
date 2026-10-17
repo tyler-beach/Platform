@@ -21,6 +21,7 @@ test("guided ADR journey explains the investigation in five plain-language steps
   ]) assert.ok(component.includes(phrase), "missing guided journey content: " + phrase);
   assert.ok(component.includes("const stepNames = ['Decision', 'Scope', 'Evidence', 'Assessment', 'Review']"));
   assert.ok(component.includes("What this supports"));
+  for (const id of ["demo-open-analysis", "demo-open-evaluation", "demo-open-functional"]) assert.ok(component.includes(`id="${id}"`), "missing technical workflow link: " + id);
   assert.ok(component.includes("No source excerpt supplied for this example"));
 });
 
