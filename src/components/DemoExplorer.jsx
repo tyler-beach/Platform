@@ -91,6 +91,26 @@ export default function DemoExplorer() {
           <ul className="technical-trace__notes"><li>Artifact version, source digest, and inclusive line range must agree.</li><li>Each factual claim must cite evidence in the same immutable job package.</li><li>Missing, stale, contradictory, or weak evidence downgrades the result to potential or inconclusive.</li></ul>
           <a href={`https://github.com/${repository}/blob/main/docs/contracts/EVIDENCE.md`} target="_blank" rel="noreferrer">Read the evidence contract <ArrowUpRight size={13} /></a>
         </article>
+        <article className="technical-trace__panel technical-trace__panel--wide">
+          <div className="technical-trace__panel-title"><Clock3 size={17} /><div><strong>03 / Append-only run event</strong><small>PoC audit log · run_events.csv</small></div></div>
+          <p className="technical-trace__explain">The PoC records stage transitions separately from evidence and findings. The event row is a timeline pointer; structured details stay in <code>details_json</code>, while source references and model transactions live in their own tables.</p>
+          <pre aria-label="Example run event JSON"><code>{JSON.stringify({
+  event_id: "evt-0007",
+  run_id: "run-example-0042",
+  timestamp: "2026-10-17T12:00:04Z",
+  stage: "evidence_collection",
+  event_type: "collection_completed",
+  status: "completed",
+  details_json: {
+    inspected_files: 12,
+    emitted_observations: 7,
+    unresolved_edges: 2,
+    coverage_complete: false
+  }
+}, null, 2)}</code></pre>
+          <div className="technical-trace__tables"><div><strong>Related audit tables</strong><p><code>artifacts</code> · immutable input hashes and versions</p><p><code>symbols</code> / <code>call_edges</code> · normalized graph facts and resolution state</p><p><code>evidence</code> / <code>observations</code> · claim-linked source records and predicates</p></div><div><strong>Assessment and governance</strong><p><code>collection_reports</code> · coverage, unsupported files, failed collectors, gaps</p><p><code>findings</code> / <code>assessment_evidence_links</code> · outcome, limitations, claim relationships, validation</p><p><code>llm_transactions</code> / <code>confidence_assessments</code> · prompt digest, token counts, versioned scoring inputs</p></div></div>
+          <a href={`https://github.com/${repository}/blob/main/.poc/store.py`} target="_blank" rel="noreferrer">Read the canonical PoC CSV schemas <ArrowUpRight size={13} /></a>
+        </article>
       </div>
       <div className="technical-trace__boundary"><strong>Boundary:</strong> AST facts are deterministic syntax observations. Semantic applicability, runtime behavior, and whether a deviation is confirmed require additional evidence and human review. The JSON above is illustrative; hashes and IDs are placeholders, not verifiable artifact identities.</div>
     </section>
