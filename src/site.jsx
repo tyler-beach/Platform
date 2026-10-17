@@ -115,6 +115,8 @@ function ArchitectureHome() {
       <FeatureDoc path="contracts/EVIDENCE.md" label="PROVENANCE" icon={<ShieldCheck size={18} />} />
       <FeatureDoc path="AI_PIPELINE.md" label="ANALYSIS" icon={<Sparkles size={18} />} />
       <FeatureDoc path="ENGINEERING_PLAYBOOK.md" label="BUILD PRACTICE" icon={<Braces size={18} />} />
+      <FeatureDoc path="adr/POD-DISRUPTION-BUDGETS.md" label="AVAILABILITY ADR" icon={<ShieldCheck size={18} />} />
+      <FeatureDoc path="adr/SESSION-TTL.md" label="SESSION SECURITY ADR" icon={<CircleDot size={18} />} />
     </div>
     <div className="architecture-bottom-grid"><div className="architecture-callout"><span className="section-kicker">START WITH THE SHAPE</span><h2>Three comparisons. One evidence standard.</h2><p>Implementation ↔ ADR, specification ↔ ADR, and specification ↔ implementation all use version-bound references. Similarity alone does not establish applicability.</p><Link to={routeForDocument('system-architecture.md')}>Explore system architecture <ArrowRight size={15} /></Link></div><div className="architecture-document-list"><div className="section-heading section-heading--compact"><div><span className="section-kicker">REFERENCE LIBRARY</span><h2>Explore by topic</h2></div></div><div className="topic-links">{navigationGroups.slice(1).map((group) => <Link key={group.title} to={routeForDocument(group.paths[0])}><span>{group.title}</span><span>{group.paths.length} topics <ArrowRight size={14} /></span></Link>)}</div></div></div>
   </div>;
