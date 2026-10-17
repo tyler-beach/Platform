@@ -273,6 +273,72 @@ class FunctionalAnalysisLedgerTests(unittest.TestCase):
             self.assertEqual(rows[1]["record_revision"], "2")
             self.assertEqual(rows[1]["supersedes_fingerprint"], rows[0]["record_fingerprint"])
 
+    def test_scheduled_reconciliation_upgrades_unreconciled_row_when_artifact_appears(self):
+        bundle = make_bundle(run_id="789", run_attempt=1)
+        digest = "sha256:" + sha(bundle)
+
+        class FakeAPI:
+            artifact_available = False
+
+            def get_json(self, path, query=None):
+                if path == "/":
+                    return {"full_name": "example-org/adr-platform", "default_branch": "main"}
+                if path == "/actions/workflows/functional-analysis-demo.yml":
+                    return {"id": 44, "path": ".github/workflows/functional-analysis-demo.yml"}
+                if path == "/actions/workflows/44/runs":
+                    return {"workflow_runs": [{"id": 789, "run_attempt": 1, "workflow_id": 44,
+                                                "event": "workflow_dispatch", "head_branch": "main",
+                                                "status": "completed", "conclusion": "success",
+                                                "head_sha": "a" * 40}], "total_count": 1}
+                if path == "/actions/runs/789/attempts/1":
+                    return {"id": 789, "run_attempt": 1, "workflow_id": 44,
+                            "event": "workflow_dispatch", "head_branch": "main", "status": "completed",
+                            "conclusion": "success", "head_sha": "a" * 40}
+                if path == "/actions/runs/789/artifacts":
+                    if not self.artifact_available:
+                        return {"artifacts": []}
+                    return {"artifacts": [{"id": 5, "name": "functional-analysis-demo-789-1",
+                                           "expired": False, "size_in_bytes": len(bundle),
+                                           "digest": digest, "workflow_run": {"id": 789}}]}
+                raise AssertionError(f"unexpected API path: {path}")
+
+            def download_artifact(self, *_args):
+                return bundle
+
+        api = FakeAPI()
+        with tempfile.TemporaryDirectory(dir=ROOT / ".poc") as temporary:
+            db_dir = Path(temporary) / "db"
+            first = reconcile(api, "example-org/adr-platform", db_dir)
+            api.artifact_available = True
+            second = reconcile(api, "example-org/adr-platform", db_dir)
+            rows = CsvStore(db_dir).rows("functional_analysis_runs")
+        self.assertEqual(first["unreconciled"], 1)
+        self.assertEqual(second["updated"], 1)
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0]["analysis_state"], "unreconciled")
+        self.assertEqual(rows[1]["analysis_state"], "validated")
+        self.assertEqual(rows[1]["record_revision"], "2")
+        self.assertEqual(rows[1]["supersedes_fingerprint"], rows[0]["record_fingerprint"])
+
+    def test_reconciliation_remains_incomplete_for_unresolved_rows_outside_scan_window(self):
+        class FakeAPI:
+            def get_json(self, path, query=None):
+                if path == "/":
+                    return {"full_name": "example-org/adr-platform", "default_branch": "main"}
+                if path == "/actions/workflows/functional-analysis-demo.yml":
+                    return {"id": 44, "path": ".github/workflows/functional-analysis-demo.yml"}
+                if path == "/actions/workflows/44/runs":
+                    return {"workflow_runs": [], "total_count": 0}
+                raise AssertionError(f"unexpected API path: {path}")
+
+        with tempfile.TemporaryDirectory(dir=ROOT / ".poc") as temporary:
+            db_dir = Path(temporary) / "db"
+            store = CsvStore(db_dir)
+            self.assertEqual(persist_record(store, execution_only_record(
+                expected_context(), persistence_state="unreconciled")), "persisted")
+            summary = reconcile(FakeAPI(), "example-org/adr-platform", db_dir)
+        self.assertEqual(summary["unreconciled"], 1)
+
     def test_csv_persistence_is_idempotent_and_rejects_identity_collision(self):
         with tempfile.TemporaryDirectory(dir=ROOT / ".poc") as temporary:
             store = CsvStore(temporary)

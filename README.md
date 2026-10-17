@@ -6,7 +6,7 @@ This is the living design notebook and engineering baseline. It separates confir
 
 ## Documentation site
 
-The documentation source is in the docs folder and is built with MkDocs Material. After the first successful GitHub Pages deployment, the site should be available at:
+The documentation source is in the docs folder and is built with MkDocs Material. This repository is currently public, and its Pages site is publicly reachable at:
 
 **https://tyler-beach.github.io/Platform/**
 
@@ -21,7 +21,7 @@ The documentation source is in the docs folder and is built with MkDocs Material
 - [PoC analysis workflow (GitHub Actions)](https://github.com/tyler-beach/Platform/actions/workflows/poc-analysis.yml)
 - [Executable semantic-analysis PoC](https://tyler-beach.github.io/Platform/EXECUTABLE_POC/)
 
-The Pages URL is expected but will not be live until GitHub Actions deploys the site and repository Pages settings allow workflow-based deployment. The REST/OpenAPI document is a proposed façade, not a claim of a deployed HTTP server.
+This public Pages deployment contains the synthetic mock walkthrough. Actions history and detailed CSV run-data exports are disabled by default; the workflow rejects those exports unless the repository is an organization-owned private/internal repository with Pages visibility and explicit opt-ins configured. Before using real source data for a demo, clone the project into the intended private organization and verify its Pages visibility settings. The REST/OpenAPI document is a proposed façade, not a claim of a deployed HTTP server.
 
 ## Start here in the repository
 

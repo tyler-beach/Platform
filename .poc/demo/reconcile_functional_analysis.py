@@ -176,14 +176,31 @@ def _attempt_context(repository: str, default_branch: str, workflow_id: int,
     return context
 
 
-def _row_identities(store: CsvStore) -> set[tuple[str, str, int]]:
-    identities = set()
+def _latest_rows(store: CsvStore) -> dict[tuple[str, str, int], dict[str, str]]:
+    latest: dict[tuple[str, str, int], dict[str, str]] = {}
+    revisions: dict[tuple[str, str, int], set[int]] = {}
     for row in store.rows("functional_analysis_runs"):
         try:
-            identities.add((row["repository"], row["workflow_run_id"], int(row["run_attempt"])))
+            identity = (row["repository"], row["workflow_run_id"], int(row["run_attempt"]))
+            revision = int(row["record_revision"])
         except (KeyError, ValueError):
             raise ReconciliationError("existing Functional Analysis ledger row is malformed") from None
-    return identities
+        if not row["repository"] or not row["workflow_run_id"] or revision <= 0:
+            raise ReconciliationError("existing Functional Analysis ledger row is malformed")
+        seen = revisions.setdefault(identity, set())
+        if revision in seen:
+            raise ReconciliationError("existing Functional Analysis ledger has duplicate record revisions")
+        seen.add(revision)
+        if identity not in latest or revision > int(latest[identity]["record_revision"]):
+            latest[identity] = row
+    return latest
+
+
+def _row_identities(store: CsvStore) -> set[tuple[str, str, int]]:
+    # Unreconciled identities are deliberately omitted so a later schedule can
+    # recover an artifact that was temporarily unavailable.
+    return {identity for identity, row in _latest_rows(store).items()
+            if row.get("persistence_state") != "unreconciled"}
 
 
 def _list_recent_runs(api: GitHubAPI, workflow_id: int, max_runs: int = MAX_RUNS) -> list[dict[str, Any]]:
@@ -290,6 +307,12 @@ def reconcile(api: GitHubAPI, repository: str, db_dir: str | Path,
             results["updated"] += 1
         else:
             results["replayed"] += 1
+    # Keep older unresolved rows visible even after the automatic scan horizon
+    # stops returning their source runs. A green reconciliation must not hide them.
+    latest = _latest_rows(store)
+    results["unreconciled"] = sum(
+        1 for row in latest.values() if row.get("persistence_state") == "unreconciled"
+    )
     return results
 
 
