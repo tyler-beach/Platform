@@ -92,7 +92,7 @@ def assess(provider:str,context:dict[str,Any],max_output_tokens:int=1000) -> dic
         result=mock_assess(context)
         return {"assessment":result,"provider":"mock","model":"deterministic-rules-v1","request_id":"mock-"+prompt_hash[:16],"input_tokens":None,"output_tokens":None,"input_chars":len(prompt),"output_chars":len(json.dumps(result)),"prompt_sha256":prompt_hash,"duration_ms":round((time.monotonic()-started)*1000),"created_at":created}
     if provider!="anthropic": raise ValueError("unsupported model provider: "+provider)
-    model_name=os.getenv("ANTHROPIC_MODEL","claude-sonnet-5")
+    model_name=(os.getenv("ANTHROPIC_MODEL") or "claude-sonnet-5-5")
     body=api_base(context,model_name);body["max_tokens"]=max_output_tokens
     payload,request_id=request_anthropic("messages",body)
     result=next((b.get("input") for b in payload.get("content",[]) if b.get("type")=="tool_use" and b.get("name")=="submit_assessment"),None)
