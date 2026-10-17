@@ -145,15 +145,15 @@ def parse_requirements(path: Path) -> list[dict[str, Any]]:
         text = raw.strip()
         if not text:
             continue
-        if re.match(r"^#{1,4}\\s+Requirement\\b", text, re.IGNORECASE):
+        if re.match(r"^#{1,4}\s+Requirement\b", text, re.IGNORECASE):
             pending_heading = True
             continue
         if text.startswith("#"):
             pending_heading = False
             continue
-        has_normative = bool(re.search(r"\\b(MUST|MUST NOT|SHALL|SHOULD|MAY)\\b", text, re.IGNORECASE))
+        has_normative = bool(re.search(r"\b(MUST|MUST NOT|SHALL|SHOULD|MAY)\b", text, re.IGNORECASE))
         if has_normative or pending_heading:
-            clean = re.sub(r"^[-*]\\s*", "", text)
+            clean = re.sub(r"^[-*]\s*", "", text)
             result.append({
                 "requirement_id": f"SPEC-R-{len(result)+1:03d}",
                 "line": number,

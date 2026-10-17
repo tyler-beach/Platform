@@ -15,20 +15,28 @@ import (
 )
 
 type Observation struct {
-	ObservationID string `json:"observation_id"`
-	Line          int    `json:"line"`
-	Call          string `json:"call"`
-	Classification string `json:"classification"`
-	Reason        string `json:"reason"`
+	ObservationID       string `json:"observation_id"`
+	Function            string `json:"enclosing_function"`
+	Line                int    `json:"line"`
+	Column              int    `json:"column"`
+	EndLine             int    `json:"end_line"`
+	EndColumn           int    `json:"end_column"`
+	Call                string `json:"call"`
+	Expression          string `json:"expression"`
+	Receiver            string `json:"receiver_expression"`
+	Method              string `json:"method_name"`
+	Classification      string `json:"classification"`
+	ClassificationBasis string `json:"classification_basis"`
+	Reason              string `json:"reason"`
 }
 
 type Result struct {
-	Scanner       string        `json:"scanner"`
-	SourcePath    string        `json:"source_path"`
-	SourceSHA256  string        `json:"source_sha256"`
-	ParseStatus   string        `json:"parse_status"`
-	Observations  []Observation `json:"observations"`
-	ScopeNote     string        `json:"scope_note"`
+	Scanner      string        `json:"scanner"`
+	SourcePath   string        `json:"source_path"`
+	SourceSHA256 string        `json:"source_sha256"`
+	ParseStatus  string        `json:"parse_status"`
+	Observations []Observation `json:"observations"`
+	ScopeNote    string        `json:"scope_note"`
 }
 
 func main() {
@@ -49,56 +57,87 @@ func main() {
 	}
 	sum := sha256.Sum256(content)
 	result := Result{
-		Scanner: "go/parser + go/ast (demo scanner; no type-check or package build)",
+		Scanner: "Go standard library: go/parser + go/ast + go/token + go/format",
 		SourcePath: *source,
 		SourceSHA256: hex.EncodeToString(sum[:]),
 		ParseStatus: "parsed",
 		Observations: []Observation{},
-		ScopeNote: "This pass extracts selected call sites from the synthetic handler. It does not resolve dynamic dispatch or prove transitive runtime behavior.",
+		ScopeNote: "This is real Go syntax-tree analysis. Classifications are explicit syntactic heuristics over call targets; there is no type-check, interprocedural call graph, dynamic dispatch resolution, or runtime proof.",
 	}
 	index := 0
-	ast.Inspect(file, func(n ast.Node) bool {
-		call, ok := n.(*ast.CallExpr)
-		if !ok {
-			return true
+	for _, decl := range file.Decls {
+		fn, ok := decl.(*ast.FuncDecl)
+		if !ok || fn.Body == nil {
+			continue
 		}
-		var b strings.Builder
-		if err := format.Node(&b, fset, call.Fun); err != nil {
+		ast.Inspect(fn.Body, func(n ast.Node) bool {
+			call, ok := n.(*ast.CallExpr)
+			if !ok {
+				return true
+			}
+			var targetBuilder, expressionBuilder strings.Builder
+			if err := format.Node(&targetBuilder, fset, call.Fun); err != nil {
+				return true
+			}
+			if err := format.Node(&expressionBuilder, fset, call); err != nil {
+				return true
+			}
+			target := targetBuilder.String()
+			selector, ok := call.Fun.(*ast.SelectorExpr)
+			if !ok {
+				return true
+			}
+			var receiverBuilder strings.Builder
+			if err := format.Node(&receiverBuilder, fset, selector.X); err != nil {
+				return true
+			}
+			receiver, method := receiverBuilder.String(), selector.Sel.Name
+			classification, reason := classify(receiver, method)
+			if classification == "" {
+				return true
+			}
+			start, end := fset.Position(call.Pos()), fset.Position(call.End())
+			index++
+			result.Observations = append(result.Observations, Observation{
+				ObservationID: fmt.Sprintf("AST-%03d", index),
+				Function: fn.Name.Name,
+				Line: start.Line,
+				Column: start.Column,
+				EndLine: end.Line,
+				EndColumn: end.Column,
+				Call: target,
+				Expression: expressionBuilder.String(),
+				Receiver: receiver,
+				Method: method,
+				Classification: classification,
+				ClassificationBasis: "syntactic_heuristic",
+				Reason: reason,
+			})
 			return true
-		}
-		callText := b.String()
-		classification, reason := classify(callText)
-		if classification == "" {
-			return true
-		}
-		index++
-		result.Observations = append(result.Observations, Observation{
-			ObservationID: fmt.Sprintf("AST-%03d", index),
-			Line: fset.Position(call.Pos()).Line,
-			Call: callText,
-			Classification: classification,
-			Reason: reason,
 		})
-		return true
-	})
+	}
 	body, err := json.MarshalIndent(result, "", "  ")
 	must(err)
 	must(os.WriteFile(*out, append(body, '\n'), 0644))
-	fmt.Printf("Go AST parse: %s (%d selected call sites)\n", result.ParseStatus, len(result.Observations))
+	fmt.Printf("Go AST parse: %s; %d classified call sites\n", result.ParseStatus, len(result.Observations))
 	for _, observation := range result.Observations {
-		fmt.Printf("  line %d: %s -> %s\n", observation.Line, observation.Call, observation.Classification)
+		fmt.Printf("  %s:%d:%d-%d:%d %s -> %s [syntactic heuristic]\n",
+			observation.Function, observation.Line, observation.Column,
+			observation.EndLine, observation.EndColumn, observation.Expression,
+			observation.Classification)
 	}
 }
 
-func classify(call string) (string, string) {
-	lower := strings.ToLower(call)
+func classify(receiver, method string) (string, string) {
+	lowerReceiver, lowerMethod := strings.ToLower(receiver), strings.ToLower(method)
 	switch {
-	case strings.HasSuffix(lower, ".assess") || strings.HasSuffix(lower, ".createmessage") || strings.HasSuffix(lower, ".generate"):
-		return "synchronous_provider_call", "A provider-style method is invoked directly at this call site; the demo treats this as inline execution."
-	case strings.HasSuffix(lower, ".enqueue") || strings.HasSuffix(lower, ".startexecution") || strings.HasSuffix(lower, ".submitjob"):
-		return "async_enqueue", "The handler hands work to an asynchronous queue/workflow boundary."
-	case strings.HasSuffix(lower, ".run"):
-		return "delegated_call", "The call delegates to another abstraction; this file alone does not establish whether provider work is synchronous."
+	case strings.Contains(lowerReceiver, "anthropic") &&
+		(lowerMethod == "assess" || lowerMethod == "createmessage" || lowerMethod == "generate"):
+		return "synchronous_provider_call", "AST shows a direct call to a provider-shaped receiver from this function. This is a syntactic rule, not a resolved SDK/type check."
+	case lowerMethod == "enqueue" || lowerMethod == "startexecution" || lowerMethod == "submitjob":
+		return "async_enqueue", "AST shows a call whose method name suggests enqueue or workflow submission. The callee implementation is not resolved."
+	case lowerMethod == "run":
+		return "delegated_call", "AST shows delegation to a Run method; this file does not show whether the callee uses synchronous or asynchronous execution."
 	default:
 		return "", ""
 	}
