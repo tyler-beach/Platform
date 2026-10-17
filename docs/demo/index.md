@@ -17,7 +17,7 @@ hide:
 
 <div class="demo-trust-note" role="note">
   <strong>Two kinds of data appear here.</strong>
-  <span>The walkthrough is regenerated from a checked-in synthetic Go fixture with the offline mock provider. Run history comes from GitHub Actions. On a private repository with internal-only Pages explicitly enabled, this page also shows a bounded projection of real PoC ledger rows. It never publishes prompts, credentials, or provider payloads; source excerpts are redacted and linked to their original artifact hashes.</span>
+  <span>The walkthrough is regenerated from a checked-in synthetic Go fixture with the offline mock provider. Run history comes from GitHub Actions. On an organization-owned private or internal repository with privately published Pages and the exact opt-in enabled, this page also shows a bounded projection of real PoC ledger rows. It never publishes prompts, credentials, or provider payloads; source excerpts are redacted and linked to their original artifact hashes.</span>
 </div>
 
 <section class="demo-section" aria-labelledby="demo-walkthrough-heading">

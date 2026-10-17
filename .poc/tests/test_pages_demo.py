@@ -129,6 +129,7 @@ class PagesSnapshotTests(unittest.TestCase):
         self.assertIn("prepare_site.py", workflow)
         self.assertIn("PAGES_REAL_RUN_DATA_ENABLED", workflow)
         self.assertIn("/pages", workflow)
+        self.assertIn('owner.get("type", "") if isinstance(owner, dict) else ""', workflow)
         self.assertIn("ADR_REPO_URL", (ROOT / "mkdocs.yml").read_text(encoding="utf-8"))
         self.assertIn("ADR_REPO_NAME", workflow)
 
@@ -287,15 +288,18 @@ class PagesSnapshotTests(unittest.TestCase):
         self.assertNotIn("secret-canary", json.dumps(snapshot))
         self.assertNotIn("prompt-canary", json.dumps(snapshot))
 
-    def test_real_history_requires_private_repository_private_pages_and_explicit_opt_in(self):
-        self.assertFalse(real_data_export_enabled("public", True, "false"))
-        self.assertTrue(real_data_export_enabled("private", False, "true"))
-        with self.assertRaisesRegex(ValueError, "repository visibility=private"):
-            real_data_export_enabled("public", False, "true")
+    def test_real_history_requires_organization_private_or_internal_pages_and_explicit_opt_in(self):
+        self.assertFalse(real_data_export_enabled("public", "Organization", True, "false"))
+        self.assertTrue(real_data_export_enabled("private", "Organization", False, "true"))
+        self.assertTrue(real_data_export_enabled("internal", "Organization", False, "true"))
+        with self.assertRaisesRegex(ValueError, "private or internal"):
+            real_data_export_enabled("public", "Organization", False, "true")
+        with self.assertRaisesRegex(ValueError, "organization-owned"):
+            real_data_export_enabled("private", "User", False, "true")
         with self.assertRaisesRegex(ValueError, "Pages API"):
-            real_data_export_enabled("private", True, "true")
+            real_data_export_enabled("internal", "Organization", True, "true")
         with self.assertRaisesRegex(ValueError, "Pages API"):
-            real_data_export_enabled("private", None, "true")
+            real_data_export_enabled("internal", "Organization", None, "true")
 
     def test_internal_actions_history_fetch_is_bounded_and_contains_only_status_metadata(self):
         seen = []

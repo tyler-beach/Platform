@@ -2,7 +2,9 @@
 
 This is the executable proof of concept for the ADR Deviation Platform. Launch Actions → ADR Deviation PoC Analysis → Run workflow. The default is the Go fixture and deterministic mock provider, so it requires no model key and makes no model API call.
 
-The [interactive PoC demo](demo/index.md) shows a generated fixture run through each stage, displays source-version evidence and confidence components, and browses GitHub Actions job status. Detailed CSV-backed run records are included only when a private-repository build verifies private Pages access and the explicit `PAGES_REAL_RUN_DATA_ENABLED=true` repository variable. Pull-request builds never receive the ledger token.
+The [interactive PoC demo](demo/index.md) shows a generated fixture run through each stage, displays source-version evidence and confidence components, and browses GitHub Actions job status. Detailed CSV-backed run records are included only when an organization-owned private or internal repository verifies private Pages access and the exact `PAGES_REAL_RUN_DATA_ENABLED=true` repository variable. Pull-request builds never receive the ledger token.
+
+GitHub calls the access-controlled Pages mode **private**. It can publish from an organization-owned private or internal repository, and requires [GitHub Enterprise Cloud](https://docs.github.com/en/enterprise-cloud@latest/pages/getting-started-with-github-pages/changing-the-visibility-of-your-github-pages-site). The workflow verifies the repository owner/visibility and checks that the Pages API reports `public: false` before reading the ledger.
 
 ## What runs for real
 

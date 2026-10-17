@@ -159,8 +159,12 @@ jobs:
           from pages_visibility import real_data_export_enabled
           repository = json.loads(sys.argv[1])
           pages = json.loads(sys.argv[2])
-          real_data_export_enabled(repository.get("visibility", ""), pages.get("public"), sys.argv[3])
-          print("Private repository and private Pages access verified.")
+          owner = repository.get("owner", {})
+          owner_type = owner.get("type", "") if isinstance(owner, dict) else ""
+          real_data_export_enabled(repository.get("visibility", ""),
+                                   owner_type,
+                                   pages.get("public"), sys.argv[3])
+          print("Organization repository visibility and private Pages access verified.")
           PY
           db_dir="$DEMO_ROOT/real-db"
           mkdir -p "$db_dir"
