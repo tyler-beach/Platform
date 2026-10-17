@@ -1,10 +1,13 @@
 #!/usr/bin/env node
 "use strict";
-const fs=require("fs"),path=require("path"),ts=require("typescript");
+const fs=require("fs"),path=require("path");
 const argv=process.argv.slice(2),args={};
 for(let i=0;i<argv.length;i++)if(argv[i].startsWith("--"))args[argv[i].slice(2)]=argv[i+1]&&!argv[i+1].startsWith("--")?argv[++i]:"true";
 if(!args.root||!args.out){console.error("usage: callgraph.cjs --root DIR --out FILE --language typescript|javascript");process.exit(2);}
 const root=path.resolve(args.root),language=args.language||"typescript";
+let ts;
+try { ts=require(require.resolve("typescript",{paths:[root]})); }
+catch (_) { ts=require("typescript"); }
 const extensions=new Set([".ts",".tsx",".js",".jsx",".mts",".cts",".mjs",".cjs"]);
 function rel(f){const r=path.relative(root,f).split(path.sep).join("/");return r.startsWith("../")?"":r;}
 function walk(dir){return fs.readdirSync(dir,{withFileTypes:true}).flatMap(e=>{if(["node_modules",".git","vendor","target","build"].includes(e.name))return [];const p=path.join(dir,e.name);return e.isDirectory()?walk(p):(extensions.has(path.extname(p))?[p]:[]);});}
