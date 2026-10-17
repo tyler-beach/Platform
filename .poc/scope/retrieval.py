@@ -179,7 +179,7 @@ def retrieve(
         "excluded_adrs": exclusions,
         "excluded_inactive_or_out_of_scope_count": len(exclusions),
         "audit": {
-            "catalog_chunk_ids": [x.get("chunk_id") for x in catalog],
+            "eligible_candidate_chunk_ids": [x.get("chunk_id") for x in candidates],
             "catalog_hash": sha("\n".join(json.dumps(x, sort_keys=True) for x in catalog)),
             "scoring_note": "Lexical ranking is a local stand-in for Bedrock embeddings plus Aurora pgvector retrieval; score is not a calibrated probability.",
         },
