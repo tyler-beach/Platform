@@ -1,0 +1,51 @@
+name: ADR Deviation Labeled Evaluation
+
+on:
+  pull_request:
+    paths:
+      - ".poc/evaluation/**"
+      - ".poc/model.py"
+      - ".poc/confidence.py"
+      - ".poc/tests/test_evaluation.py"
+      - ".github/workflows/poc-evaluation.yml"
+  workflow_dispatch:
+    inputs:
+      provider:
+        description: mock runs offline; anthropic makes paid live model calls
+        required: true
+        default: mock
+        type: choice
+        options: [mock, anthropic]
+
+permissions:
+  contents: read
+
+jobs:
+  evaluate:
+    name: Labeled evaluation / ${{ inputs.provider || 'mock' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run evaluation unit tests
+        run: python -m unittest .poc.tests.test_evaluation -v
+      - name: Execute labeled cases
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL }}
+          PROVIDER: ${{ github.event_name == 'workflow_dispatch' && inputs.provider || 'mock' }}
+        run: |
+          python .poc/evaluation/evaluate.py --provider "$PROVIDER" --output-dir "$RUNNER_TEMP/adr-deviation-evaluation"
+      - name: Publish evaluation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: adr-deviation-evaluation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/adr-deviation-evaluation/evaluation.md
+            ${{ runner.temp }}/adr-deviation-evaluation/evaluation.json
+          if-no-files-found: warn
+          retention-days: 30
