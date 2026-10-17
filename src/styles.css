@@ -388,3 +388,6 @@ button { color: inherit; }
   .requirement-lab__rail { padding:14px 12px; }
   .requirement-lab__review-actions { grid-template-columns:minmax(0,1fr); }
 }
+
+.demo-launch-button--explore { border-color:rgba(129,226,209,.38); color:#8de5d7; background:rgba(129,226,209,.07); }
+.demo-launch-button--explore:hover { border-color:#87e4d7; color:#e9fffa; background:rgba(129,226,209,.13); }
