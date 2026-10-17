@@ -26,7 +26,7 @@ The fixture includes an intentional sync call path through Handler.Submit, Worke
 - Python's dynamic dispatch, reflection, monkey-patching, and weakly typed receivers can defeat static resolution. This adapter resolves supported intra-project scopes/imports and obvious receiver types and emits unresolved edges for the rest.
 - Tree-sitter is the shared syntax parser, not itself a type checker. Language-specific compiler/type information is what resolves call targets.
 - The mock model does not call a provider and is not a substitute for evaluating model quality. Only the decision stage is mocked; its deterministic rules consume the same evidence contract as Anthropic mode.
-- The budget estimate in mock mode is intentionally approximate. Anthropic mode should use the provider token-count endpoint before sending a Messages request; recorded token usage comes from the API response.
+- The budget gate uses Anthropic's token-count endpoint in real-provider mode before sending a Messages request; measured usage from the Messages response is also recorded. Mock mode uses a character-based token estimate.
 
 ## CSV audit database
 
