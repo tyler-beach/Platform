@@ -35,10 +35,18 @@ It reads:
 - `.poc/scope/adr_catalog.jsonl`: eight versioned ADR chunks with lifecycle and applicability metadata plus transparent demo control cues.
 - `.poc/scope/scenarios.jsonl`: eight labeled events with repository/service/domain/language, changed paths, change summary and illustrative source observations.
 - `.poc/scope/retrieval.py`: hard metadata filters followed by a lexical ranking baseline.
-- `.poc/scope/run_scope.py`: retrieval plus conservative, cue-based triage; generates Markdown and JSON reports.
+- `.poc/scope/run_scope.py`: retrieval plus conservative, cue-based triage; generates Markdown and JSON reports. It also accepts a single real event via `--event-json`.
+- `.poc/scope/event-template.json`: example envelope for passing repository/service scope and source line/call-edge/diff evidence into retrieval.
+- `.poc/scope/index_catalog.py`: validates source hashes before indexing chunks; skips unchanged embeddings on a live re-index and supersedes older versions when a newer active version is present in the manifest.
 - `.poc/tests/test_scope.py`: assertions for lifecycle exclusion, metadata filtering, retrieval, evidence hashes and non-promotion of flags.
 
 The report includes candidate ADR IDs and versions, lexical relevance scores, reasons, excluded ADRs, matched cues, evidence path/line/excerpt/hash, and a catalog hash. The cue matcher is intentionally limited and transparent; a match only creates a `potential_deviation` candidate. A missing cue does not prove compliance.
+
+For a single event envelope, copy and edit `.poc/scope/event-template.json`, then run:
+
+    python .poc/scope/run_scope.py --event-json /path/to/change-event.json --output-dir /tmp/adr-scope-one-change
+
+The event contains `repository`, `service`, `domain`, `language`, `change_summary`, changed paths, call-edge summaries and source observations. Keep the evidence ID, artifact ID, edge ID, source path, line, exact excerpt and claim from the upstream code/diff analyzer wherever available. The source-observation excerpt hash is recomputed when the report is created. The bundled JSON is a template, not an actual source-analysis result.
 
 Run the full scope test set:
 
@@ -78,9 +86,18 @@ A good future policy is to create a review item for candidate conflicts and miss
 The optional adapter is in `.poc/scope/aurora_backend.py`. It uses the AWS SDK credential chain for Bedrock embeddings, connects to Aurora PostgreSQL with TLS, and binds SQL parameters for all search input. By default, database authentication uses an RDS IAM auth token; set `ADR_DB_AUTH=password` only for environments that intentionally use password-based authentication.
 
 1. Provision Aurora PostgreSQL with the pgvector extension and apply `.poc/scope/aurora_schema.sql`.
-2. Ensure the embedding model used during ingestion matches `BEDROCK_EMBEDDING_MODEL_ID` and the schema's vector dimension. The example adapter defaults to a 1,024-dimension Titan Text Embeddings v2 vector; configure both ingestion and query paths identically if choosing another supported embedding model.
-3. Ingest each accepted/current ADR chunk, including its version, lifecycle/applicability metadata, source hash, normative text and embedding. Updating an ADR inserts a new version and marks the previous version superseded in a controlled transaction.
-4. Run from a network location that can reach the private Aurora endpoint. Configure `AWS_REGION`, `ADR_PGHOST`, `ADR_PGDATABASE`, `ADR_PGUSER`, and the RDS CA trust bundle via `PGSSLROOTCERT`. Grant the workload role only the required Bedrock model invocation permission and database connect/read permissions. IAM database authentication needs the matching database role grants.
+2. Install optional dependencies and validate the catalog fixture paths and SHA-256 values offline:
+
+       pip install -r .poc/scope/requirements-aws.txt
+       python .poc/scope/index_catalog.py --dry-run
+
+3. Ensure the embedding model used during ingestion matches `BEDROCK_EMBEDDING_MODEL_ID` and the schema's vector dimension. The example adapter defaults to a 1,024-dimension Titan Text Embeddings v2 vector; configure both ingestion and query paths identically if choosing another supported embedding model.
+4. Index the validated catalog from a network location with Bedrock/Aurora permissions:
+
+       python .poc/scope/index_catalog.py
+
+   The indexer verifies each chunk's source hash, embeds changed chunks only, upserts metadata/vectors transactionally, and marks older database versions superseded when a newer active version is present in the manifest. Review this versioning behavior against the real ADR lifecycle before production use.
+5. Run retrieval from a network location that can reach the private Aurora endpoint. Configure `AWS_REGION`, `ADR_PGHOST`, `ADR_PGDATABASE`, `ADR_PGUSER`, and the RDS CA trust bundle via `PGSSLROOTCERT`. Grant the workload role only the required Bedrock model invocation permission and database connect/read permissions. IAM database authentication needs the matching database role grants.
 5. Install `pip install -r .poc/scope/requirements-aws.txt` and run:
 
        python .poc/scope/run_scope.py --backend aurora --output-dir /tmp/adr-scope-live
