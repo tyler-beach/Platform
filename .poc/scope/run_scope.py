@@ -400,11 +400,12 @@ def main() -> None:
         result = evaluate_event(event, catalog, args.top_k, args.in_scope_threshold, args.review_threshold, args.backend)
         result["gold_adr_ids"] = event.get("gold_adr_ids", [])
         result["gold_disposition"] = event.get("gold_disposition")
+        result["gold_comparison"] = event.get("gold_comparison")
         result["description"] = event.get("description", "")
         results.append(result)
     metrics = metric_summary(results)
     payload = {
-        "schema_version": "adr-scope-simulation-v1.0.0",
+        "schema_version": "adr-scope-comparison-v1.1.0",
         "catalog_hash": results[0]["scope"].get("audit", {}).get("catalog_hash", "") if results else "",
         "metrics": metrics,
         "results": results,
@@ -413,7 +414,7 @@ def main() -> None:
     (out_dir / "scope-report.md").write_text(render_report(results, metrics), encoding="utf-8")
     print(f"Scope simulation complete: {len(results)} scenarios")
     print(f"Expected ADR recall: {fmt(metrics['expected_adr_recall_on_in_scope_cases'])}")
-    print(f"Potential deviation cues: {metrics['potential_deviation_flags']}")
+    print("Comparison outcomes: " + json.dumps(metrics["comparison_counts"], sort_keys=True))
     print(f"Report: {out_dir / 'scope-report.md'}")
 
 
