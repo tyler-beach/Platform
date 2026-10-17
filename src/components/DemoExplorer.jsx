@@ -150,17 +150,13 @@ function RequirementLab() {
 
   useEffect(() => {
     if (!isPlaying) return undefined;
-    const timer = window.setInterval(() => {
-      setActiveStage(current => {
-        if (current >= example.stages.length - 1) {
-          setIsPlaying(false);
-          return current;
-        }
-        return current + 1;
-      });
-    }, 4200);
-    return () => window.clearInterval(timer);
-  }, [isPlaying, example.stages.length]);
+    if (activeStage >= example.stages.length - 1) {
+      setIsPlaying(false);
+      return undefined;
+    }
+    const timer = window.setTimeout(() => setActiveStage(activeStage + 1), 4200);
+    return () => window.clearTimeout(timer);
+  }, [isPlaying, activeStage, example.stages.length]);
 
   function chooseExample(key) {
     setIsPlaying(false);
@@ -219,7 +215,7 @@ function RequirementLab() {
         <div className="journey-rail__note"><ShieldCheck size={15}/><span>Evidence first.<br/>Human decision.</span></div>
       </aside>
 
-      <main className="journey-scene" aria-live="polite">
+      <div className="journey-scene" aria-live="polite">
         <div className="journey-scene__top"><span className="demo-label">STEP {String(activeStage + 1).padStart(2, '0')} · {stepNames[activeStage].toUpperCase()}</span><span className="journey-scene__state"><i/>{isPlaying ? 'PLAYING' : activeStage === 4 ? 'READY FOR REVIEW' : 'GUIDED MODE'}</span></div>
         {activeStage === 0 && <div className="journey-scene__content journey-scene__content--decision">
           <span className="journey-overline">THE ARCHITECTURE DECISION</span>
@@ -269,7 +265,7 @@ function RequirementLab() {
           <div className="journey-controls__left"><span>{activeStage + 1} of {example.stages.length}</span><span className="journey-controls__dots" aria-label={\`Step \${activeStage + 1} of 5\`}>{example.stages.map((item, index) => <i key={item[0]} className={index === activeStage ? 'is-active' : index < activeStage ? 'is-complete' : ''}/>)}</span></div>
           <div className="journey-controls__buttons"><button type="button" className="journey-secondary" disabled={activeStage === 0} onClick={() => goToStage(activeStage - 1)}>Back</button><button type="button" className="journey-next" onClick={() => { if (activeStage === example.stages.length - 1) { setIsPlaying(false); setActiveStage(0); } else goToStage(activeStage + 1); }}>{activeStage === example.stages.length - 1 ? 'Start again' : 'Next step'} <ArrowRight size={15}/></button></div>
         </footer>
-      </main>
+      </div>
     </div>
     <div className="journey-footnote"><span><ShieldCheck size={14}/> Synthetic fixture · no live infrastructure queried</span><span>Illustrative evidence · deterministic PoC · human decides</span></div>
   </section>;
