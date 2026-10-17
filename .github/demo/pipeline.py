@@ -55,7 +55,7 @@ def copy_input(source: Path, target: Path, artifact_id: str, role: str, original
     artifacts.append({
         "artifact_id": artifact_id,
         "role": role,
-        "path": target.as_posix(),
+        "path": target.relative_to(target.parents[1]).as_posix(),
         "original_fixture_path": original,
         "sha256": value,
         "version": "sha256:" + value,
@@ -144,14 +144,16 @@ def parse_requirements(path: Path) -> list[dict[str, Any]]:
     for number, raw in enumerate(lines, 1):
         text = raw.strip()
         if not text:
-            pending_heading = False
             continue
-        if re.match(r"^#{1,4}\s+Requirement\b", text, re.IGNORECASE):
+        if re.match(r"^#{1,4}\\s+Requirement\\b", text, re.IGNORECASE):
             pending_heading = True
             continue
-        has_normative = bool(re.search(r"\b(MUST|MUST NOT|SHALL|SHOULD|MAY)\b", text, re.IGNORECASE))
-        if has_normative or (pending_heading and not text.startswith("#")):
-            clean = re.sub(r"^[-*]\s*", "", text)
+        if text.startswith("#"):
+            pending_heading = False
+            continue
+        has_normative = bool(re.search(r"\\b(MUST|MUST NOT|SHALL|SHOULD|MAY)\\b", text, re.IGNORECASE))
+        if has_normative or pending_heading:
+            clean = re.sub(r"^[-*]\\s*", "", text)
             result.append({
                 "requirement_id": f"SPEC-R-{len(result)+1:03d}",
                 "line": number,
@@ -449,8 +451,33 @@ def validate(args: argparse.Namespace) -> None:
         checks.append({"name": name, "passed": bool(passed), "detail": detail})
 
     check("Evidence IDs are unique", len(evidence_by_id) == len(evidence), "Evidence package IDs must be unique.")
+    source_bytes_match = all(
+        (root / item["path"]).is_file() and digest(root / item["path"]) == item["sha256"]
+        for item in manifest["artifacts"]
+    )
+    check("Pinned source hashes match bundle bytes", source_bytes_match, "The exact downloaded source bytes must match the manifest SHA-256.")
     refs_exist = all(item.get("artifact_id") in source_by_id for item in evidence)
     check("Every evidence item maps to a source artifact", refs_exist, "Artifact IDs must resolve to the pinned input manifest.")
+
+    def locator_resolves(item: dict[str, Any]) -> bool:
+        source_path = root / item.get("source_path", "")
+        if not source_path.is_file():
+            return False
+        lines = source_path.read_text(encoding="utf-8").splitlines()
+        loc = item.get("locator", {})
+        start, end = loc.get("line_start"), loc.get("line_end")
+        if not isinstance(start, int) or not isinstance(end, int) or start < 1 or end < start or end > len(lines):
+            return False
+        excerpt = item.get("excerpt", "").strip()
+        selected = lines[start - 1:end]
+        if loc.get("kind") == "diff-line":
+            parts = [part.strip() for part in excerpt.split(" | ") if part.strip()]
+            available = [line[1:].strip() for line in selected if line.startswith("+") and not line.startswith("+++")]
+            return bool(parts) and all(part in available for part in parts)
+        return bool(excerpt) and any(excerpt in line for line in selected)
+
+    locators_resolve = all(locator_resolves(item) for item in evidence)
+    check("Evidence locators resolve to excerpts", locators_resolve, "Every source locator must resolve to the cited text in the pinned artifact.")
     versions_match = all(
         item.get("artifact_version") == source_by_id.get(item.get("artifact_id"), {}).get("version")
         for item in evidence
