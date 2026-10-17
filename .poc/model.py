@@ -35,6 +35,15 @@ def mock_assess(context: dict[str,Any]) -> dict[str,Any]:
     reachable=[e for e in edges if e.get("reachable_from_entry") and e.get("resolution_status") in {"resolved","resolved_static","resolved_approximate"}]
     names=" ".join(str(e.get("callee_qualified_name",e.get("callee_symbol_id",""))) for e in reachable).lower()
     has_provider_path=any(x in names for x in ("anthropic","provider","assess","complete","generate"))
+    root_ids=set(context.get("graph",{}).get("entry_symbol_ids",[]))
+    entry_provider_edges=[
+        e for e in context.get("graph",{}).get("reachable_edges",[])
+        if e.get("caller_symbol_id") in root_ids
+        and any(x in (str(e.get("callee_qualified_name",""))+" "+str(e.get("call_expression",""))).lower()
+                for x in ("anthropic","provider","assess","complete","generate","invoke"))
+        and e.get("resolution_status") in {"resolved","resolved_static","resolved_approximate"}
+    ]
+    has_entry_provider_call=bool(entry_provider_edges)
     requires_async=any(x in req for x in ("asynchronous","asynchronously","queue","queued","must not block","non-blocking"))
     explicit_sync=any(x in req for x in ("synchronous","synchronously","inline","before returning","blocking"))
     limitations=[]
@@ -54,10 +63,15 @@ def mock_assess(context: dict[str,Any]) -> dict[str,Any]:
                        0 if e.get("evidence_type")=="resolved_call_edge" else 1))
     ids.extend(e["evidence_id"] for e in scored_edges if e.get("evidence_id"))
     ids.extend(e["evidence_id"] for e in evidence_items if e.get("evidence_type")=="diff_line" and e.get("evidence_id"))
-    if requires_async and has_provider_path:
-        outcome="supported_deviation";summary="A reachable provider-shaped call path conflicts with an asynchronous execution requirement."
-        rationale="The requirement states asynchronous/non-blocking behavior, while the reachable call graph contains a provider/assessment call from the selected entry symbol. Treat this as a candidate deviation and inspect the cited edge's resolution basis."
-        confidence=0.72 if not limitations else 0.58
+    if requires_async and has_entry_provider_call:
+        outcome="supported_deviation";summary="The selected entry function directly invokes a provider-shaped assessment method despite an asynchronous/non-blocking requirement."
+        rationale="A resolved call edge originates at the selected request entry and targets a provider/assessment method. The entry path therefore contains a direct provider call instead of only delegating to the expected queue/worker path. Review the exact source excerpt and dispatch basis; the analyzer does not execute the application."
+        confidence=0.78 if not limitations else 0.62
+    elif requires_async and has_provider_path:
+        outcome="potential_deviation";summary="A provider assessment is reachable below the entry point, but the graph does not show a direct entry-to-provider call."
+        rationale="The provider call occurs through another function or worker. The graph alone does not prove that the entry waits for that call or bypasses the required asynchronous boundary."
+        limitations.append("The model did not identify a direct provider call at the selected entry; inspect queue/enqueue boundaries before treating this as a violation.")
+        confidence=0.52
     elif not context.get("graph",{}).get("functions"):
         outcome="inconclusive";summary="No usable function graph was available for this comparison."
         rationale="There is insufficient statically resolved call-path evidence to establish alignment or deviation."
@@ -75,12 +89,14 @@ def mock_assess(context: dict[str,Any]) -> dict[str,Any]:
         rationale="The graph describes observed calls, but a deviation decision requires a normative requirement to compare against."
         limitations.append("No unambiguous synchronous/asynchronous requirement was extracted from the supplied ADR/spec text.");confidence=0.4
     req_candidates=[e for e in normative_items if e.get("evidence_id")]
-    observations=scored_edges or [e for e in evidence_items if e.get("evidence_type")=="diff_line"]
+    entry_edge_ids={e.get("edge_id") for e in entry_provider_edges}
+    entry_observations=[e for e in evidence_items if e.get("edge_id") in entry_edge_ids and e.get("evidence_type")=="resolved_call_edge"]
+    observations=entry_observations or scored_edges or [e for e in evidence_items if e.get("evidence_type")=="diff_line"]
     evidence_links=[]
     if req_candidates and observations:
         req_ev=req_candidates[0]
         obs_ev=observations[0]
-        relationship="contradicts" if outcome=="supported_deviation" else "consistent_with" if outcome=="no_deviation_found" else "uncertain"
+        relationship="contradicts" if outcome=="supported_deviation" and obs_ev in entry_observations else "consistent_with" if outcome=="no_deviation_found" else "uncertain"
         evidence_links=[{
             "requirement_evidence_id":req_ev["evidence_id"],
             "observation_evidence_id":obs_ev["evidence_id"],
@@ -88,7 +104,8 @@ def mock_assess(context: dict[str,Any]) -> dict[str,Any]:
             "explanation":(
                 f"Requirement at {req_ev.get('path')}:{req_ev.get('start_line')} says: {req_ev.get('excerpt')}. "
                 f"Observation at {obs_ev.get('path')}:{obs_ev.get('start_line')} is: {obs_ev.get('claim')} "
-                f"(excerpt: {obs_ev.get('excerpt')}). The relation is {relationship}; inspect the resolution status and limitations before relying on it."
+                f"(excerpt: {obs_ev.get('excerpt')}). The relation is {relationship}. "
+                f"A contradiction is proposed only when the selected entry directly calls the provider; otherwise the relationship remains uncertain."
             )
         }]
     else:
