@@ -6,10 +6,11 @@ from typing import Any
 
 ALGORITHM_VERSION = "evidence-strength-v1.0.0"
 WEIGHTS = {
-    "requirement_clarity": 0.25,
-    "call_path_resolution": 0.30,
-    "evidence_coverage": 0.20,
-    "provenance_integrity": 0.15,
+    "requirement_clarity": 0.20,
+    "call_path_resolution": 0.25,
+    "requirement_observation_linkage": 0.20,
+    "evidence_coverage": 0.15,
+    "provenance_integrity": 0.10,
     "analysis_completeness": 0.10,
 }
 STATUS_WEIGHT = {
@@ -51,6 +52,7 @@ def score_assessment(
     evidence: list[dict[str, Any]],
     artifact_rows: list[dict[str, Any]],
     cited_ids: list[str],
+    evidence_links: list[dict[str, Any]],
     proposed_outcome: str,
 ) -> dict[str, Any]:
     evidence_by_id = {e.get("evidence_id"): e for e in evidence}
@@ -104,8 +106,9 @@ def score_assessment(
         })
     # Score only call paths actually cited as support, not an unrelated resolved edge elsewhere in the repo.
     if path_scores:
-        path_score = max(path_scores)
-        path_explanation = "Based on cited call paths; each path is bounded by its least-certain edge, and the strongest cited path is used."
+        # Multiple cited paths must not hide a weaker path that the model also relies on.
+        path_score = min(path_scores)
+        path_explanation = "Based on cited call paths; each path is bounded by its least-certain edge, and the least-certain cited path sets this component score."
     elif graph.get("entry_resolution") == "resolved" and graph.get("reachable_edges"):
         path_score = 0.38
         path_explanation = "The entry point is resolved, but none of the cited call-edge evidence resolved to an auditable entry-to-edge path."
@@ -134,6 +137,42 @@ def score_assessment(
         coverage_score = min(coverage_score, 0.10)
         coverage_explanation += " Citation integrity failed: duplicate or unknown evidence IDs are present."
 
+    # Require explicit, typed links between a normative requirement and observed behavior.
+    valid_links = []
+    invalid_links = []
+    for link in evidence_links:
+        req_id = link.get("requirement_evidence_id")
+        obs_id = link.get("observation_evidence_id")
+        req_ev = evidence_by_id.get(req_id)
+        obs_ev = evidence_by_id.get(obs_id)
+        relation = link.get("relationship")
+        valid = (
+            req_ev is not None and req_ev.get("evidence_type") == "normative_requirement"
+            and obs_ev is not None and obs_ev.get("evidence_type") in {"resolved_call_edge", "unresolved_call_edge", "diff_line"}
+            and relation in {"contradicts", "consistent_with", "uncertain"}
+            and isinstance(link.get("explanation"), str) and bool(link.get("explanation", "").strip())
+            and req_id in cited_set and obs_id in cited_set
+        )
+        if valid:
+            valid_links.append({**link, "requirement_type": req_ev.get("evidence_type"), "observation_type": obs_ev.get("evidence_type"), "observation_claim": obs_ev.get("claim", "")})
+        else:
+            invalid_links.append({"link": link, "reason": "Link must cite a normative requirement and a call-edge/diff observation, both included in evidence_ids, with a known relationship and explanation."})
+    contradiction_links = [
+        x for x in valid_links
+        if x.get("relationship") == "contradicts"
+        and x.get("observation_type") in {"resolved_call_edge", "diff_line"}
+    ]
+    if contradiction_links:
+        linkage_score = 0.98
+        linkage_explanation = "The model supplied an explicit contradiction link from a cited normative requirement to a cited source observation; the application validated both evidence types and IDs."
+    elif valid_links:
+        linkage_score = 0.65 if any(x.get("relationship") == "uncertain" for x in valid_links) else 0.55
+        linkage_explanation = "Requirement-to-observation links exist, but none explicitly identifies a supported contradiction."
+    else:
+        linkage_score = 0.10
+        linkage_explanation = "No valid explicit link ties a cited normative requirement to the observed behavior."
+    if invalid_links:
+        linkage_explanation += f" {len(invalid_links)} proposed link(s) failed deterministic validation."
     artifact_ids = {str(x.get("artifact_id")) for x in artifact_rows}
     missing_artifacts = [e.get("evidence_id") for e in valid_cites if not e.get("artifact_id") or str(e.get("artifact_id")) not in artifact_ids]
     bad_excerpt_hashes = [
@@ -172,6 +211,9 @@ def score_assessment(
                    {"cited_normative_count": len(cited_normative), "all_normative_count": len(normative), "explicit_execution_constraint": explicit}),
         _component("call_path_resolution", path_score, path_explanation, [e["evidence_id"] for e in cited_edges],
                    {"cited_paths": path_details}),
+        _component("requirement_observation_linkage", linkage_score, linkage_explanation,
+                   list(dict.fromkeys([x.get("requirement_evidence_id", "") for x in valid_links] + [x.get("observation_evidence_id", "") for x in valid_links])),
+                   {"validated_links": valid_links, "invalid_links": invalid_links, "contradiction_link_count": len(contradiction_links)}),
         _component("evidence_coverage", coverage_score, coverage_explanation, [e["evidence_id"] for e in valid_cites],
                    {"covers_normative_requirement": bool(cited_normative), "covers_call_edge": has_call_support, "covers_diff": has_diff_support, "citation_ids_valid": cites_valid}),
         _component("provenance_integrity", provenance_score, provenance_explanation, [e["evidence_id"] for e in valid_cites],
@@ -190,9 +232,9 @@ def score_assessment(
     if not cites_valid or missing_artifacts or bad_excerpt_hashes:
         raw_score = min(raw_score, 0.39)
         caps.append("Citation/provenance validation failed: score capped at 0.39.")
-    if proposed_outcome == "supported_deviation" and not (cited_normative and has_call_support):
+    if proposed_outcome == "supported_deviation" and not (cited_normative and has_call_support and contradiction_links):
         raw_score = min(raw_score, 0.49)
-        caps.append("A supported-deviation claim must cite both normative and call-edge evidence: score capped at 0.49.")
+        caps.append("A supported-deviation claim must cite a normative requirement, observed behavior, and a validated contradiction link: score capped at 0.49.")
     score = round(clamp(raw_score), 4)
     band = next(label for threshold, label in BANDS if score >= threshold)
     accepted_outcome = proposed_outcome
@@ -204,6 +246,9 @@ def score_assessment(
         elif not cited_normative or not cited_edges:
             accepted_outcome = "potential_deviation"
             guardrails.append("Downgraded to potential_deviation: candidate did not cite both the requirement and a call-graph edge.")
+        elif not contradiction_links:
+            accepted_outcome = "potential_deviation"
+            guardrails.append("Downgraded to potential_deviation: no validated relationship explicitly links the requirement to contradictory behavior.")
         elif not path_scores or path_score < 0.50 or score < 0.60:
             accepted_outcome = "potential_deviation"
             guardrails.append("Downgraded to potential_deviation: call-path/provenance/completeness evidence is below the minimum support threshold.")
@@ -222,5 +267,7 @@ def score_assessment(
         "caps": caps,
         "guardrails": guardrails,
         "model_self_reported_confidence": None,
+        "evidence_links": valid_links,
+        "invalid_evidence_links": invalid_links,
         "principle": "Evidence-strength score is a deterministic, explainable support rating, not a probability that the finding is true. Model confidence is recorded separately and does not increase this score.",
     }
