@@ -16,9 +16,9 @@ test('public application is React/Vite with first-class Architecture and Demo ro
   assert.match(build, /outDir:\s*'site'/);
   assert.match(app, /path="\/architecture\/\*"/);
   assert.match(app, /path="\/demo\/\*"/);
-  assert.match(app, /Architecture, made inspectable/);
   assert.match(app, /Understand the system/);
-  assert.match(app, /See evidence in motion/);
+  assert.match(app, /Keep decisions on the/);
+  assert.match(app, /Follow a paved path/);
   assert.match(demo, /demo-gallery-list/);
   assert.match(demo, /demo-stages/);
   assert.match(demo, /demo-run-list/);

@@ -18,15 +18,15 @@ import {
 } from './content.js';
 import DemoExplorer from './components/DemoExplorer.jsx';
 
-const BRAND = 'ADR Platform';
+const BRAND = 'Pathfinder';
 const repository = document.querySelector('meta[name="adr-repository"]')?.content || 'tyler-beach/Platform';
 const repo = `https://github.com/${repository}`;
 const pageAsset = (relative) => `${BASE_URL}${relative.replace(/^\//, '')}`;
 
 function Logo({ compact = false }) {
   return <Link className="brand" to="/" aria-label={`${BRAND} home`}>
-    <img src={pageAsset('content/assets/brand-mark.svg')} alt="" />
-    {!compact && <span><strong>ADR Platform</strong><small>Architecture intelligence</small></span>}
+    <img src={pageAsset('content/assets/pathfinder-mark.svg')} alt="" />
+    {!compact && <span><strong>Pathfinder</strong><small>From intent to reality</small></span>}
   </Link>;
 }
 
@@ -60,10 +60,10 @@ function Home() {
     <div className="home-page">
       <section className="hero-grid">
         <div className="hero-copy">
-          <div className="eyebrow"><span className="eyebrow-dot" /> ARCHITECTURE · EVIDENCE · GOVERNANCE</div>
-          <h1>Make architectural drift <em>visible.</em></h1>
-          <p className="hero-lede">Connect decisions, technical specifications, and code changes. Find potential divergence with source-linked evidence and a clear audit trail.</p>
-          <div className="hero-actions"><Link className="button button--light" to="/architecture">Explore the architecture <ArrowRight size={16} /></Link><Link className="button button--outline" to="/demo"><Workflow size={16} /> Open workflow demo</Link></div>
+          <div className="eyebrow"><span className="eyebrow-dot" /> PATHFINDER · ARCHITECTURE ASSURANCE</div>
+          <h1>Keep decisions on the <em>paved path.</em></h1>
+          <p className="hero-lede">Pathfinder connects architecture decisions to specs and code changes, then shows where implementation may have left the paved path—with evidence you can inspect and a person in control of the call.</p>
+          <div className="hero-actions"><Link className="button button--light" to="/demo"><Workflow size={16} /> Follow a paved path <ArrowRight size={16} /></Link><Link className="button button--outline" to="/architecture">Explore the architecture</Link></div>
           <div className="hero-proof"><span><Check size={14} /> Version-bound evidence</span><span><Check size={14} /> Human-governed findings</span><span><Check size={14} /> Auditable workflows</span></div>
         </div>
         <PipelineCanvas />
@@ -78,7 +78,7 @@ function Home() {
             <div className="experience-art experience-art--docs" aria-hidden="true"><span /><span /><span /><i /><i /></div>
           </Link>
           <Link className="experience-card experience-card--demo" to="/demo">
-            <div className="experience-icon"><Workflow size={21} /></div><span className="experience-index">02 / WORKFLOW DEMO</span><h3>See evidence in motion</h3><p>Compare synthetic scenarios, step through a run, inspect citations, and browse prior workflow attempts.</p><span className="experience-card__link">Open the run explorer <ArrowRight size={16} /></span>
+            <div className="experience-icon"><Workflow size={21} /></div><span className="experience-index">02 / PATHFINDER WALKTHROUGH</span><h3>Follow the paved path</h3><p>See a decision checked against implementation evidence, explore what is known and missing, and make the review call yourself.</p><span className="experience-card__link">Start an investigation <ArrowRight size={16} /></span>
             <div className="experience-art experience-art--demo" aria-hidden="true"><span /><span /><span /><b /><b /></div>
           </Link>
         </div>
