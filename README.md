@@ -18,14 +18,15 @@ The documentation source is in the docs folder and is built with MkDocs Material
 - [Engineering playbook](https://tyler-beach.github.io/Platform/ENGINEERING_PLAYBOOK/)
 - [Adversarial design review](https://tyler-beach.github.io/Platform/ADVERSARIAL_DESIGN_REVIEW/)
 - [Architecture diagrams](https://tyler-beach.github.io/Platform/architecture/)
-- [Functional analysis demo (GitHub Actions)](https://github.com/tyler-beach/Platform/actions/workflows/functional-analysis-demo.yml)
+- [PoC analysis workflow (GitHub Actions)](https://github.com/tyler-beach/Platform/actions/workflows/poc-analysis.yml)
+- [Executable semantic-analysis PoC](https://tyler-beach.github.io/Platform/EXECUTABLE_POC/)
 
 The Pages URL is expected but will not be live until GitHub Actions deploys the site and repository Pages settings allow workflow-based deployment. The REST/OpenAPI document is a proposed façade, not a claim of a deployed HTTP server.
 
 ## Start here in the repository
 
 - [Project brief](docs/PROJECT_BRIEF.md)
-- [Architecture overview](docs/ARCHITECTURE.md)
+- [Architecture overview](docs/architecture-overview.md)
 - [gRPC and Protobuf design](docs/RPC_AND_PROTOBUF.md)
 - [AI pipeline and harness](docs/AI_PIPELINE.md)
 - [Adversarial design review](docs/ADVERSARIAL_DESIGN_REVIEW.md)
@@ -95,7 +96,7 @@ Code changes and plain-English technical specifications are both first-class inp
 
 ## Status
 
-Design baseline / planning repository. Protobuf schema and Buf configuration are design artifacts; this repository does not yet contain the production gRPC server, generated Go code, deployed infrastructure, or a validated end-to-end pipeline. OpenSpec validation, Protobuf lint/build, OpenAPI lint and the MkDocs site build still need to be run after these documentation changes.
+Design baseline plus runnable GitHub Actions PoC. The PoC runs deterministic code or YAML/JSON configuration analysis, writes an auditable CSV ledger and run bundle, and provides an interactive Pages walkthrough. It does not provide the proposed production gRPC server, generated Go clients, deployed AWS infrastructure, or a production Step Functions workflow. Pull requests run the deterministic tests, language-validation matrix, OpenAPI validation, OpenSpec validation, labeled fixture evaluation, and strict documentation build; Pages deployment occurs only on eligible default-branch runs.
 
 ## Guiding rule
 

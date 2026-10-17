@@ -1,0 +1,1 @@
+ADR chunks and applicability metadata are stored in Aurora PostgreSQL with pgvector. Retrieval combines vector similarity with hard filters for status, repository, service, and validity; every result preserves ADR version and source provenance.

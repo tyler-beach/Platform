@@ -1,0 +1,6 @@
+diff --git a/handler.go b/handler.go
+--- a/handler.go
++++ b/handler.go
+@@
+- return enqueueAssessment(ctx, req)
++ return h.Provider.Assess(ctx, req)
