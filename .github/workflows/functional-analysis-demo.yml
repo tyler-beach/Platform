@@ -1,5 +1,5 @@
 name: Functional Analysis Demo
-run-name: Functional Analysis Demo / ${{ inputs.comparison }} / ${{ inputs.sample_case }}
+run-name: Functional Analysis Demo / ${{ inputs.comparison }} / ${{ inputs.language }} / ${{ inputs.sample_case }}
 
 on:
   workflow_dispatch:
@@ -13,6 +13,17 @@ on:
           - code-diff
           - technical-spec
           - spec-vs-implementation
+      language:
+        description: "Choose the source language for code comparisons"
+        required: true
+        type: choice
+        default: go
+        options:
+          - go
+          - python
+          - javascript
+          - typescript
+          - java
       sample_case:
         description: "Choose the synthetic outcome to exercise"
         required: true
@@ -42,6 +53,7 @@ jobs:
           python .github/demo/pipeline.py prepare \
             --comparison "${{ inputs.comparison }}" \
             --sample-case "${{ inputs.sample_case }}" \
+            --language "${{ inputs.language }}" \
             --run-id "${{ github.run_id }}" \
             --output run-data
       - name: Upload pinned input bundle
@@ -63,17 +75,21 @@ jobs:
         with:
           name: demo-inputs-${{ github.run_id }}-${{ github.run_attempt }}
           path: run-data/
-      - name: Set up Go for AST analysis
+      - name: Set up Python for Tree-sitter
         if: ${{ inputs.comparison != 'technical-spec' }}
-        uses: actions/setup-go@v5
+        uses: actions/setup-python@v5
         with:
-          go-version: "1.25.x"
-          cache: false
-      - name: Parse Go source with go/parser and go/ast
+          python-version: "3.12"
+      - name: Install Tree-sitter language pack
+        if: ${{ inputs.comparison != 'technical-spec' }}
+        run: python -m pip install -r .github/demo/requirements.txt
+      - name: Parse selected source with Tree-sitter
         if: ${{ inputs.comparison != 'technical-spec' }}
         run: |
-          go run .github/demo/ast_scan.go \
-            --source run-data/input/handler.go \
+          SOURCE_PATH="$(python -c 'import json; m=json.load(open("run-data/input-manifest.json")); print(next(a["path"] for a in m["artifacts"] if a["role"] == "implementation"))')"
+          python .github/demo/ast_scan.py \
+            --language "${{ inputs.language }}" \
+            --source "run-data/$SOURCE_PATH" \
             --out run-data/ast-analysis.json
       - name: Explain why AST is not applicable
         if: ${{ inputs.comparison == 'technical-spec' }}
