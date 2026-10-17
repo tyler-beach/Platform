@@ -20,6 +20,10 @@
   const CONCLUSIONS = new Set(["success", "failure", "neutral", "cancelled", "skipped", "timed_out", "action_required"]);
   const STEP_STATES = new Set(["queued", "in_progress", "completed"]);
   const MAX_RUNS = 10;
+  const GALLERY_MODES = ["code-diff", "technical-spec", "spec-vs-implementation"];
+  const GALLERY_CASES = ["deviation", "aligned", "insufficient-evidence"];
+  const GALLERY_OUTCOMES = { deviation: "supported_deviation", aligned: "no_deviation_found", "insufficient-evidence": "inconclusive" };
+  const GALLERY_ROLES = new Set(["adr", "technical_spec", "implementation", "diff"]);
 
   function plain(value, limit) {
     return typeof value === "string" ? value.slice(0, limit || 180) : "";
@@ -170,6 +174,131 @@
     return null;
   }
 
+  function normalizeScenarioGallery(value) {
+    if (!value || value.schema_version !== "adr-synthetic-gallery-v1" ||
+        value.source !== "checked-in synthetic Functional Analysis fixtures" ||
+        typeof value.repository !== "string" || !/^[A-Za-z0-9-]{1,39}\/[A-Za-z0-9_.-]{1,100}$/.test(value.repository) ||
+        !Number.isSafeInteger(value.scenario_count) || value.scenario_count < 9 || value.scenario_count > 19 ||
+        !Array.isArray(value.scenarios) || value.scenarios.length !== value.scenario_count ||
+        !value.live_import || typeof value.live_import.enabled !== "boolean" ||
+        !["eligible_runs", "imported", "rejected", "expired"].every(key => Number.isSafeInteger(value.live_import[key]) && value.live_import[key] >= 0 && value.live_import[key] <= 500)) {
+      throw new Error("Synthetic scenario catalog is malformed or unsupported.");
+    }
+    const expected = new Set(GALLERY_MODES.flatMap(mode => GALLERY_CASES.map(sample => `${mode}--${sample}`)));
+    const seen = new Set();
+    const scenarios = value.scenarios.map(scenario => {
+      const isCurated = scenario && expected.has(scenario.id) && scenario.record_type === "curated_fixture";
+      const isLive = scenario && scenario.record_type === "workflow_run" && /^live-[1-9][0-9]*-[1-9][0-9]*$/.test(scenario.id || "");
+      if (!scenario || typeof scenario !== "object" || (!isCurated && !isLive) || seen.has(scenario.id) ||
+          !GALLERY_MODES.includes(scenario.comparison) || !GALLERY_CASES.includes(scenario.sample_case) ||
+          (isCurated && scenario.id !== `${scenario.comparison}--${scenario.sample_case}`) ||
+          scenario.outcome !== GALLERY_OUTCOMES[scenario.sample_case] || scenario.validation_status !== "passed" ||
+          typeof scenario.rationale !== "string" || scenario.rationale.length > 1200 ||
+          !Array.isArray(scenario.limitations) || scenario.limitations.length > 10 || scenario.limitations.some(item => typeof item !== "string" || item.length > 500) ||
+          !Array.isArray(scenario.artifacts) || scenario.artifacts.length < 2 || scenario.artifacts.length > 4 ||
+          !Array.isArray(scenario.evidence) || scenario.evidence.length < 1 || scenario.evidence.length > 100 ||
+          !Array.isArray(scenario.stages) || scenario.stages.length !== 6 ||
+          !Array.isArray(scenario.validation_checks) || scenario.validation_checks.length < 1 || scenario.validation_checks.length > 20 ||
+          !Array.isArray(scenario.requirements) || scenario.requirements.length > 50 ||
+          !Array.isArray(scenario.observations) || scenario.observations.length > 50) {
+        throw new Error("Synthetic scenario record failed its shape or outcome checks.");
+      }
+      if (isLive && (!positiveId(scenario.run_id) || !positiveId(scenario.run_attempt) ||
+          scenario.id !== `live-${scenario.run_id}-${scenario.run_attempt}` || !positiveId(scenario.workflow_id) ||
+          typeof scenario.workflow_sha !== "string" || !/^[a-f0-9]{40}$/i.test(scenario.workflow_sha) ||
+          typeof scenario.artifact_sha256 !== "string" || !/^sha256:[a-f0-9]{64}$/.test(scenario.artifact_sha256) ||
+          typeof scenario.artifact_name !== "string" || scenario.artifact_name !== `functional-analysis-demo-${scenario.run_id}-${scenario.run_attempt}` ||
+          !safeRunUrl(scenario.run_url, scenario.run_id, safeRepository(value.repository)))) {
+        throw new Error("Live workflow artifact identity or provenance is malformed.");
+      }
+      seen.add(scenario.id);
+      const roles = new Set();
+      const artifactByRole = new Map();
+      scenario.artifacts.forEach(item => {
+        if (!item || !GALLERY_ROLES.has(item.role) || roles.has(item.role) ||
+            typeof item.path !== "string" || !/^\.github\/demo\/fixtures\/[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*$/.test(item.path) ||
+            typeof item.sha256 !== "string" || !/^[a-f0-9]{64}$/.test(item.sha256) ||
+            !Number.isSafeInteger(item.byte_length) || item.byte_length < 0 || item.byte_length > 32768 ||
+            typeof item.text !== "string" || new TextEncoder().encode(item.text).length !== item.byte_length || item.text.length > 32768) {
+          throw new Error("Synthetic scenario input failed its path, size, or digest metadata checks.");
+        }
+        roles.add(item.role);
+        artifactByRole.set(item.role, item);
+      });
+      const wanted = scenario.comparison === "code-diff" ? ["adr", "implementation", "diff"]
+        : scenario.comparison === "technical-spec" ? ["adr", "technical_spec"]
+        : ["adr", "technical_spec", "implementation", "diff"];
+      if (roles.size !== wanted.length || wanted.some(role => !roles.has(role))) throw new Error("Synthetic scenario inputs do not match the selected comparison.");
+      const expectedPaths = { adr: ".github/demo/fixtures/adr/ADR-001.md" };
+      if (scenario.comparison !== "technical-spec") {
+        const extensions = { go: ".go", python: ".py", javascript: ".js", typescript: ".ts", java: ".java" };
+        if (!extensions[scenario.language]) throw new Error("Synthetic scenario language is not supported.");
+        const base = `.github/demo/fixtures/code-diff/${scenario.sample_case}/${scenario.language}`;
+        expectedPaths.implementation = `${base}/handler${extensions[scenario.language]}`;
+        expectedPaths.diff = `${base}/change.diff`;
+      }
+      if (scenario.comparison === "technical-spec") expectedPaths.technical_spec = `.github/demo/fixtures/technical-spec/${scenario.sample_case}.md`;
+      if (scenario.comparison === "spec-vs-implementation") expectedPaths.technical_spec = ".github/demo/fixtures/technical-spec/aligned.md";
+      if (scenario.artifacts.some(item => item.path !== expectedPaths[item.role])) throw new Error("Synthetic scenario source path does not match its selected fixture case.");
+      const evidenceIds = new Set();
+      scenario.evidence.forEach(item => {
+        if (!item || typeof item.evidence_id !== "string" || !/^EV-[A-Z0-9-]{1,48}$/.test(item.evidence_id) ||
+            evidenceIds.has(item.evidence_id) || !roles.has(item.role) || item.path !== artifactByRole.get(item.role).path ||
+            !Number.isSafeInteger(item.line_start) || item.line_start < 1 ||
+            !Number.isSafeInteger(item.line_end) || item.line_end < item.line_start ||
+            typeof item.fact !== "string" || item.fact.length > 1000 || typeof item.excerpt !== "string" || item.excerpt.length > 2000) {
+          throw new Error("Synthetic scenario evidence reference is malformed.");
+        }
+        evidenceIds.add(item.evidence_id);
+      });
+      scenario.stages.forEach(stage => {
+        if (!stage || typeof stage.title !== "string" || typeof stage.summary !== "string" || stage.status !== "passed") {
+          throw new Error("Synthetic scenario stage summary is malformed.");
+        }
+      });
+      scenario.validation_checks.forEach(check => {
+        if (!check || typeof check.name !== "string" || typeof check.passed !== "boolean" || !check.passed) {
+          throw new Error("Synthetic scenario contains an invalid or failed validation check.");
+        }
+      });
+      scenario.requirements.concat(scenario.observations).forEach(item => {
+        if (!item || !Number.isSafeInteger(item.line) || item.line < 1 || typeof item.classification !== "string" ||
+            typeof (item.text === undefined ? item.expression : item.text) !== "string") {
+          throw new Error("Synthetic scenario analysis observation is malformed.");
+        }
+      });
+      return scenario;
+    });
+    if (Array.from(expected).some(id => !seen.has(id)) || value.live_import.imported !== scenarios.filter(item => item.record_type === "workflow_run").length ||
+        value.live_import.imported > 10 || value.live_import.eligible_runs > 10) {
+      throw new Error("Synthetic scenario catalog does not contain the complete fixture matrix or consistent live artifact counts.");
+    }
+    return scenarios;
+  }
+
+  function galleryArtifactOrder(comparison, artifacts) {
+    const roles = new Set(artifacts.map(item => item.role));
+    const order = comparison === "spec-vs-implementation"
+      ? ["technical_spec", "implementation", "adr", "diff"]
+      : ["adr", "technical_spec", "implementation", "diff"];
+    return order.filter(role => roles.has(role));
+  }
+
+  function galleryArtifactNode(doc, artifact) {
+    const make = (tag, className, text) => {
+      const node = doc.createElement(tag);
+      if (className) node.className = className;
+      node.textContent = String(text == null ? "" : text);
+      return node;
+    };
+    const card = make("article", "demo-gallery-input");
+    card.appendChild(make("span", "demo-eyebrow", artifact.role.replaceAll("_", " ")));
+    card.appendChild(make("code", "demo-source-ref", artifact.path));
+    card.appendChild(make("small", "demo-gallery-digest", `SHA-256 ${artifact.sha256} · ${artifact.byte_length} bytes`));
+    card.appendChild(make("pre", "demo-excerpt demo-gallery-source", artifact.text));
+    return card;
+  }
+
   function normalizeJobs(rawJobs, repository = `${OWNER}/${REPOSITORY}`) {
     if (!Array.isArray(rawJobs)) return [];
     return rawJobs.filter((job) => job && positiveId(job.id) && typeof job.name === "string" &&
@@ -294,7 +423,7 @@
     return item.conclusion || item.status || "unknown";
   }
 
-  const core = { normalizeRuns, normalizeLedgerRuns, normalizeJobs, historyProjection, evidenceForFinding, fetchSiteJson, fetchWorkflowRuns, fetchRunJobs, safeRunUrl, formatDate, statusText, workflows: WORKFLOWS };
+  const core = { normalizeRuns, normalizeLedgerRuns, normalizeJobs, historyProjection, normalizeScenarioGallery, galleryArtifactOrder, galleryArtifactNode, evidenceForFinding, fetchSiteJson, fetchWorkflowRuns, fetchRunJobs, safeRunUrl, formatDate, statusText, workflows: WORKFLOWS };
   root.ADRDemoCore = core;
 
   function init() {
@@ -308,6 +437,82 @@
       if (text != null) node.textContent = String(text);
       return node;
     };
+    function renderGallery(scenarios, selectedId) {
+      const buttons = byId("demo-gallery-list");
+      const inputs = byId("demo-gallery-inputs");
+      const selected = scenarios.find(item => item.id === selectedId) || scenarios.find(item => item.id === "spec-vs-implementation--deviation") || scenarios[0];
+      buttons.replaceChildren();
+      scenarios.forEach(item => {
+        const label = item.record_type === "workflow_run" ? `Actual run #${item.run_id} · attempt ${item.run_attempt}`
+          : `${item.comparison.replaceAll("-", " ")} · ${item.sample_case.replaceAll("-", " ")}`;
+        const button = el("button", "demo-gallery-choice", label);
+        button.type = "button";
+        button.setAttribute("aria-pressed", String(item.id === selected.id));
+        button.addEventListener("click", () => renderGallery(scenarios, item.id));
+        button.appendChild(el("span", "demo-gallery-choice__outcome", item.outcome.replaceAll("_", " ")));
+        buttons.appendChild(button);
+      });
+      setText("demo-gallery-selected-title", selected.record_type === "workflow_run"
+        ? `Actual workflow run #${selected.run_id} · attempt ${selected.run_attempt}`
+        : `${selected.comparison.replaceAll("-", " ")} · ${selected.sample_case.replaceAll("-", " ")}`);
+      setText("demo-gallery-selected-meta", selected.record_type === "workflow_run"
+        ? `${selected.comparison} · ${selected.language} · updated ${formatDate(selected.updated_at)} · workflow SHA ${selected.workflow_sha.slice(0, 12)} · artifact ${selected.artifact_id} (${selected.artifact_name}) · ${selected.artifact_sha256}`
+        : `${selected.language} · ${selected.artifacts.length} pinned synthetic inputs · deterministic mock`);
+      setText("demo-gallery-selected-outcome", selected.outcome.replaceAll("_", " "));
+      setText("demo-gallery-rationale", `${selected.rationale}${selected.limitations.length ? ` Limitations: ${selected.limitations.join(" ")}` : ""}`);
+      const byRole = new Map(selected.artifacts.map(item => [item.role, item]));
+      inputs.replaceChildren();
+      galleryArtifactOrder(selected.comparison, selected.artifacts).forEach(role => inputs.appendChild(galleryArtifactNode(doc, byRole.get(role))));
+      const runLink = byId("demo-gallery-run-link");
+      runLink.replaceChildren();
+      if (selected.record_type === "workflow_run") {
+        const link = el("a", "md-button", `Open Functional Analysis run #${selected.run_id}`);
+        link.href = selected.run_url;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        runLink.appendChild(link);
+      }
+      const stageList = byId("demo-gallery-stages");
+      stageList.replaceChildren();
+      selected.stages.forEach(stage => stageList.appendChild(el("li", "", `${stage.title} — ${stage.status}: ${stage.summary}`)));
+      const requirementList = byId("demo-gallery-requirements");
+      requirementList.replaceChildren();
+      if (selected.requirements.length) selected.requirements.forEach(item => requirementList.appendChild(el("li", "", `Line ${item.line} · ${item.classification}: ${item.text}`)));
+      else requirementList.appendChild(el("li", "demo-muted", "No technical-spec requirement was part of this comparison."));
+      const observationList = byId("demo-gallery-observations");
+      observationList.replaceChildren();
+      if (selected.observations.length) selected.observations.forEach(item => observationList.appendChild(el("li", "", `Line ${item.line} · ${item.classification}: ${item.expression}`)));
+      else observationList.appendChild(el("li", "demo-muted", "No code observation was part of this comparison."));
+      const evidenceList = byId("demo-gallery-evidence");
+      evidenceList.replaceChildren();
+      selected.evidence.forEach(item => {
+        const card = el("article", "demo-evidence-card");
+        card.appendChild(el("span", "demo-eyebrow", `${item.evidence_id} · ${item.type.replaceAll("_", " ")}`));
+        card.appendChild(el("h4", "", item.fact));
+        card.appendChild(el("code", "demo-source-ref", `${item.path}:${item.line_start}-${item.line_end} · ${item.role}`));
+        card.appendChild(el("pre", "demo-excerpt", item.excerpt));
+        evidenceList.appendChild(card);
+      });
+      const checks = byId("demo-gallery-checks");
+      checks.replaceChildren();
+      selected.validation_checks.forEach(item => checks.appendChild(el("li", "", `PASS · ${item.name}`)));
+    }
+
+    async function loadGallery() {
+      const status = byId("demo-gallery-status");
+      try {
+        const data = await fetchSiteJson(root.fetch.bind(root), "data/scenario-gallery.json", root.location.origin);
+        const scenarios = normalizeScenarioGallery(data);
+        renderGallery(scenarios);
+        const live = scenarios.filter(item => item.record_type === "workflow_run").length;
+        const rejected = data.live_import.rejected + data.live_import.expired;
+        setText("demo-gallery-status", `Loaded 9 curated synthetic scenarios and ${live} validated Functional Analysis workflow artifacts.${rejected ? ` ${rejected} expired or rejected artifact(s) were excluded.` : ""} The live entries are recent workflow attempts, not an unbounded archive.`);
+      } catch (error) {
+        setText("demo-gallery-status", `${error.message} The separate synthetic walkthrough remains available.`);
+        byId("demo-gallery-list").replaceChildren();
+        byId("demo-gallery-inputs").replaceChildren();
+      }
+    }
     const addLink = (parent, href, text) => {
       const link = el("a", "demo-link", text);
       link.href = href;
@@ -633,6 +838,7 @@
     });
     byId("demo-pause").addEventListener("click", stopPlayback);
     byId("demo-reload-history").addEventListener("click", loadHistory);
+    loadGallery();
     const workflows = workflowDefinitions(`${OWNER}/${REPOSITORY}`);
     byId("demo-open-analysis").href = workflows[0].launch;
     byId("demo-open-evaluation").href = workflows[1].launch;

@@ -18,8 +18,37 @@ hide:
 
 <div class="demo-trust-note" role="note">
   <strong>Two kinds of data appear here.</strong>
-  <span>The walkthrough is regenerated from checked-in synthetic fixtures with offline mock providers. On internal Pages, <code>PAGES_ACTIONS_HISTORY_ENABLED</code> controls bounded run/job/step history; the separate <code>PAGES_REAL_RUN_DATA_ENABLED</code> switch controls detailed audit rows. Functional Analysis runs are reconciled from validated Actions artifacts into an additive CSV ledger table. The deterministic fixture oracle is not confidence, so its confidence is explicitly unavailable. Pages publishes allowlisted provenance and evidence locations, never prompts, credentials, provider payloads, raw workflow bundles, or source excerpts.</span>
+  <span>The gallery and walkthrough use synthetic fixtures and the offline mock provider. It includes nine curated scenarios plus up to ten recent successful default-branch Functional Analysis workflow artifacts from the 13-day recovery window. The live artifacts are checked against their run identity, bundle digest, input hashes, evidence, and expected synthetic fixture paths before their inputs appear here. Actions job history and CSV ledger export remain separately controlled by their existing settings. Nothing here is a calibrated confidence or model quality claim.</span>
 </div>
+
+<section class="demo-section demo-gallery" aria-labelledby="demo-gallery-heading">
+  <div class="demo-section-heading">
+    <div><span class="demo-eyebrow">SYNTHETIC SCENARIO LIBRARY</span><h2 id="demo-gallery-heading">Compare the spec, code, and diff</h2></div>
+    <span class="demo-pill">9 validated fixture scenarios</span>
+  </div>
+  <p id="demo-gallery-status" class="demo-muted" role="status" aria-live="polite">Loading the offline synthetic scenario catalog…</p>
+  <nav id="demo-gallery-list" class="demo-gallery-choices" aria-label="Synthetic comparison scenarios"></nav>
+  <article class="demo-gallery-detail" aria-live="polite">
+    <div class="demo-gallery-detail__heading">
+      <div><span class="demo-eyebrow">SELECTED SYNTHETIC RUN</span><h3 id="demo-gallery-selected-title">Loading scenario</h3><p id="demo-gallery-selected-meta" class="demo-muted"></p></div>
+      <span id="demo-gallery-selected-outcome" class="demo-outcome">Loading</span>
+    </div>
+    <p id="demo-gallery-run-link"></p>
+    <p id="demo-gallery-rationale"></p>
+    <h4>Exact inputs</h4>
+    <p class="demo-muted">Every pane is the input used by the deterministic workflow. Source hashes identify the precise fixture bytes.</p>
+    <div id="demo-gallery-inputs" class="demo-gallery-inputs"></div>
+    <div class="demo-gallery-output-grid">
+      <details class="demo-disclosure" open><summary>Requirements extracted</summary><ul id="demo-gallery-requirements" class="demo-gallery-stage-list"></ul></details>
+      <details class="demo-disclosure" open><summary>Code observations</summary><ul id="demo-gallery-observations" class="demo-gallery-stage-list"></ul></details>
+    </div>
+    <div class="demo-gallery-output-grid">
+      <details class="demo-disclosure" open><summary>Workflow stages</summary><ol id="demo-gallery-stages" class="demo-gallery-stage-list"></ol></details>
+      <details class="demo-disclosure"><summary>Validated checks</summary><ul id="demo-gallery-checks" class="demo-gallery-stage-list"></ul></details>
+    </div>
+    <details class="demo-disclosure"><summary>Evidence references</summary><div id="demo-gallery-evidence" class="demo-evidence-grid"></div></details>
+  </article>
+</section>
 
 <section class="demo-section" aria-labelledby="demo-walkthrough-heading">
   <div class="demo-section-heading">
@@ -105,7 +134,7 @@ hide:
     <li>For infrastructure or other declarative YAML/JSON inputs, choose <code>none</code> as the language and set <code>config_source</code>. Unsupported formats are reported as incomplete coverage, not as compliance.</li>
     <li>Open the run's job summary and download the <code>adr-deviation-poc-…</code> artifact. Inspect <code>report.md</code>, <code>confidence.json</code>, <code>evidence.json</code>, <code>observations.json</code>, and the CSV tables.</li>
     <li>Use <a id="demo-guide-evaluation" href="#">ADR Deviation Labeled Evaluation</a> to run deterministic regression cases and the 50-ADR extraction/coverage audit.</li>
-    <li>Use <a id="demo-guide-functional" href="#">Functional Analysis Demo</a> to compare the Tree-sitter and document-analysis workflow across languages and outcomes.</li>
+    <li>Use <a id="demo-guide-functional" href="#">Functional Analysis Demo</a> to compare the Tree-sitter and document-analysis workflow across languages and outcomes. Successful default-branch runs appear in the scenario gallery after the Pages build validates their artifacts; the gallery retains up to ten recent attempts within the 13-day artifact recovery window.</li>
   </ol>
   <p><strong>Scope boundary:</strong> these are repository-hosted demonstrators, not the proposed Step Functions/AWS production service. The synthetic corpus is not independently adjudicated; mock evaluation does not measure model quality. Anthropic mode requires repository secrets and provider-data approval.</p>
 </section>

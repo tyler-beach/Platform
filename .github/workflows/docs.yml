@@ -7,6 +7,7 @@ on:
       - "mkdocs.yml"
       - "docs-requirements.txt"
       - ".poc/**"
+      - ".github/demo/**"
       - ".github/workflows/poc-analysis.yml"
       - ".github/workflows/poc-evaluation.yml"
       - ".github/workflows/functional-analysis-demo.yml"
@@ -21,6 +22,7 @@ on:
       - "mkdocs.yml"
       - "docs-requirements.txt"
       - ".poc/**"
+      - ".github/demo/**"
       - ".github/workflows/poc-analysis.yml"
       - ".github/workflows/poc-evaluation.yml"
       - ".github/workflows/functional-analysis-demo.yml"
@@ -126,6 +128,33 @@ jobs:
           assert data["stages"] and data["evidence"] and data["confidence"]["components"]
           assert "not a calibrated probability" in data["confidence"]["interpretation"].lower()
           print(f"Validated generated demo walkthrough ({len(data['stages'])} stages, {len(data['evidence'])} evidence items).")
+          PY
+      - name: Generate and validate the synthetic scenario gallery
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          live_args=()
+          if [[ "$GITHUB_EVENT_NAME" != "pull_request" ]]; then
+            live_args+=(--include-live)
+          fi
+          python .github/demo/build_scenario_gallery.py --repository-root . --repository "$GITHUB_REPOSITORY" --output site/demo/data/scenario-gallery.json "${live_args[@]}"
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          catalog_path = Path("site/demo/data/scenario-gallery.json")
+          catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+          expected = {f"{mode}--{sample}" for mode in ("code-diff", "technical-spec", "spec-vs-implementation")
+                      for sample in ("deviation", "aligned", "insufficient-evidence")}
+          actual = {item["id"] for item in catalog["scenarios"]}
+          assert catalog["schema_version"] == "adr-synthetic-gallery-v1"
+          assert catalog["scenario_count"] == len(catalog["scenarios"]) and expected <= actual
+          assert len(actual) <= 19
+          assert catalog["live_import"]["imported"] == len(actual - expected)
+          assert all(item["validation_status"] == "passed" and all(check["passed"] for check in item["validation_checks"])
+                     for item in catalog["scenarios"])
+          assert catalog_path.stat().st_size <= 5 * 1024 * 1024
+          print(f"Validated {len(catalog['scenarios'])} synthetic scenarios ({catalog_path.stat().st_size} bytes).")
           PY
       - name: Prepare bounded real run history for internal Pages
         if: github.event_name != 'pull_request' && (github.event_name == 'workflow_run' || github.ref == 'refs/heads/main')

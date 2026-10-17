@@ -5,13 +5,74 @@ const path = require("node:path");
 const test = require("node:test");
 
 const source = fs.readFileSync(path.join(__dirname, "demo-explorer.js"), "utf8");
-const context = { URL, Date, Math, Array, Object, Number, String, Promise, console, document: undefined };
+const context = { URL, Date, Math, Array, Object, Number, String, Promise, TextEncoder, console, document: undefined };
 context.globalThis = context;
 vm.runInNewContext(source, context, { filename: "demo-explorer.js" });
 const core = context.ADRDemoCore;
 
 test("offers the Functional Analysis Demo workflow alongside the audit workflows", () => {
   assert.ok(core.workflows.some(workflow => workflow.id === "functional-analysis-demo.yml"));
+});
+
+function syntheticGallery() {
+  const modes = ["code-diff", "technical-spec", "spec-vs-implementation"];
+  const cases = ["deviation", "aligned", "insufficient-evidence"];
+  const outcomes = { deviation: "supported_deviation", aligned: "no_deviation_found", "insufficient-evidence": "inconclusive" };
+  const roles = { "code-diff": ["adr", "implementation", "diff"], "technical-spec": ["adr", "technical_spec"], "spec-vs-implementation": ["adr", "technical_spec", "implementation", "diff"] };
+  return { schema_version: "adr-synthetic-gallery-v1", source: "checked-in synthetic Functional Analysis fixtures", repository: "tyler-beach/Platform", scenario_count: 9,
+    live_import: { enabled: false, eligible_runs: 0, imported: 0, rejected: 0, expired: 0 },
+    scenarios: modes.flatMap(comparison => cases.map(sample_case => {
+      const language = comparison === "technical-spec" ? "not_applicable" : "go";
+      const base = `.github/demo/fixtures/code-diff/${sample_case}/go`;
+      const paths = { adr: ".github/demo/fixtures/adr/ADR-001.md", technical_spec: comparison === "spec-vs-implementation" ? ".github/demo/fixtures/technical-spec/aligned.md" : `.github/demo/fixtures/technical-spec/${sample_case}.md`, implementation: `${base}/handler.go`, diff: `${base}/change.diff` };
+      return {
+      id: `${comparison}--${sample_case}`, comparison, sample_case, language, outcome: outcomes[sample_case], validation_status: "passed", rationale: "Fixture result.", limitations: [],
+      record_type: "curated_fixture",
+      artifacts: roles[comparison].map(role => ({ role, path: paths[role], sha256: "a".repeat(64), byte_length: 4, text: "safe" })),
+      evidence: [{ evidence_id: "EV-ADR-001", role: roles[comparison][0], path: paths[roles[comparison][0]], type: "architectural_constraint", line_start: 1, line_end: 1, fact: "Bounded fact", excerpt: "safe" }],
+      requirements: [], observations: [],
+      stages: Array.from({ length: 6 }, (_, index) => ({ title: `Stage ${index}`, status: "passed", summary: "Complete" })),
+      validation_checks: [{ name: "Fixture validation passed", passed: true }],
+    }; })) };
+}
+
+test("accepts the complete nine-case synthetic scenario gallery", () => {
+  const scenarios = core.normalizeScenarioGallery(syntheticGallery());
+  assert.equal(scenarios.length, 9);
+  assert.ok(scenarios.some(item => item.id === "spec-vs-implementation--deviation"));
+  assert.deepEqual(Array.from(core.galleryArtifactOrder("spec-vs-implementation", scenarios[8].artifacts)), ["technical_spec", "implementation", "adr", "diff"]);
+});
+
+test("accepts a provenance-bound live workflow attempt alongside curated scenarios", () => {
+  const gallery = syntheticGallery();
+  gallery.repository = "example-org/adr-platform";
+  const live = structuredClone(gallery.scenarios[0]);
+  Object.assign(live, { id: "live-789-2", record_type: "workflow_run", run_id: 789, run_attempt: 2,
+    workflow_id: 456, workflow_sha: "b".repeat(40), artifact_name: "functional-analysis-demo-789-2",
+    artifact_sha256: `sha256:${"c".repeat(64)}`, run_url: "https://github.com/example-org/adr-platform/actions/runs/789" });
+  gallery.scenarios.push(live);
+  gallery.scenario_count = 10;
+  gallery.live_import = { enabled: true, eligible_runs: 1, imported: 1, rejected: 0, expired: 0 };
+  assert.equal(core.normalizeScenarioGallery(gallery).length, 10);
+  live.run_url = "https://evil.example/actions/runs/789";
+  assert.throws(() => core.normalizeScenarioGallery(gallery), /identity or provenance/);
+});
+
+test("rejects incomplete scenarios and artifact paths outside synthetic fixtures", () => {
+  const missing = syntheticGallery();
+  missing.scenarios.pop();
+  assert.throws(() => core.normalizeScenarioGallery(missing), /malformed or unsupported/);
+  const unsafe = syntheticGallery();
+  unsafe.scenarios[0].artifacts[0].path = "../../secrets.txt";
+  assert.throws(() => core.normalizeScenarioGallery(unsafe), /path, size, or digest/);
+});
+
+test("renders source contents as text rather than HTML", () => {
+  const document = { createElement: tag => ({ tag, children: [], appendChild(child) { this.children.push(child); } }) };
+  const node = core.galleryArtifactNode(document, { role: "implementation", path: "fixture.go", sha256: "a".repeat(64), byte_length: 21, text: "<script>alert(1)</script>" });
+  const source = node.children.find(child => child.tag === "pre");
+  assert.equal(source.textContent, "<script>alert(1)</script>");
+  assert.equal(source.children.length, 0);
 });
 
 test("renders ledger-only history without inventing unavailable job status", () => {

@@ -14,6 +14,12 @@ The scheduled reconciler MUST be executable directly from the repository root in
 - **AND** the confidence field is either produced from the versioned evidence-strength algorithm's validated inputs or marked unavailable with a reason
 - **AND** the fixture-oracle result is not described as confidence or model quality.
 
+#### Scenario: Repository metadata is loaded from the REST API root
+- **GIVEN** the writer is validating the configured repository before run reconciliation
+- **WHEN** it requests repository metadata from GitHub
+- **THEN** it calls the repository endpoint without an extra trailing path segment
+- **AND** it verifies the returned repository identity and default branch before processing attempts.
+
 #### Scenario: The scheduled reconciler is launched by its workflow
 - **GIVEN** the workflow invokes the reconciler script from the repository root with no ambient `PYTHONPATH`
 - **WHEN** Python starts `.poc/demo/reconcile_functional_analysis.py`

@@ -94,7 +94,7 @@ class GitHubAPI:
     def get_json(self, path: str, query: dict[str, str] | None = None) -> dict[str, Any]:
         if not path.startswith("/") or ".." in path or "\n" in path:
             raise ValueError("GitHub API path is invalid")
-        url = self.root + path
+        url = self.root if path == "/" else self.root + path
         if query:
             url += "?" + urllib.parse.urlencode(query)
         raw = self._request(url, authenticated=True, max_bytes=4 * 1024 * 1024)

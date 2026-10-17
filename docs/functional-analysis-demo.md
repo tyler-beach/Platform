@@ -10,6 +10,8 @@ The analysis workflow is read-only and uploads a 14-day synthetic run artifact. 
 
 On an organization-owned repository with internal or private Pages access configured, set `PAGES_ACTIONS_HISTORY_ENABLED=true` to show completed runs with bounded job and step status in the Pages explorer. This does not publish the downloadable workflow artifact or source files. The separate `PAGES_REAL_RUN_DATA_ENABLED=true` setting adds validated CSV-backed audit details. Functional Analysis history shows outcome, provenance hashes, evidence locations and validation checks. Its confidence is explicitly unavailable because the deterministic fixture oracle is not a confidence measure.
 
+The **Synthetic Scenario Library** on the Pages demo always includes nine checked-in fixture scenarios. For non-pull-request Pages builds, it also imports up to ten recent successful `workflow_dispatch` runs from the default branch, while their artifacts remain within the 13-day retention window. It validates each run attempt, workflow and artifact identity, artifact digest, bundle hashes, and exact fixture paths before displaying the actual ADR/spec/source/diff text alongside that run's analysis stages, observations, evidence, and validation checks. Inputs are rendered as text and never executed by the Pages site. Rejected, expired, or out-of-window artifacts are skipped and counted; the gallery is an illustrative synthetic history, not an unbounded artifact archive.
+
 ## Run a scenario
 
 1. Open the <a id="functional-analysis-workflow-step" href="https://github.com/tyler-beach/Platform/actions/workflows/functional-analysis-demo.yml">workflow</a> and select **Run workflow**.

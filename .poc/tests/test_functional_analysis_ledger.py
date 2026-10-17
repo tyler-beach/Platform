@@ -30,23 +30,24 @@ def sha(value: bytes) -> str:
 
 def make_bundle(*, run_id="123", run_attempt=2, outcome="supported_deviation", check_passed=True,
                 adr_bytes=b"ADR: MUST use async execution.\n", code_bytes=b"callProvider()\n",
-                duplicate_evidence=False, unknown_citation=False, invalid_declared_code_hash=False, extra_files=None):
+                duplicate_evidence=False, unknown_citation=False, invalid_declared_code_hash=False, extra_files=None,
+                original_code_path=".github/demo/fixtures/code-diff/deviation/go/handler.go"):
     diff_bytes = b"+callProvider()\n"
     files = {"input/adr.md": adr_bytes, "input/handler.go": code_bytes, "input/change.diff": diff_bytes}
     manifest = {
         "manifest_version": "1.1.0", "run_id": str(run_id), "run_attempt": run_attempt,
         "comparison": "code-diff", "sample_case": "deviation", "language": "go",
         "comparison_contract": "implementation_vs_adr", "artifacts": [
-            {"artifact_id": "ART-ADR-001", "role": "adr", "path": "input/adr.md", "sha256": sha(adr_bytes), "version": "sha256:" + sha(adr_bytes), "byte_length": len(adr_bytes)},
-            {"artifact_id": "ART-CODE-001", "role": "implementation", "path": "input/handler.go", "sha256": ("0" * 64 if invalid_declared_code_hash else sha(code_bytes)), "version": "sha256:" + ("0" * 64 if invalid_declared_code_hash else sha(code_bytes)), "byte_length": len(code_bytes)},
-            {"artifact_id": "ART-DIFF-001", "role": "diff", "path": "input/change.diff", "sha256": sha(diff_bytes), "version": "sha256:" + sha(diff_bytes), "byte_length": len(diff_bytes)},
+            {"artifact_id": "ART-ADR-001", "role": "adr", "path": "input/adr.md", "original_fixture_path": ".github/demo/fixtures/adr/ADR-001.md", "sha256": sha(adr_bytes), "version": "sha256:" + sha(adr_bytes), "byte_length": len(adr_bytes)},
+            {"artifact_id": "ART-CODE-001", "role": "implementation", "path": "input/handler.go", "original_fixture_path": original_code_path, "sha256": ("0" * 64 if invalid_declared_code_hash else sha(code_bytes)), "version": "sha256:" + ("0" * 64 if invalid_declared_code_hash else sha(code_bytes)), "byte_length": len(code_bytes)},
+            {"artifact_id": "ART-DIFF-001", "role": "diff", "path": "input/change.diff", "original_fixture_path": ".github/demo/fixtures/code-diff/deviation/go/change.diff", "sha256": sha(diff_bytes), "version": "sha256:" + sha(diff_bytes), "byte_length": len(diff_bytes)},
         ],
     }
     evidence = {
         "evidence_contract_version": "1.0.0",
         "items": [
-            {"evidence_id": "EV-ADR-001", "artifact_id": "ART-ADR-001", "artifact_version": "sha256:" + sha(adr_bytes), "source_path": "input/adr.md", "locator": {"kind": "source-line", "line_start": 1, "line_end": 1}, "evidence_type": "architectural_constraint", "excerpt": "MUST use async execution."},
-            {"evidence_id": "EV-TS-001", "artifact_id": "ART-CODE-001", "artifact_version": "sha256:" + sha(code_bytes), "source_path": "input/handler.go", "locator": {"kind": "tree-sitter-node", "line_start": 1, "line_end": 1, "start_byte": 0, "end_byte": len(code_bytes.rstrip())}, "evidence_type": "syntax_call_site", "excerpt": code_bytes.rstrip().decode()},
+            {"evidence_id": "EV-ADR-001", "artifact_id": "ART-ADR-001", "artifact_version": "sha256:" + sha(adr_bytes), "source_path": "input/adr.md", "locator": {"kind": "source-line", "line_start": 1, "line_end": 1}, "evidence_type": "architectural_constraint", "fact": "Governing async requirement.", "excerpt": "MUST use async execution."},
+            {"evidence_id": "EV-TS-001", "artifact_id": "ART-CODE-001", "artifact_version": "sha256:" + sha(code_bytes), "source_path": "input/handler.go", "locator": {"kind": "tree-sitter-node", "line_start": 1, "line_end": 1, "start_byte": 0, "end_byte": len(code_bytes.rstrip())}, "evidence_type": "syntax_call_site", "fact": "Call observed.", "excerpt": code_bytes.rstrip().decode()},
         ],
     }
     if duplicate_evidence:
@@ -58,6 +59,8 @@ def make_bundle(*, run_id="123", run_attempt=2, outcome="supported_deviation", c
         "evidence-package.json": json.dumps(evidence).encode(),
         "mock-model-response.json": json.dumps({"provider": "deterministic-mock", "network_requests": 0, "candidate": {"outcome": outcome, "evidence_ids": citations, "limitations": ["Evidence is insufficient."] if outcome == "inconclusive" else []}}).encode(),
         "validation-result.json": json.dumps({"validation_version": "1.0.0", "status": "passed" if check_passed else "failed", "candidate_outcome": outcome, "checks": checks}).encode(),
+        "analysis.json": json.dumps({"static_analysis": {"observations": []}, "requirements": []}).encode(),
+        "budget-decision.json": json.dumps({"within_budget": True, "estimated_input_tokens": 20}).encode(),
         "functional-analysis-report.json": json.dumps({"report_version": "1.0.0", "run_id": str(run_id), "run_attempt": run_attempt, "comparison": "code-diff", "comparison_contract": "implementation_vs_adr", "sample_case": "deviation", "language": "go", "status": "passed" if check_passed else "failed", "actual_outcome": outcome, "evidence_item_count": len(evidence["items"])}).encode(),
     })
     if extra_files:
@@ -83,6 +86,14 @@ def expected_context(**updates):
 
 
 class FunctionalAnalysisLedgerTests(unittest.TestCase):
+    def test_repository_metadata_request_uses_api_root_without_trailing_slash(self):
+        api = GitHubAPI("test-token", "example-org/adr-platform")
+        with patch("reconcile_functional_analysis.urllib.request.urlopen") as request:
+            request.return_value.__enter__.return_value.read.return_value = b"{}"
+            request.return_value.__enter__.return_value.headers.get.return_value = ""
+            self.assertEqual(api.get_json("/"), {})
+        self.assertEqual(request.call_args.args[0].full_url, api.root)
+
     def test_reconciler_cli_imports_when_launched_from_repository_root(self):
         environment = os.environ.copy()
         environment.pop("PYTHONPATH", None)
