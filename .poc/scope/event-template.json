@@ -32,7 +32,10 @@
       "path": "internal/handler/submit.go",
       "line": 42,
       "excerpt": "return h.Provider.Assess(ctx, req)",
-      "claim": "Resolved call edge from request handler to provider method, reachable from entry."
+      "claim": "Resolved call edge from request handler to provider method, reachable from entry.",
+      "caller_qualified_name": "Handler.Submit",
+      "callee_qualified_name": "Provider.Assess",
+      "resolution_status": "resolved_static"
     },
     {
       "evidence_id": "RUN-123:evidence-0018",
@@ -41,7 +44,10 @@
       "path": "changes/submit.patch",
       "line": 17,
       "excerpt": "+ return h.Provider.Assess(ctx, req)",
-      "claim": "Diff adds provider assessment on request handler path."
+      "claim": "Diff adds provider assessment on request handler path.",
+      "caller_qualified_name": "Handler.Submit",
+      "callee_qualified_name": "Provider.Assess",
+      "resolution_status": "resolved_static"
     }
   ]
 }
