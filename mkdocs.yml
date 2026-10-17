@@ -107,6 +107,7 @@ nav:
   - Engineering:
       - Functional analysis demo: functional-analysis-demo.md
       - Executable semantic-analysis PoC: EXECUTABLE_POC.md
+      - ADR scope retrieval: ADR_SCOPE_RETRIEVAL.md
       - Engineering playbook: ENGINEERING_PLAYBOOK.md
       - OpenSpec workflow: OPEN_SPEC_WORKFLOW.md
       - Adversarial design review: ADVERSARIAL_DESIGN_REVIEW.md
