@@ -42,7 +42,7 @@ test("journey animations respect reduced-motion preferences and narrow screens",
 });
 
 test("the implementation plan keeps synthetic examples distinct from live PoC runs", () => {
-  assert.ok(plan.includes("Synthetic walkthrough"));
+  assert.ok(plan.includes("synthetic example data"));
   assert.ok(plan.includes("does not change the detection engine"));
   assert.ok(plan.includes("human review"));
 });
