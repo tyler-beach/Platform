@@ -90,11 +90,18 @@ def assess_candidates(event: dict[str, Any], retrieval_result: dict[str, Any]) -
 
 
 def evaluate_event(event: dict[str, Any], catalog: list[dict[str, Any]], top_k: int,
-                   in_scope_threshold: float, review_threshold: float) -> dict[str, Any]:
-    retrieval_result = retrieve(
-        event, catalog, top_k=top_k, in_scope_threshold=in_scope_threshold,
-        review_threshold=review_threshold,
-    )
+                   in_scope_threshold: float, review_threshold: float, backend: str = "local") -> dict[str, Any]:
+    if backend == "aurora":
+        from aurora_backend import retrieve_from_aurora
+        retrieval_result = retrieve_from_aurora(
+            event, top_k=top_k, in_scope_threshold=in_scope_threshold,
+            review_threshold=review_threshold,
+        )
+    else:
+        retrieval_result = retrieve(
+            event, catalog, top_k=top_k, in_scope_threshold=in_scope_threshold,
+            review_threshold=review_threshold,
+        )
     candidate_findings = assess_candidates(event, retrieval_result)
     flags = [x for x in candidate_findings if x["finding_disposition"] == "potential_deviation"]
     unresolved = [x for x in candidate_findings if x["finding_disposition"] == "inconclusive"]
@@ -137,7 +144,7 @@ def metric_summary(results: list[dict[str, Any]]) -> dict[str, Any]:
     false_in_scope = sum(r["scope"]["disposition"] == "in_scope" for r in results if r.get("gold_disposition") == "out_of_scope")
     return {
         "scenario_count": total,
-        "retrieval_backend": "local_lexical_baseline",
+        "retrieval_backend": results[0]["scope"]["backend"] if results else "local_lexical_baseline",
         "selected_any_adr_count": len(retrieved),
         "expected_adr_recall_on_in_scope_cases": sum(recall_per_case) / len(recall_per_case) if recall_per_case else None,
         "false_in_scope_cases": false_in_scope,
@@ -207,16 +214,22 @@ def main() -> None:
     parser.add_argument("--catalog", type=Path, default=DEFAULT_CATALOG)
     parser.add_argument("--scenarios", type=Path, default=DEFAULT_SCENARIOS)
     parser.add_argument("--output-dir", type=Path, default=ROOT / ".poc" / "scope" / "output")
+    parser.add_argument("--backend", choices=("local", "aurora"), default="local",
+                        help="local is offline lexical search; aurora uses Bedrock embeddings and Aurora pgvector")
     parser.add_argument("--top-k", type=int, default=5)
-    parser.add_argument("--in-scope-threshold", type=float, default=0.28)
-    parser.add_argument("--review-threshold", type=float, default=0.14)
+    parser.add_argument("--in-scope-threshold", type=float, default=None)
+    parser.add_argument("--review-threshold", type=float, default=None)
     args = parser.parse_args()
+    if args.in_scope_threshold is None:
+        args.in_scope_threshold = 0.55 if args.backend == "aurora" else 0.28
+    if args.review_threshold is None:
+        args.review_threshold = 0.43 if args.backend == "aurora" else 0.14
     catalog, scenarios = load_jsonl(args.catalog), load_jsonl(args.scenarios)
     out_dir = args.output_dir if args.output_dir.is_absolute() else ROOT / args.output_dir
     out_dir.mkdir(parents=True, exist_ok=True)
     results = []
     for event in scenarios:
-        result = evaluate_event(event, catalog, args.top_k, args.in_scope_threshold, args.review_threshold)
+        result = evaluate_event(event, catalog, args.top_k, args.in_scope_threshold, args.review_threshold, args.backend)
         result["gold_adr_ids"] = event.get("gold_adr_ids", [])
         result["gold_disposition"] = event.get("gold_disposition")
         result["description"] = event.get("description", "")
@@ -224,7 +237,7 @@ def main() -> None:
     metrics = metric_summary(results)
     payload = {
         "schema_version": "adr-scope-simulation-v1.0.0",
-        "catalog_hash": results[0]["scope"]["audit"]["catalog_hash"] if results else "",
+        "catalog_hash": results[0]["scope"].get("audit", {}).get("catalog_hash", "") if results else "",
         "metrics": metrics,
         "results": results,
     }
