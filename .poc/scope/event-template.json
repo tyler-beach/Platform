@@ -1,0 +1,47 @@
+{
+  "event_id": "manual-change-001",
+  "repository": "Platform",
+  "service": "assessment-api",
+  "domain": "application",
+  "language": "go",
+  "changed_paths": [
+    "internal/handler/submit.go"
+  ],
+  "change_summary": "Review a change on the request handler path that appears to invoke a remote provider before the request returns.",
+  "diff_summary": "Added direct call from request handler to provider assessment; no enqueue call is visible in the affected hunk.",
+  "evidence_terms": [
+    "request handler",
+    "provider assessment",
+    "synchronous call",
+    "call graph",
+    "enqueue",
+    "remote provider"
+  ],
+  "normative_requirements": [
+    "The handler must enqueue provider assessment asynchronously and return without waiting for the remote provider response."
+  ],
+  "call_edges": [
+    "Handler.Submit -> Provider.Assess; edge resolution_status=resolved_static; reachable from entry=true"
+  ],
+  "source_observations": [
+    {
+      "evidence_id": "RUN-123:evidence-0012",
+      "artifact_id": "RUN-123:artifact-0001",
+      "edge_id": "RUN-123:edge-0004",
+      "evidence_type": "resolved_call_edge",
+      "path": "internal/handler/submit.go",
+      "line": 42,
+      "excerpt": "return h.Provider.Assess(ctx, req)",
+      "claim": "Resolved call edge from request handler to provider method, reachable from entry."
+    },
+    {
+      "evidence_id": "RUN-123:evidence-0018",
+      "artifact_id": "RUN-123:artifact-0003",
+      "evidence_type": "diff_line",
+      "path": "changes/submit.patch",
+      "line": 17,
+      "excerpt": "+ return h.Provider.Assess(ctx, req)",
+      "claim": "Diff adds provider assessment on request handler path."
+    }
+  ]
+}
