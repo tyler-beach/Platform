@@ -129,12 +129,13 @@ jobs:
         if: github.event_name != 'pull_request' && (github.event_name == 'workflow_run' || github.ref == 'refs/heads/main')
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HISTORY_OPT_IN: ${{ vars.PAGES_ACTIONS_HISTORY_ENABLED }}
           REAL_DATA_OPT_IN: ${{ vars.PAGES_REAL_RUN_DATA_ENABLED }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           DEMO_ROOT: ${{ runner.temp }}/adr-poc-pages-demo
         run: |
           set -euo pipefail
-          if [[ "$REAL_DATA_OPT_IN" != "true" ]]; then
+          if [[ "$HISTORY_OPT_IN" != "true" && "$REAL_DATA_OPT_IN" != "true" ]]; then
             mkdir -p site/demo/data
             python - <<'PY'
           import json
@@ -145,34 +146,45 @@ jobs:
               "schema_version": "adr-demo-history-v1", "repository": os.environ.get("GITHUB_REPOSITORY", "tyler-beach/Platform"),
               "data_available": False,
               "api_history_available": False, "run_count": 0, "workflow_runs": [], "runs": [],
-              "message": "Detailed run records are disabled for this Pages deployment."
+              "message": "Actions history and detailed run records are disabled for this Pages deployment."
           }, indent=2) + "\n", encoding="utf-8")
           PY
-            echo "Real run data disabled; Pages will contain the synthetic fixture walkthrough only."
+            echo "Pages will contain the synthetic fixture walkthrough only; both real-data exports are disabled."
             exit 0
           fi
           repository_info="$(gh api "/repos/${GITHUB_REPOSITORY}")"
           pages_info="$(gh api "/repos/${GITHUB_REPOSITORY}/pages")"
-          python - "$repository_info" "$pages_info" "$REAL_DATA_OPT_IN" <<'PY'
+          python - "$repository_info" "$pages_info" "$HISTORY_OPT_IN" "$REAL_DATA_OPT_IN" <<'PY'
           import json
           import sys
           from pathlib import Path
           sys.path.insert(0, str(Path(".poc/demo").resolve()))
-          from pages_visibility import real_data_export_enabled
+          from pages_visibility import actions_history_export_enabled, real_data_export_enabled
           repository = json.loads(sys.argv[1])
           pages = json.loads(sys.argv[2])
           owner = repository.get("owner", {})
           owner_type = owner.get("type", "") if isinstance(owner, dict) else ""
-          real_data_export_enabled(repository.get("visibility", ""),
-                                   owner_type,
-                                   pages.get("public"), sys.argv[3])
+          visibility = repository.get("visibility", "")
+          pages_public = pages.get("public")
+          actions_history_export_enabled(visibility, owner_type, pages_public, sys.argv[3])
+          real_data_export_enabled(visibility, owner_type, pages_public, sys.argv[4])
           print("Organization repository visibility and private Pages access verified.")
           PY
           db_dir="$DEMO_ROOT/real-db"
           mkdir -p "$db_dir"
-          if gh api "/repos/${GITHUB_REPOSITORY}/branches/poc-database" >/dev/null 2>&1; then
-            gh repo clone "$GITHUB_REPOSITORY" "$RUNNER_TEMP/poc-db-pages" -- --depth 1 --single-branch --branch poc-database
-            cp "$RUNNER_TEMP/poc-db-pages/.poc-db/"*.csv "$db_dir/"
+          if [[ "$REAL_DATA_OPT_IN" == "true" ]]; then
+            if gh api "/repos/${GITHUB_REPOSITORY}/branches/poc-database" >/dev/null 2>&1; then
+              gh repo clone "$GITHUB_REPOSITORY" "$RUNNER_TEMP/poc-db-pages" -- --depth 1 --single-branch --branch poc-database
+              cp "$RUNNER_TEMP/poc-db-pages/.poc-db/"*.csv "$db_dir/"
+            else
+              python - "$db_dir" <<'PY'
+          import sys
+          from pathlib import Path
+          sys.path.insert(0, str(Path(".poc").resolve()))
+          from store import CsvStore
+          CsvStore(sys.argv[1])
+          PY
+            fi
           else
             python - "$db_dir" <<'PY'
           import sys
@@ -182,10 +194,16 @@ jobs:
           CsvStore(sys.argv[1])
           PY
           fi
-          python .poc/demo/actions_history.py --output "$DEMO_ROOT/actions-history.json"
+          history_args=()
+          if [[ "$HISTORY_OPT_IN" == "true" ]]; then
+            python .poc/demo/actions_history.py --output "$DEMO_ROOT/actions-history.json"
+            history_args+=(--actions-history "$DEMO_ROOT/actions-history.json")
+          else
+            echo "Actions history collection disabled; CSV ledger projection remains independently controlled."
+          fi
           python .poc/demo/export_site_snapshot.py \
             --db-dir "$db_dir" --history --limit 20 \
-            --actions-history "$DEMO_ROOT/actions-history.json" \
+            "${history_args[@]}" \
             --output site/demo/data/real-runs.json
       - name: Verify homepage layout structure
         run: |

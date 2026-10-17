@@ -15,7 +15,7 @@ sys.path.insert(0, str(ROOT / ".poc" / "demo"))
 
 from actions_history import collect_history
 from export_site_snapshot import build_history_snapshot, build_snapshot, export_snapshot
-from pages_visibility import real_data_export_enabled
+from pages_visibility import actions_history_export_enabled, real_data_export_enabled
 from prepare_site import prepare_site
 
 
@@ -121,6 +121,8 @@ class PagesSnapshotTests(unittest.TestCase):
         ):
             self.assertIn(required, workflow)
         self.assertIn("if: github.event_name != 'pull_request'", workflow)
+        self.assertIn("HISTORY_OPT_IN: ${{ vars.PAGES_ACTIONS_HISTORY_ENABLED }}", workflow)
+        self.assertIn("REAL_DATA_OPT_IN: ${{ vars.PAGES_REAL_RUN_DATA_ENABLED }}", workflow)
         self.assertIn('workflows: ["ADR Deviation PoC Analysis", "ADR Deviation Labeled Evaluation", "Functional Analysis Demo"]', workflow)
         self.assertIn("github.ref == 'refs/heads/main'", workflow)
         self.assertIn("github.event.workflow_run.event != 'pull_request'", workflow)
@@ -135,11 +137,30 @@ class PagesSnapshotTests(unittest.TestCase):
         self.assertIn('functional-analysis-demo.yml', workflow)
         self.assertIn('id="demo-open-functional"', (ROOT / "docs/demo/index.md").read_text(encoding="utf-8"))
 
+    def test_docs_workflow_has_independent_history_and_ledger_gates(self):
+        workflow = (ROOT / ".github/workflows/docs.yml").read_text(encoding="utf-8")
+        history_gate = workflow.index('if [[ "$HISTORY_OPT_IN" == "true" ]]')
+        ledger_gate = workflow.index('if [[ "$REAL_DATA_OPT_IN" == "true" ]]; then')
+        history_api = workflow.index("python .poc/demo/actions_history.py")
+        ledger_clone = workflow.index('gh repo clone "$GITHUB_REPOSITORY"')
+        self.assertLess(history_gate, history_api)
+        self.assertLess(ledger_gate, ledger_clone)
+        history_only_block = workflow.split('if [[ "$HISTORY_OPT_IN" == "true" ]]; then', 1)[1].split("else", 1)[0]
+        ledger_only_block = workflow.split('if [[ "$REAL_DATA_OPT_IN" == "true" ]]; then', 1)[1].split("else", 1)[0]
+        self.assertIn("python .poc/demo/actions_history.py", history_only_block)
+        self.assertNotIn('gh repo clone "$GITHUB_REPOSITORY"', history_only_block)
+        self.assertIn('gh repo clone "$GITHUB_REPOSITORY"', ledger_only_block)
+        self.assertNotIn("python .poc/demo/actions_history.py", ledger_only_block)
+        self.assertIn('if [[ "$HISTORY_OPT_IN" != "true" && "$REAL_DATA_OPT_IN" != "true" ]]', workflow)
+        self.assertIn('"${history_args[@]}"', workflow)
+        self.assertIn("github.event_name != 'pull_request'", workflow)
+
     def test_internal_pages_runbook_matches_the_workflow_gates(self):
         guide = (ROOT / "docs/how-to/enable-private-pages-demo.md").read_text(encoding="utf-8")
         workflow = (ROOT / ".github/workflows/docs.yml").read_text(encoding="utf-8")
         analysis = (ROOT / ".github/workflows/poc-analysis.yml").read_text(encoding="utf-8")
         self.assertIn("GitHub Enterprise Cloud", guide)
+        self.assertIn("PAGES_ACTIONS_HISTORY_ENABLED", guide)
         self.assertIn("PAGES_REAL_RUN_DATA_ENABLED", guide)
         self.assertIn("select the default branch (`main`)", guide)
         self.assertIn("poc-database", guide)
@@ -322,6 +343,38 @@ class PagesSnapshotTests(unittest.TestCase):
             real_data_export_enabled("internal", "Organization", True, "true")
         with self.assertRaisesRegex(ValueError, "Pages API"):
             real_data_export_enabled("internal", "Organization", None, "true")
+
+    def test_actions_history_has_its_own_opt_in_and_same_private_pages_gate(self):
+        self.assertFalse(actions_history_export_enabled("internal", "Organization", False, "false"))
+        self.assertTrue(actions_history_export_enabled("internal", "Organization", False, "true"))
+        self.assertFalse(actions_history_export_enabled("internal", "Organization", False, "TRUE"))
+        with self.assertRaisesRegex(ValueError, "private or internal"):
+            actions_history_export_enabled("public", "Organization", False, "true")
+        with self.assertRaisesRegex(ValueError, "organization-owned"):
+            actions_history_export_enabled("private", "User", False, "true")
+        with self.assertRaisesRegex(ValueError, "Pages API"):
+            actions_history_export_enabled("private", "Organization", True, "true")
+
+    def test_history_snapshot_can_contain_actions_metadata_without_ledger_rows(self):
+        sys.path.insert(0, str(ROOT / ".poc"))
+        from store import CsvStore
+
+        empty_db = self.base / "empty-ledger"
+        CsvStore(empty_db)
+        actions = {
+            "schema_version": "adr-demo-actions-v1", "available": True,
+            "repository": "example-org/adr-platform",
+            "runs": [{"id": 789, "run_number": 12, "run_attempt": 1, "name": "Functional Analysis Demo",
+                      "workflow_file": "functional-analysis-demo.yml", "workflow_name": "Functional Analysis Demo",
+                      "event": "workflow_dispatch", "status": "completed", "conclusion": "success",
+                      "head_branch": "main", "head_sha": "b" * 40,
+                      "html_url": "https://github.com/example-org/adr-platform/actions/runs/789",
+                      "created_at": "2026-10-17T10:00:00Z", "updated_at": "2026-10-17T10:01:00Z", "jobs": []}],
+        }
+        snapshot = build_history_snapshot(empty_db, actions_history=actions)
+        self.assertTrue(snapshot["api_history_available"])
+        self.assertEqual(snapshot["runs"], [])
+        self.assertEqual(snapshot["workflow_runs"][0]["id"], 789)
 
     def test_internal_actions_history_fetch_is_bounded_and_contains_only_status_metadata(self):
         seen = []
