@@ -57,6 +57,20 @@ class ScopeRetrievalTests(unittest.TestCase):
                     f"{case_id} missed all expected ADRs; ranked={[(x['adr_id'],x['score']) for x in result['selected_adrs']]} review={[(x['adr_id'],x['score']) for x in result['review_candidates']]}",
                 )
 
+
+    def test_event_template_uses_supplied_evidence_and_flags_only_a_candidate(self):
+        import json
+        event = json.loads((SCOPE_DIR / "event-template.json").read_text(encoding="utf-8"))
+        result = run_scope.evaluate_event(event, self.catalog, top_k=5, in_scope_threshold=0.28,
+                                          review_threshold=0.14, backend="local")
+        findings = [x for x in result["candidate_assessments"] if x["adr_id"] == "ADR-001"]
+        self.assertTrue(findings)
+        self.assertEqual(findings[0]["finding_disposition"], "potential_deviation")
+        refs = findings[0]["source_observations"]
+        self.assertEqual(refs[0]["evidence_id"], "RUN-123:evidence-0012")
+        self.assertEqual(refs[0]["path"], "internal/handler/submit.go")
+        self.assertEqual(result["triage"]["supported_deviation_count"], 0)
+
     def test_direct_provider_evidence_creates_only_review_candidate(self):
         event = self.by_id["SCOPE-01"]
         result = run_scope.evaluate_event(event, self.catalog, top_k=5, in_scope_threshold=0.28,
