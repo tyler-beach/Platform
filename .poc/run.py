@@ -39,7 +39,10 @@ def semantic(language,source,out):
     elif language=="java":
         classes=out.parent/"java-classes";classes.mkdir(parents=True,exist_ok=True)
         run_cmd(["javac","-d",str(classes),str(Path(".poc/analyzers/java/CallGraph.java").resolve())])
-        run_cmd(["java","-cp",str(classes),"CallGraph","--root",str(source),"--out",str(out)])
+        cmd=["java","-cp",str(classes),"CallGraph","--root",str(source),"--out",str(out)]
+        project_cp=os.environ.get("JAVA_POC_CLASSPATH","")
+        if project_cp: cmd.extend(["--classpath",project_cp])
+        run_cmd(cmd)
     else: raise ValueError("unsupported language "+language)
     return json.loads(out.read_text(encoding="utf-8"))
 def bind_graph(g,root_name,run_id):
