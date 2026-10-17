@@ -1,11 +1,12 @@
 openapi: 3.1.0
 info:
   title: ADR Deviation Platform API
-  version: 1.0.0-proposed
+  version: 1.0.0
   description: >
-    First-pass proposed REST/JSON mapping of the adrplatform.v1 Protobuf
-    control-plane API. Design-only; no deployed API server or authentication
-    scheme is implied. Public JSON names follow protobuf JSON mapping.
+    Production-target REST/JSON mapping of the adrplatform.v1 Protobuf control-plane
+    API. The contract and deterministic mock responses are intended for production
+    implementation; this documentation does not imply a deployed API server.
+    Public JSON names follow protobuf JSON mapping.
   contact:
     name: ADR Deviation Platform maintainers
     url: https://github.com/tyler-beach/Platform
