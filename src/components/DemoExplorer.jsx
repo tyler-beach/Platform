@@ -36,6 +36,7 @@ export default function DemoExplorer() {
 
     <RequirementLab />
 
+    <details className="demo-supporting-details"><summary>Explore the underlying demo artifacts <span>Scenario library · Pipeline walkthrough · Evidence outputs</span></summary><div className="demo-supporting-details__body">
     <DemoSection id="demo-gallery-heading" kicker="SCENARIO LIBRARY" title="Compare spec, code, and change" icon={<LayersIcon />} badge="9 CURATED CASES">
       <div className="demo-section__inner demo-gallery-surface">
         <p id="demo-gallery-status" className="demo-muted" role="status" aria-live="polite">Loading the offline synthetic scenario catalog…</p>
@@ -79,6 +80,7 @@ export default function DemoExplorer() {
       <div className="demo-section__inner demo-run-guide"><ol><li>Open <a id="demo-guide-analysis" href="#">PoC Analysis</a> and choose <strong>Run workflow</strong>. Defaults use the checked-in Go fixture and offline mock provider.</li><li>For infrastructure YAML/JSON, choose <code>none</code> as the language and set <code>config_source</code>. Unsupported formats are incomplete coverage, not compliance.</li><li>Download the <code>adr-deviation-poc-…</code> artifact and inspect reports, evidence, observations, confidence, and CSV tables.</li><li>Use <a id="demo-guide-evaluation" href="#">the labeled evaluation</a> for regression cases and the 50-ADR coverage audit.</li><li>Use <a id="demo-guide-functional" href="#">Functional Analysis Demo</a> for the Tree-sitter and document-analysis workflow. Validated fixture artifacts can appear in the scenario library for a bounded recovery window.</li></ol><div className="demo-scope-note"><CircleHelp size={16} /><p>This is a repository-hosted demonstrator, not the proposed production service. The synthetic corpus is not independently adjudicated; mock evaluation does not measure model quality. Provider mode requires repository secrets and data approval.</p></div></div>
     </DemoSection>
     <div className="demo-endnote"><span><CheckCircle2 size={16} /> Evidence and provenance stay inspectable at every stage.</span><a href={`https://github.com/${repository}/actions`} target="_blank" rel="noreferrer">Open all Actions <ExternalLink size={13} /></a></div>
+    </div></details>
   </div>;
 }
 
