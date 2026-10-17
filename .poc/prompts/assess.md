@@ -12,11 +12,14 @@ Outcomes:
 
 Cite only evidence IDs present in the supplied package. Do not invent paths, line numbers, symbols, requirements, test results, or citations. Be explicit about limitations and resolution certainty. The deterministic application validator—not you—decides whether the returned structure and evidence references are acceptable.
 
+For every material conclusion, return explicit evidence_links connecting a normative requirement evidence ID to an observed call-edge or diff evidence ID. Each link must include relationship = contradicts, consistent_with, or uncertain, and an explanation that names the requirement and the observed behavior. Do not call an unresolved or merely name-matched edge a proven violation. A supported_deviation requires a concrete contradiction link; if the source does not support one, choose potential_deviation or inconclusive.
+
 Return the submit_assessment tool input matching this contract:
 - outcome: one of the four outcome strings above
 - summary: concise finding
 - rationale: evidence-based reasoning
 - evidence_ids: array of supplied evidence IDs
+- evidence_links: array of {requirement_evidence_id, observation_evidence_id, relationship, explanation}
 - limitations: array of unresolved questions or limits
 - confidence: number from 0 to 1
 
