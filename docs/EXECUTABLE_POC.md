@@ -29,15 +29,16 @@ The score is a weighted calculation with a versioned algorithm:
 
 | Dimension | Weight | What it checks |
 |---|---:|---|
-| Requirement clarity | 25% | Whether a cited normative requirement states a specific, operational constraint |
-| Call-path resolution | 30% | The least-certain edge on each cited entry-to-call path; a static/approximate/dynamic edge is not treated equally |
-| Evidence coverage | 20% | Whether citations cover both the requirement and the observed call behavior, plus relevant diff evidence |
-| Provenance integrity | 15% | Whether every citation resolves to a pinned input artifact and its excerpt hash matches |
+| Requirement clarity | 20% | Whether a cited normative requirement states a specific, operational constraint |
+| Call-path resolution | 25% | The least-certain edge on the cited entry-to-call paths; unresolved and approximate dispatch are not treated as proven direct calls |
+| Requirement-observation linkage | 20% | Whether a validated explicit link names the requirement and observed source behavior and labels the relationship |
+| Evidence coverage | 15% | Whether citations cover the requirement and observed behavior |
+| Provenance integrity | 10% | Whether every citation resolves to a pinned input artifact and its excerpt hash matches |
 | Analysis completeness | 10% | Whether the entry resolves, parsing/semantic diagnostics exist, and reachable dynamic edges remain |
 
-The calculation stores the raw score for each dimension, its weight and contribution, the explanation, supporting evidence IDs, and any cap/guardrail. A score is capped at 49/100 when no normative requirement or resolved cited call path exists, and at 39/100 when citation/provenance validation fails. A `supported_deviation` is downgraded if it lacks a cited normative requirement and a cited call edge, if the entry/path is insufficiently resolved, or if evidence integrity fails.
+The calculation stores the raw score for each dimension, its weight and contribution, the explanation, supporting evidence IDs, and any cap/guardrail. A score is capped at 49/100 when no normative requirement or resolved cited call path exists, and at 39/100 when citation/provenance validation fails. A `supported_deviation` is downgraded if it lacks a cited normative requirement, a cited call edge, or a validated `contradicts` link connecting them; it is also downgraded if the entry/path is insufficiently resolved or evidence integrity fails.
 
-The evidence package is intended to answer **what, why, and how**: which requirement line conflicts, which changed/source line and edge support the observation, how the analyzer resolved that edge, which transitive path reaches it, which exact input artifact hash was analyzed, and which uncertainty reduced the score. Open `confidence.json` and `callgraph.json` beside `evidence.json` for the full machine-readable trail. CSV tables `confidence_assessments.csv` and `confidence_components.csv` preserve the score and its component arithmetic.
+The evidence package is intended to answer **what, why, and how**: which requirement line conflicts, which changed/source line and edge support the observation, how the analyzer resolved that edge, which transitive path reaches it, which exact input artifact hash was analyzed, and which uncertainty reduced the score. Open `confidence.json` and `callgraph.json` beside `evidence.json` for the full machine-readable trail. CSV tables `confidence_assessments.csv` and `confidence_components.csv` preserve the score and its component arithmetic. `assessment_evidence_links.csv` records each requirement-to-observation link, including the relationship and explanation.
 
 The weights and thresholds are initial PoC policy, not empirically calibrated truth. Before using this to enforce architecture policy, build a labeled evaluation set of true violations, non-violations, and ambiguous cases; measure precision/recall and calibration; tune thresholds; and retain a human review path for material findings.
 
