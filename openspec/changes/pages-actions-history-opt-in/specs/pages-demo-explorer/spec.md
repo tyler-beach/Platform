@@ -11,6 +11,7 @@ The documentation build MUST generate the synthetic walkthrough in every site bu
 - **THEN** it publishes bounded Actions run, job, and step metadata
 - **AND** it publishes zero CSV-backed ledger records
 - **AND** it does not clone the ledger branch
+- **AND** the explorer makes job/step statuses available from Actions metadata
 
 #### Scenario: Ledger export is enabled without Actions history
 - **GIVEN** an organization-owned private repository has Pages `public: false`
@@ -19,6 +20,8 @@ The documentation build MUST generate the synthetic walkthrough in every site bu
 - **WHEN** the documentation workflow builds the site
 - **THEN** it publishes the validated bounded ledger projection
 - **AND** it does not call the GitHub Actions history API
+- **AND** the explorer renders the ledger audit records without claiming unavailable job/step statuses
+- **AND** generated run URLs use the cloned repository identity
 
 #### Scenario: Either export is enabled on an ineligible repository
 - **GIVEN** either export opt-in is exactly `true`

@@ -203,6 +203,7 @@ jobs:
           fi
           python .poc/demo/export_site_snapshot.py \
             --db-dir "$db_dir" --history --limit 20 \
+            --repository "$GITHUB_REPOSITORY" \
             "${history_args[@]}" \
             --output site/demo/data/real-runs.json
       - name: Verify homepage layout structure

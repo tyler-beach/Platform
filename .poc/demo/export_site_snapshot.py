@@ -6,6 +6,7 @@ import argparse
 import csv
 import hashlib
 import json
+import os
 import re
 from pathlib import Path
 from typing import Any
@@ -15,6 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from observations import redact_source_text, redact_source_values
 
 SCHEMA_VERSION = "adr-demo-run-v1"
+_REPOSITORY_NAME = re.compile(r"[A-Za-z0-9-]{1,39}/[A-Za-z0-9_.-]{1,100}\Z")
 STAGE_COPY = {
     "admission": ("Pin inputs", "Record immutable input paths, sizes, and SHA-256 versions."),
     "syntax": ("Parse syntax", "Index syntax and report parser diagnostics."),
@@ -235,13 +237,17 @@ def _display_text(value: str, limit: int = 1000) -> tuple[str, bool]:
     return safe, changed
 
 
-def build_history_snapshot(db_dir: str | Path, limit: int = 20, actions_history: dict[str, Any] | None = None) -> dict[str, Any]:
+def build_history_snapshot(db_dir: str | Path, limit: int = 20, actions_history: dict[str, Any] | None = None,
+                           repository: str | None = None) -> dict[str, Any]:
     """Project a small, redacted run history from CSV tables; never export raw tables."""
     if not isinstance(limit, int) or limit < 1 or limit > 50:
         raise ValueError("real run history limit must be between 1 and 50")
-    repository = actions_history.get("repository", "tyler-beach/Platform") if actions_history else "tyler-beach/Platform"
-    if not isinstance(repository, str) or not re.fullmatch(r"[A-Za-z0-9-]{1,39}/[A-Za-z0-9_.-]{1,100}", repository):
+    history_repository = actions_history.get("repository") if actions_history else None
+    repository = repository or history_repository or os.environ.get("GITHUB_REPOSITORY") or "tyler-beach/Platform"
+    if not isinstance(repository, str) or not _REPOSITORY_NAME.fullmatch(repository):
         raise ValueError("internal Actions history has an invalid repository name")
+    if history_repository is not None and history_repository != repository:
+        raise ValueError("internal Actions history repository does not match the configured repository")
     db = Path(db_dir).resolve()
     runs = _rows(db, "runs")
     tables = {
@@ -463,13 +469,14 @@ def build_history_snapshot(db_dir: str | Path, limit: int = 20, actions_history:
 
 
 def export_history_snapshot(db_dir: str | Path, destination: str | Path, limit: int = 20,
-                            actions_history_path: str | Path | None = None) -> Path:
+                            actions_history_path: str | Path | None = None,
+                            repository: str | None = None) -> Path:
     path = Path(destination).resolve()
     if path.parent.name != "data" or path.parent.parent.name != "demo" or path.parent.parent.parent.name != "site":
         raise ValueError("real run snapshot output must be under site demo data")
     path.parent.mkdir(parents=True, exist_ok=True)
     actions_history = json.loads(Path(actions_history_path).read_text(encoding="utf-8")) if actions_history_path else None
-    snapshot = build_history_snapshot(db_dir, limit, actions_history)
+    snapshot = build_history_snapshot(db_dir, limit, actions_history, repository)
     path.write_text(json.dumps(snapshot, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
     return path
 
@@ -483,9 +490,10 @@ def main() -> None:
     parser.add_argument("--history", action="store_true", help="export bounded real-run history from the CSV database")
     parser.add_argument("--limit", type=int, default=20)
     parser.add_argument("--actions-history")
+    parser.add_argument("--repository", default=os.environ.get("GITHUB_REPOSITORY", "tyler-beach/Platform"))
     args = parser.parse_args()
     if args.history:
-        output = export_history_snapshot(args.db_dir, args.output, args.limit, args.actions_history)
+        output = export_history_snapshot(args.db_dir, args.output, args.limit, args.actions_history, args.repository)
         print(f"Exported bounded Pages run history: {output}")
     else:
         if not args.run_dir or not args.fixture_root:

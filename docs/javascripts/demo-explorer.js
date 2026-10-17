@@ -76,6 +76,45 @@
       }));
   }
 
+  function normalizeLedgerRuns(rawRuns, repository = `${OWNER}/${REPOSITORY}`) {
+    if (!Array.isArray(rawRuns)) return [];
+    return rawRuns.slice(0, MAX_RUNS).flatMap((record) => {
+      if (!record || !(typeof record.github_run_id === "number" || (typeof record.github_run_id === "string" && /^\d+$/.test(record.github_run_id)))) return [];
+      const id = Number(record.github_run_id);
+      const url = safeRunUrl(record.workflow_url, id, repository);
+      if (!positiveId(id) || !url) return [];
+      const status = ["complete", "failed", "model_response_rejected", "unknown"].includes(record.status) ? record.status : "unknown";
+      const attempt = positiveId(record.run_attempt) ? record.run_attempt : 1;
+      const comparison = plain(record.comparison, 80);
+      const outcome = plain(record.outcome, 80);
+      return [{
+        id, number: id, attempt,
+        name: `PoC audit · ${comparison || "analysis"} · ${outcome || "inconclusive"}`,
+        event: "PoC ledger record", status: "completed", conclusion: "",
+        branch: "", sha: "", created: plain(record.started_at, 40), updated: plain(record.completed_at, 40),
+        url, workflowName: "PoC analysis", jobs: [], ledgerOnly: true,
+        ledgerStatus: status, ledgerOutcome: outcome, ledgerLanguage: plain(record.language, 40),
+        ledgerProvider: plain(record.provider, 40),
+      }];
+    });
+  }
+
+  function historyProjection(history, repository = `${OWNER}/${REPOSITORY}`) {
+    if (!history || typeof history !== "object") return null;
+    const ledgerRuns = normalizeLedgerRuns(history.runs, repository);
+    if (history.api_history_available === true && Array.isArray(history.workflow_runs)) {
+      const runs = normalizeRuns(history.workflow_runs, repository);
+      const seen = new Set(runs.map((run) => `${run.id}:${run.attempt}`));
+      ledgerRuns.forEach((run) => {
+        const key = `${run.id}:${run.attempt}`;
+        if (!seen.has(key)) { runs.push(run); seen.add(key); }
+      });
+      return { source: "actions", runs };
+    }
+    if (history.data_available === true) return { source: "ledger", runs: ledgerRuns };
+    return null;
+  }
+
   function normalizeJobs(rawJobs, repository = `${OWNER}/${REPOSITORY}`) {
     if (!Array.isArray(rawJobs)) return [];
     return rawJobs.filter((job) => job && positiveId(job.id) && typeof job.name === "string" &&
@@ -200,7 +239,7 @@
     return item.conclusion || item.status || "unknown";
   }
 
-  const core = { normalizeRuns, normalizeJobs, evidenceForFinding, fetchSiteJson, fetchWorkflowRuns, fetchRunJobs, safeRunUrl, formatDate, statusText, workflows: WORKFLOWS };
+  const core = { normalizeRuns, normalizeLedgerRuns, normalizeJobs, historyProjection, evidenceForFinding, fetchSiteJson, fetchWorkflowRuns, fetchRunJobs, safeRunUrl, formatDate, statusText, workflows: WORKFLOWS };
   root.ADRDemoCore = core;
 
   function init() {
@@ -330,8 +369,12 @@
         button.type = "button";
         button.addEventListener("click", () => showRunJobs(run));
         card.appendChild(button);
-        card.appendChild(el("span", `demo-status demo-status--${statusText(run).replace(/[^a-z_]/g, "")}`, statusText(run).replaceAll("_", " ")));
-        card.appendChild(el("p", "", `${run.event || "workflow"} · ${run.branch || "branch unavailable"} · ${run.sha || "commit unavailable"}`));
+        const label = run.ledgerOnly ? run.ledgerStatus : statusText(run);
+        card.appendChild(el("span", `demo-status demo-status--${label.replace(/[^a-z_]/g, "")}`, label.replaceAll("_", " ")));
+        const metadata = run.ledgerOnly
+          ? `${run.ledgerLanguage || "language unavailable"} · ${run.ledgerProvider || "provider unavailable"} · outcome ${run.ledgerOutcome || "inconclusive"}`
+          : `${run.event || "workflow"} · ${run.branch || "branch unavailable"} · ${run.sha || "commit unavailable"}`;
+        card.appendChild(el("p", "", metadata));
         card.appendChild(el("time", "", formatDate(run.updated || run.created)));
         addLink(card, run.url, "Open workflow run and artifacts");
         historyNode.appendChild(card);
@@ -364,6 +407,10 @@
     async function showRunJobs(run) {
       selectedRun = run;
       renderRealRunRecord(run);
+      if (run.ledgerOnly) {
+        jobsNode.replaceChildren(el("p", "demo-empty", "This ledger-only record has no job or step metadata."));
+        return;
+      }
       jobsNode.replaceChildren(el("p", "demo-loading", `Loading jobs for run #${run.number}…`));
       try {
         const jobs = Array.isArray(run.jobs) ? normalizeJobs(run.jobs, activeRepository) : await fetchRunJobs(root.fetch.bind(root), run, activeRepository);
@@ -447,9 +494,12 @@
       byId("demo-guide-analysis").href = activeWorkflows[0].launch;
       byId("demo-guide-evaluation").href = activeWorkflows[1].launch;
       byId("demo-guide-functional").href = activeWorkflows[2].launch;
-      if (realHistory && realHistory.api_history_available && Array.isArray(realHistory.workflow_runs)) {
-        const runs = normalizeRuns(realHistory.workflow_runs, activeRepository);
-        setText("demo-history-status", `Loaded ${runs.length} server-verified workflow runs. Detailed audit rows are included only for the internal Pages deployment.`);
+      const projection = historyProjection(realHistory, activeRepository);
+      if (projection) {
+        const runs = projection.runs;
+        setText("demo-history-status", projection.source === "actions"
+          ? `Loaded ${runs.length} server-verified workflow and ledger records.`
+          : `Loaded ${runs.length} ledger-backed audit records. Job and step statuses are not included.`);
         renderRuns(runs);
         if (selectedRun) renderRealRunRecord(selectedRun);
         return;

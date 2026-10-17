@@ -123,6 +123,7 @@ class PagesSnapshotTests(unittest.TestCase):
         self.assertIn("if: github.event_name != 'pull_request'", workflow)
         self.assertIn("HISTORY_OPT_IN: ${{ vars.PAGES_ACTIONS_HISTORY_ENABLED }}", workflow)
         self.assertIn("REAL_DATA_OPT_IN: ${{ vars.PAGES_REAL_RUN_DATA_ENABLED }}", workflow)
+        self.assertIn('--repository "$GITHUB_REPOSITORY"', workflow)
         self.assertIn('workflows: ["ADR Deviation PoC Analysis", "ADR Deviation Labeled Evaluation", "Functional Analysis Demo"]', workflow)
         self.assertIn("github.ref == 'refs/heads/main'", workflow)
         self.assertIn("github.event.workflow_run.event != 'pull_request'", workflow)
@@ -330,6 +331,14 @@ class PagesSnapshotTests(unittest.TestCase):
         self.assertEqual(snapshot["repository"], "example-org/adr-platform")
         self.assertNotIn("secret-canary", json.dumps(snapshot))
         self.assertNotIn("prompt-canary", json.dumps(snapshot))
+
+    def test_ledger_only_snapshot_uses_explicit_cloned_repository_identity(self):
+        self._rewrite_table("runs", lambda rows: rows[0].update(github_run_id="864209"))
+        snapshot = build_history_snapshot(self.db, repository="example-org/adr-platform")
+        self.assertEqual(snapshot["repository"], "example-org/adr-platform")
+        self.assertEqual(snapshot["runs"][0]["workflow_url"], "https://github.com/example-org/adr-platform/actions/runs/864209")
+        with self.assertRaisesRegex(ValueError, "does not match the configured repository"):
+            build_history_snapshot(self.db, actions_history={"repository": "other-org/other-repo"}, repository="example-org/adr-platform")
 
     def test_real_history_requires_organization_private_or_internal_pages_and_explicit_opt_in(self):
         self.assertFalse(real_data_export_enabled("public", "Organization", True, "false"))

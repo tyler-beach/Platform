@@ -14,6 +14,40 @@ test("offers the Functional Analysis Demo workflow alongside the audit workflows
   assert.ok(core.workflows.some(workflow => workflow.id === "functional-analysis-demo.yml"));
 });
 
+test("renders ledger-only history without inventing unavailable job status", () => {
+  const projection = core.historyProjection({
+    schema_version: "adr-demo-history-v1", repository: "example-org/adr-platform",
+    api_history_available: false, data_available: true, workflow_runs: [],
+    runs: [{ github_run_id: 789, run_attempt: 1, workflow_url: "https://github.com/example-org/adr-platform/actions/runs/789",
+      started_at: "2026-10-17T10:00:00Z", completed_at: "2026-10-17T10:01:00Z", comparison: "code-diff",
+      language: "go", provider: "mock", status: "complete", outcome: "supported_deviation" }],
+  }, "example-org/adr-platform");
+  assert.equal(projection.source, "ledger");
+  assert.equal(projection.runs.length, 1);
+  assert.equal(projection.runs[0].ledgerOnly, true);
+  assert.equal(projection.runs[0].jobs.length, 0);
+  assert.equal(projection.runs[0].url, "https://github.com/example-org/adr-platform/actions/runs/789");
+  assert.equal(core.historyProjection({ api_history_available: false, data_available: false, runs: [] }, "example-org/adr-platform"), null);
+});
+
+test("merges validated ledger records with server history without duplicating attempts", () => {
+  const projection = core.historyProjection({
+    api_history_available: true, data_available: true,
+    workflow_runs: [{ id: 789, run_number: 12, run_attempt: 1, name: "Functional Analysis Demo",
+      event: "workflow_dispatch", status: "completed", conclusion: "success",
+      html_url: "https://github.com/example-org/adr-platform/actions/runs/789" }],
+    runs: [
+      { github_run_id: 789, run_attempt: 1, workflow_url: "https://github.com/example-org/adr-platform/actions/runs/789", status: "complete" },
+      { github_run_id: 654, run_attempt: 2, workflow_url: "https://evil.invalid/actions/runs/654", status: "complete" },
+      { github_run_id: 123, run_attempt: 1, workflow_url: "https://github.com/example-org/adr-platform/actions/runs/123", status: "complete" },
+    ],
+  }, "example-org/adr-platform");
+  assert.equal(projection.source, "actions");
+  assert.deepEqual(Array.from(projection.runs, run => `${run.id}:${run.attempt}`), ["789:1", "123:1"]);
+  assert.equal(projection.runs[0].ledgerOnly, undefined);
+  assert.equal(projection.runs[1].ledgerOnly, true);
+});
+
 test("normalizes only known public run URLs and safe primitive metadata", () => {
   const rows = core.normalizeRuns([{ id: 42, run_number: 8, run_attempt: 1, name: "PoC <img>", event: "workflow_dispatch", status: "completed", conclusion: "success", head_branch: "main", head_sha: "a".repeat(40), html_url: "https://github.com/tyler-beach/Platform/actions/runs/42" }]);
   assert.equal(rows.length, 1);
