@@ -28,72 +28,171 @@ def event_text(event: dict[str, Any]) -> str:
     return "\n".join(part for part in parts if part)
 
 
-def assess_candidates(event: dict[str, Any], retrieval_result: dict[str, Any]) -> list[dict[str, Any]]:
-    """Conservative cue-based triage; every flag is a review candidate, never automatic proof."""
-    corpus = event_text(event)
-    candidates = []
-    for adr in retrieval_result["selected_adrs"]:
-        check = adr.get("deviation_check", {})
-        violations, compliance = [], []
-        for pattern in check.get("violation_patterns", []):
-            if re.search(pattern, corpus, re.IGNORECASE):
-                violations.append(pattern)
-        for pattern in check.get("compliance_patterns", []):
-            if re.search(pattern, corpus, re.IGNORECASE):
-                compliance.append(pattern)
-
-        if violations:
-            disposition = "potential_deviation"
-            rationale = (
-                "One or more versioned deviation cues matched the supplied change/evidence text. "
-                "This is a retrieval-plus-cue candidate, not proof; validate the executable path, "
-                "normative wording, applicability and source locations before accepting it."
-            )
-        elif compliance:
-            disposition = "no_conflict_signal"
-            rationale = (
-                "One or more alignment cues matched and no configured violation cue matched. "
-                "This does not establish absence of deviation; inspect the full relevant path and branches."
-            )
-        else:
-            disposition = "inconclusive"
-            rationale = (
-                "The ADR was retrieved, but the cue policy did not establish either conflict or alignment. "
-                "Keep it visible for semantic assessment or human review."
-            )
-
-        observations = event.get("source_observations", [])
-        evidence_refs = [{
-            "evidence_id": obs.get("evidence_id") or f"{event.get('case_id', 'event')}:SRC:{i + 1}",
+def _observation_units(event: dict[str, Any]) -> list[dict[str, Any]]:
+    """Use source-backed excerpts/call edges, never retrieval keywords, as comparison evidence."""
+    units: list[dict[str, Any]] = []
+    for i, obs in enumerate(event.get("source_observations", []), start=1):
+        excerpt = str(obs.get("excerpt", "")).strip()
+        if not excerpt:
+            continue
+        units.append({
+            "evidence_id": obs.get("evidence_id") or f"{event.get('case_id', event.get('event_id', 'event'))}:SRC:{i}",
             "artifact_id": obs.get("artifact_id"),
             "edge_id": obs.get("edge_id"),
             "evidence_type": obs.get("evidence_type", "source_observation"),
             "path": obs.get("path"),
             "line": obs.get("line", obs.get("start_line")),
-            "excerpt": obs.get("excerpt"),
-            "claim": obs.get("claim"),
-            "excerpt_sha256": sha(str(obs.get("excerpt", ""))),
-        } for i, obs in enumerate(observations)]
-        candidates.append({
+            "excerpt": excerpt,
+            "caller_qualified_name": obs.get("caller_qualified_name", ""),
+            "callee_qualified_name": obs.get("callee_qualified_name", ""),
+            "resolution_status": obs.get("resolution_status", ""),
+            "excerpt_sha256": sha(excerpt),
+        })
+    for i, line in enumerate(event.get("diff_lines", []), start=1):
+        excerpt = str(line.get("excerpt", "") if isinstance(line, dict) else line).strip()
+        if not excerpt:
+            continue
+        item = line if isinstance(line, dict) else {}
+        units.append({
+            "evidence_id": item.get("evidence_id") or f"{event.get('case_id', event.get('event_id', 'event'))}:DIFF:{i}",
+            "artifact_id": item.get("artifact_id"),
+            "edge_id": item.get("edge_id"),
+            "evidence_type": "diff_line",
+            "path": item.get("path"),
+            "line": item.get("line", item.get("start_line")),
+            "excerpt": excerpt,
+            "caller_qualified_name": item.get("caller_qualified_name", ""),
+            "callee_qualified_name": item.get("callee_qualified_name", ""),
+            "resolution_status": item.get("resolution_status", ""),
+            "excerpt_sha256": sha(excerpt),
+        })
+    return units
+
+
+def _match_cue(pattern: str, unit: dict[str, Any]) -> bool:
+    try:
+        return re.search(pattern, unit["excerpt"], re.IGNORECASE) is not None
+    except re.error:
+        # Invalid catalog rules should not silently create a match or crash the run.
+        return False
+
+
+def _cue_record(pattern: str, unit: dict[str, Any], relationship: str, explanation: str) -> dict[str, Any]:
+    return {
+        "relationship": relationship,
+        "rule": pattern,
+        "evidence_id": unit["evidence_id"],
+        "path": unit.get("path"),
+        "line": unit.get("line"),
+        "excerpt": unit["excerpt"],
+        "excerpt_sha256": unit["excerpt_sha256"],
+        "explanation": explanation,
+    }
+
+
+def assess_candidates(event: dict[str, Any], retrieval_result: dict[str, Any]) -> list[dict[str, Any]]:
+    """Compare each matched active ADR with pinned source/diff evidence.
+
+    This local baseline uses explicit cue rules. In production, a semantic model can
+    propose the comparison, but every result must still cite the ADR requirement and
+    source observations, and then pass deterministic validation.
+    """
+    units = _observation_units(event)
+    matches = []
+    for adr in retrieval_result["selected_adrs"]:
+        check = adr.get("deviation_check", {})
+        cue_links: list[dict[str, Any]] = []
+
+        for pattern in check.get("violation_patterns", []):
+            for unit in units:
+                if not _match_cue(pattern, unit):
+                    continue
+                relationship = "contradicts"
+                explanation = "A source-backed excerpt matched a versioned contradiction cue."
+                # A provider call alone is not a violation: for the async-provider ADR,
+                # the call site must be on the request path; a worker call is alignment,
+                # and a missing caller identity remains uncertain.
+                if adr.get("adr_id") == "ADR-001" and "Provider" in pattern:
+                    caller = str(unit.get("caller_qualified_name", ""))
+                    if re.search(r"(worker|consumer|async|background)", caller, re.IGNORECASE):
+                        relationship = "consistent_with"
+                        explanation = "Provider call is attributed to an asynchronous worker/consumer, not the request handler."
+                    elif not caller:
+                        relationship = "uncertain"
+                        explanation = "Provider call was found, but caller identity is absent; sync-vs-async behavior is not established."
+                    elif not re.search(r"(handler|controller|submit|request|endpoint)", caller, re.IGNORECASE):
+                        relationship = "uncertain"
+                        explanation = "Provider call was found, but caller identity does not establish whether this is the synchronous request path."
+                cue_links.append(_cue_record(pattern, unit, relationship, explanation))
+
+        for pattern in check.get("compliance_patterns", []):
+            for unit in units:
+                if _match_cue(pattern, unit):
+                    cue_links.append(_cue_record(
+                        pattern, unit, "consistent_with",
+                        "A source-backed excerpt matched a versioned alignment cue.",
+                    ))
+
+        contradictions = [x for x in cue_links if x["relationship"] == "contradicts"]
+        alignments = [x for x in cue_links if x["relationship"] == "consistent_with"]
+        unresolved_links = [x for x in cue_links if x["relationship"] == "uncertain"]
+        if contradictions and alignments:
+            result = "uncertain"
+            rationale = "Evidence contains both contradiction and alignment cues; keep the ADR comparison unresolved for semantic/reviewer adjudication."
+        elif contradictions:
+            result = "deviation"
+            rationale = "Source-backed evidence matches a versioned contradiction cue for this active ADR. This is a candidate deviation and must pass production semantic/evidence validation."
+        elif alignments and not unresolved_links:
+            result = "aligned"
+            rationale = "Source-backed evidence matches an alignment cue and no contradiction cue matched. This is provisional alignment, not a proof that every code path complies."
+        else:
+            result = "uncertain"
+            rationale = "The active ADR matched the event scope, but available source-backed evidence does not establish alignment or deviation."
+
+        requirement_id = f"{adr.get('chunk_id', adr['adr_id'])}:REQUIREMENT"
+        requirement_hash = sha(str(adr.get("normative_text", "")))
+        evidence_links = []
+        for index, link in enumerate(cue_links, start=1):
+            evidence_links.append({
+                "link_id": f"{requirement_id}:LINK:{index}",
+                "requirement_evidence_id": requirement_id,
+                "observation_evidence_id": link["evidence_id"],
+                "relationship": link["relationship"],
+                "rule": link["rule"],
+                "explanation": link["explanation"],
+            })
+        matches.append({
             "adr_id": adr["adr_id"],
             "adr_version": adr["version"],
+            "chunk_id": adr["chunk_id"],
             "title": adr["title"],
-            "finding_disposition": disposition,
+            "applicability": "matched_active_adr",
+            "comparison_result": result,
+            "match_status": "matched",
             "control_id": check.get("check_id", "none"),
-            "matched_violation_cues": violations,
-            "matched_alignment_cues": compliance,
+            "matched_violation_cues": [x["rule"] for x in contradictions],
+            "matched_alignment_cues": [x["rule"] for x in alignments],
             "candidate_explanation": rationale,
-            "requirement_excerpt": adr["normative_text"],
+            "requirement_evidence": {
+                "evidence_id": requirement_id,
+                "artifact_id": adr.get("chunk_id"),
+                "path": adr.get("source_path"),
+                "line": adr.get("source_line_start", 1),
+                "excerpt": adr.get("normative_text", ""),
+                "excerpt_sha256": requirement_hash,
+                "source_sha256": adr.get("source_sha256"),
+            },
             "adr_source": {
                 "path": adr["source_path"],
                 "sha256": adr["source_sha256"],
                 "chunk_id": adr["chunk_id"],
             },
-            "source_observations": evidence_refs,
+            "source_observations": units,
+            "evidence_links": evidence_links,
+            "matched_cue_evidence": cue_links,
             "control_limitations": check.get("note", "No versioned cue policy is defined for this ADR."),
         })
-    return candidates
-
+    return matches
 
 def evaluate_event(event: dict[str, Any], catalog: list[dict[str, Any]], top_k: int,
                    in_scope_threshold: float, review_threshold: float, backend: str = "local") -> dict[str, Any]:
@@ -108,21 +207,31 @@ def evaluate_event(event: dict[str, Any], catalog: list[dict[str, Any]], top_k: 
             event, catalog, top_k=top_k, in_scope_threshold=in_scope_threshold,
             review_threshold=review_threshold,
         )
-    candidate_findings = assess_candidates(event, retrieval_result)
-    flags = [x for x in candidate_findings if x["finding_disposition"] == "potential_deviation"]
-    unresolved = [x for x in candidate_findings if x["finding_disposition"] == "inconclusive"]
+    adr_matches = assess_candidates(event, retrieval_result)
+    deviations = [x for x in adr_matches if x["comparison_result"] == "deviation"]
+    aligned = [x for x in adr_matches if x["comparison_result"] == "aligned"]
+    unresolved = [x for x in adr_matches if x["comparison_result"] == "uncertain"]
+    if deviations:
+        overall_result = "deviation"
+    elif unresolved:
+        overall_result = "uncertain"
+    elif aligned:
+        overall_result = "aligned"
+    else:
+        overall_result = "no_applicable_adr"
     return {
         "event_id": event.get("case_id", event.get("event_id", "unknown")),
         "event_summary": event.get("change_summary", ""),
         "scope": retrieval_result,
-        "candidate_assessments": candidate_findings,
-        "triage": {
-            "status": "review_required" if flags or unresolved or retrieval_result["disposition"] == "uncertain" else
-                      "no_retrieved_adr" if retrieval_result["disposition"] == "not_in_scope" else "no_conflict_signal",
-            "potential_deviation_count": len(flags),
-            "inconclusive_count": len(unresolved),
-            "supported_deviation_count": 0,
-            "note": "This simulated pipeline never emits supported_deviation. That outcome requires semantic assessment plus evidence-link, citation, and provenance validation in the main pipeline.",
+        "adr_matches": adr_matches,
+        "candidate_assessments": adr_matches,
+        "comparison": {
+            "overall_result": overall_result,
+            "matched_active_adr_count": len(adr_matches),
+            "deviation_count": len(deviations),
+            "aligned_count": len(aligned),
+            "uncertain_count": len(unresolved),
+            "note": "Local comparison uses auditable cue rules over source-backed observations. Deviations and alignments are provisional labels; production model assessments must link each ADR requirement to exact evidence and pass schema/provenance validation.",
         },
     }
 
