@@ -1,7 +1,7 @@
 # Functional analysis demo
 
-This directory contains **synthetic test fixtures and a demo-only deterministic harness** for the GitHub Actions workflow `Functional Analysis Demo`.
+The source-analysis stage uses the real Tree-sitter parser and language grammars through the pinned `tree-sitter-language-pack` dependency. Go, Python, JavaScript, TypeScript and Java share one parser interface and a common result shape with exact syntax-node spans.
 
-The Go AST scanner parses the selected synthetic handler with Go's standard-library parser. The Python harness normalizes fixture inputs, builds source-versioned evidence records, estimates a demonstration budget, emits a deterministic mock-model candidate, validates evidence references and writes the report.
+Call labels are intentionally limited heuristics over the parsed receiver and method name. Tree-sitter does not resolve types or prove transitive runtime behavior. The Markdown specification pass is separate and deterministic.
 
-The mock-model stage makes no network calls and uses no repository secrets. It is not a real model evaluation and its pass/fail result is only a harness check.
+All fixtures are synthetic. The mock-model stage is a deterministic ruleset shaped like a structured model response. It makes no network calls and uses no repository secrets. Budget numbers demonstrate the gate only; they are not provider token counts or charges.
