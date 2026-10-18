@@ -41,6 +41,11 @@ def sha(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
+def dataset_fingerprint() -> str:
+    """Fingerprint the exact bytes of the labeled dataset used for this run."""
+    return hashlib.sha256(CASES_PATH.read_bytes()).hexdigest()
+
+
 def load_cases() -> list[dict[str, Any]]:
     cases = [json.loads(line) for line in CASES_PATH.read_text(encoding="utf-8").splitlines() if line.strip()]
     ids = [case.get("case_id") for case in cases]
@@ -317,6 +322,7 @@ def write_report(path: Path, provider: str, results: list[dict[str, Any]], metri
         "",
         f"- Provider: {provider}",
         f"- Dataset: {CASES_PATH.relative_to(ROOT)}",
+        f"- Dataset SHA-256: {dataset_fingerprint()}",
         f"- Cases: {metrics['case_count']}",
         f"- Labels: {json.dumps(metrics['label_counts'], sort_keys=True)}",
         f"- Three-way exact accuracy: {metrics['exact_three_way_accuracy']:.1%}",
@@ -450,7 +456,14 @@ def main() -> None:
         })
     metrics = compute_metrics(results)
     payload = {
-        "benchmark_version": "labeled-adr-evaluation-v1.0.0",
+        "benchmark_version": "labeled-adr-evaluation-v1.1.0",
+        "dataset_fingerprint_sha256": dataset_fingerprint(),
+        "analysis_configuration": {
+            "provider": args.provider,
+            "max_output_tokens": args.max_output_tokens,
+            "score_algorithm": confidence.ALGORITHM_VERSION,
+            "outcome_mapping_version": "outcome-label-map-v1",
+        },
         "provider": args.provider,
         "score_algorithm": confidence.ALGORITHM_VERSION,
         "dataset_path": str(CASES_PATH.relative_to(ROOT)),
