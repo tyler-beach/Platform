@@ -1,0 +1,33 @@
+{
+  "case_id": "session-ttl-over-limit",
+  "adr": {
+    "artifact_id": "ADR-SESSION-001",
+    "revision": "git:abc123",
+    "path": "adrs/session-ttl.md",
+    "content": "Session TTL must not exceed 600 seconds.",
+    "sha256": "a3f26674d27de7a2777a3538ba0b5bb86b941d27eeea81b32cd3d60def4d443f",
+    "status": "accepted"
+  },
+  "source": {
+    "artifact_id": "service-config",
+    "revision": "git:def456",
+    "path": "config/session.json",
+    "content": "{\"session_ttl_seconds\": 720}",
+    "sha256": "b1fbeaa0eff34d3acf9814ae50805c3ab2402f4dc2bbf867e57fff34a7c03d90"
+  },
+  "scope_match": true,
+  "max_ttl_seconds": 600,
+  "evidence": [
+    {
+      "evidence_id": "EV-TTL-1",
+      "artifact_id": "service-config",
+      "revision": "git:def456",
+      "locator": {
+        "kind": "json_pointer",
+        "value": "/session_ttl_seconds"
+      },
+      "predicate": "session.ttl_seconds",
+      "value": 720
+    }
+  ]
+}
