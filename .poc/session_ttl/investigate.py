@@ -200,10 +200,13 @@ def main() -> int:
     parser.add_argument("--output", type=Path, help="Write canonical result JSON to this path")
     parser.add_argument("--verify-repeat", action="store_true", help="Run twice and fail if result fingerprints differ")
     args = parser.parse_args()
-    case = load_case(args.case)
-    result = investigate(case)
-    if args.verify_repeat and result != investigate(load_case(args.case)):
-        raise SystemExit("deterministic replay mismatch")
+    try:
+        case = load_case(args.case)
+        result = investigate(case)
+        if args.verify_repeat and result != investigate(load_case(args.case)):
+            raise ValueError("deterministic replay mismatch")
+    except (OSError, json.JSONDecodeError, ValueError) as exc:
+        parser.error(str(exc))
     encoded = json.dumps(result, indent=2, ensure_ascii=False, sort_keys=True) + "\n"
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
