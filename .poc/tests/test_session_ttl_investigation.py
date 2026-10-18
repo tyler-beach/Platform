@@ -136,6 +136,51 @@ class SessionTTLInvestigationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "max_ttl_seconds"):
             investigate.investigate(fixture(720, scope_match=False, max_ttl_seconds=-1))
 
+    def test_policy_threshold_cannot_be_overridden(self):
+        with self.assertRaisesRegex(ValueError, "must equal the 600-second limit"):
+            investigate.investigate(fixture(720, max_ttl_seconds=1))
+
+    def test_decision_evidence_excludes_unrelated_package_evidence(self):
+        case = fixture(720)
+        case["evidence"].append({
+            "evidence_id": "EV-ADR-1",
+            "artifact_id": case["adr"]["artifact_id"],
+            "revision": case["adr"]["revision"],
+            "locator": {"kind": "text_span", "value": "1:1-1:40"},
+            "predicate": "adr.requirement",
+            "value": "Session TTL must not exceed 600 seconds.",
+        })
+        result = investigate.investigate(case)
+        self.assertEqual(result["evidence_ids"], ["EV-TTL-1"])
+
+    def test_non_applicable_result_has_no_decision_evidence(self):
+        result = investigate.investigate(fixture(720, scope_match=False))
+        self.assertEqual(result["evidence_ids"], [])
+
+    def test_ttl_evidence_rejects_unsupported_locator_kind(self):
+        case = fixture(720)
+        case["evidence"][0]["locator"] = {"kind": "text_span", "value": "1:1-1:20"}
+        with self.assertRaisesRegex(ValueError, "unsupported locator"):
+            investigate.investigate(case)
+
+    def test_negative_ttl_observation_is_inconclusive_not_compliant(self):
+        case = fixture(-1)
+        result = investigate.investigate(case)
+        self.assertEqual(result["outcome"], "inconclusive")
+        self.assertEqual(result["relationship"], "insufficient_evidence")
+        self.assertEqual(result["evidence_ids"], [])
+
+    def test_float_ttl_observation_is_inconclusive_not_compliant(self):
+        case = fixture(720)
+        source_content = json.dumps({"observations": [{"predicate": "session.ttl_seconds", "value": 12.5}]}, separators=(",", ":"))
+        case["source"] = artifact("service-config", "git:def456", "config/session.json", source_content)
+        case["evidence"][0]["locator"]["value"] = "/observations/0/value"
+        case["evidence"][0]["value"] = 12.5
+        result = investigate.investigate(case)
+        self.assertEqual(result["outcome"], "inconclusive")
+        self.assertEqual(result["relationship"], "insufficient_evidence")
+        self.assertEqual(result["evidence_ids"], [])
+
     def test_mutated_pinned_artifact_hash_is_rejected(self):
         case = fixture(720)
         case["source"]["content"] += " "
