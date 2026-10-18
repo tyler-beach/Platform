@@ -17,7 +17,7 @@ The report is written to `.poc/evaluation/requirements/latest-report.json`, incl
 
 Labels are **provisional synthetic scenario-specification labels**. The facts are deliberately structured so the initial evaluator can be checked against explicit scenarios and evidence states. They are not independent human adjudications, real production observations, or estimates of production accuracy. Every case is marked `independent_adjudication_status: pending`; no independent-review result is invented. Use the included labels as regression oracles for the current deterministic rules, not as proof the rules generalize.
 
-Before describing this as an independently adjudicated benchmark, have a reviewer who did not author the rules examine the requirement, evidence, rationale, applicability, and expected disposition; record reviewer identity/role, adjudicated label, evidence rationale, and disagreement resolution. Keep locked cases inaccessible during rule tuning and refresh them after changes are accepted.
+A blank review worksheet is provided at `.poc/evaluation/requirements/adjudication-template.csv` with one row per case. Before describing this as an independently adjudicated benchmark, have a reviewer who did not author the rules examine the requirement, evidence, rationale, applicability, and expected disposition; record reviewer identity/role, adjudicated label, evidence rationale, and disagreement resolution. Do not copy the provisional label into the adjudicated-label field without independent review. Keep locked cases inaccessible during rule tuning and refresh them after changes are accepted.
 
 ## Conservative disposition rules
 

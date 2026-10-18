@@ -37,8 +37,8 @@ def classify(case):
             return "ambiguous"
         ttl=f.get("ttl_seconds"); limit=f.get("max_ttl_seconds")
         if ttl is None or limit is None: return "ambiguous"
-        if ttl > limit and f.get("exception_approved") is True: return "no_deviation"
-        if ttl > limit and f.get("exception_approved") is None: return "ambiguous"
+        if ttl > limit and f.get("exception_valid") is True: return "no_deviation"
+        if ttl > limit and f.get("exception_valid") is None: return "ambiguous"
         return "deviation" if ttl > limit else "no_deviation"
     if t=="pod_disruption_budget":
         if not f.get("evidence_complete"): return "ambiguous"
@@ -53,12 +53,15 @@ def classify(case):
         if not f.get("evidence_complete"): return "ambiguous"
         sensitive=f.get("sensitive_data_observed"); redaction=f.get("redaction_verified")
         if sensitive is None or redaction is None: return "ambiguous"
-        return "deviation" if sensitive and not redaction else "no_deviation"
+        if sensitive is True: return "deviation"
+        if sensitive is False and redaction is True: return "no_deviation"
+        return "ambiguous"
     if t=="async_provider":
         if not f.get("evidence_complete") or not f.get("dispatch_resolved"): return "ambiguous"
         direct=f.get("direct_sync_call"); boundary=f.get("async_boundary")
         if direct is None or boundary is None: return "ambiguous"
-        return "deviation" if direct and not boundary else "no_deviation"
+        if direct is True and boundary is True: return "ambiguous"
+        return "deviation" if direct is True and boundary is False else "no_deviation"
     if t=="approved_exception":
         if not f.get("evidence_complete"): return "ambiguous"
         if f.get("exception_used") is False: return "no_deviation"
