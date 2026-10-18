@@ -16,4 +16,4 @@
 ## 3. Verification
 
 - [x] 3.1 Go tests + npm tests + OpenSpec validate
-- [ ] 3.2 CI green; optional live issue smoke
+- [x] 3.2 CI green on #62; live issue smoke deferred
