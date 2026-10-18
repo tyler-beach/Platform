@@ -296,5 +296,46 @@ class SessionTTLInvestigationTests(unittest.TestCase):
         ])
 
 
+    def test_result_contract_rejects_unhashable_outcome(self):
+        result = investigate.investigate(fixture(720))
+        result["outcome"] = []
+        with self.assertRaisesRegex(ValueError, "invalid result outcome"):
+            investigate.validate_result(result)
+
+    def test_json_pointer_rfc6901_escaped_tokens_and_empty_key(self):
+        document = {"a/b": {"~key": [10, 20]}, "": "empty-key"}
+        self.assertEqual(investigate.resolve_json_pointer(document, "/a~1b/~0key/1"), 20)
+        self.assertEqual(investigate.resolve_json_pointer(document, "/"), "empty-key")
+        self.assertIs(investigate.resolve_json_pointer(document, ""), document)
+
+    def test_json_pointer_rejects_noncanonical_array_indices(self):
+        document = {"values": [10, 20]}
+        for pointer in ("/values/00", "/values/-", "/values/-1", "/values/2"):
+            with self.subTest(pointer=pointer), self.assertRaises(ValueError):
+                investigate.resolve_json_pointer(document, pointer)
+
+    def test_json_pointer_rejects_scalar_traversal(self):
+        with self.assertRaisesRegex(ValueError, "scalar"):
+            investigate.resolve_json_pointer({"value": 1}, "/value/child")
+
+    def test_evidence_artifact_id_wrong_type_is_contract_error(self):
+        case = fixture(720)
+        case["evidence"][0]["artifact_id"] = []
+        with self.assertRaisesRegex(ValueError, "artifact_id must be a string"):
+            investigate.investigate(case)
+
+    def test_artifact_identity_collision_is_rejected(self):
+        case = fixture(720)
+        case["source"]["artifact_id"] = case["adr"]["artifact_id"]
+        with self.assertRaisesRegex(ValueError, "artifact IDs must be distinct"):
+            investigate.investigate(case)
+
+    def test_malformed_source_json_is_rejected_without_ttl_evidence(self):
+        case = fixture(None)
+        case["source"]["content"] = "{not-json"
+        case["source"]["sha256"] = hashlib.sha256(case["source"]["content"].encode()).hexdigest()
+        with self.assertRaisesRegex(ValueError, "source content must be valid JSON"):
+            investigate.investigate(case)
+
 if __name__ == "__main__":
     unittest.main()
