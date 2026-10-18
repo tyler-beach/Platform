@@ -14,5 +14,5 @@
 
 ## 3. Verification
 
-- [ ] 3.1 Go tests + live smoke
-- [ ] 3.2 Archive after acceptance
+- [x] 3.1 Go tests + CI Pathfinder Go real-catalog dry-run
+- [x] 3.2 Archive after acceptance
