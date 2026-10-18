@@ -224,7 +224,7 @@ class SessionTTLInvestigationTests(unittest.TestCase):
     def test_result_contract_rejects_non_applicable_compliance_claim(self):
         result = investigate.investigate(fixture(720))
         result["applicability"]["applicable"] = False
-        with self.assertRaisesRegex(ValueError, "non-applicable result"):
+        with self.assertRaisesRegex(ValueError, "applicability fields are inconsistent"):
             investigate.validate_result(result)
 
     def test_cli_success_and_repeat_verification(self):
