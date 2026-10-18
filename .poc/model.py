@@ -62,7 +62,7 @@ def mock_assess(context: dict[str,Any]) -> dict[str,Any]:
         or e.get("resolution_status")=="resolved_approximate"
         for e in entry_provider_edges
     )
-    requires_async=any(x in req for x in ("asynchronous","asynchronously","queue","queued","must not block","non-blocking"))
+    requires_async=any(x in req for x in ("asynchronous","asynchronously","queue","queued","enqueue","outbox","background worker","must not block","non-blocking"))
     explicit_sync=any(x in req for x in ("synchronous","synchronously","inline","before returning","blocking"))
     limitations=[]
     generic_config_only=False
