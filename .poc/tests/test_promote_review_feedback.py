@@ -47,6 +47,20 @@ class FeedbackPromotionTests(unittest.TestCase):
         result = export_candidates([event("holdout", evaluation_split="holdout")])
         self.assertEqual(result["candidate_count"], 0)
 
+    def test_missing_split_never_defaults_to_training(self):
+        row = event("missing-split")
+        del row["evaluation_split"]
+        result = export_candidates([row])
+        self.assertEqual(result["candidate_count"], 0)
+        self.assertEqual(result["excluded_counts"]["holdout_or_eval_split"], 1)
+
+    def test_missing_adjudicator_provenance_is_excluded(self):
+        row = event("missing-adjudicator")
+        del row["adjudicator_id"]
+        result = export_candidates([row])
+        self.assertEqual(result["candidate_count"], 0)
+        self.assertEqual(result["excluded_counts"]["missing_provenance"], 1)
+
     def test_candidate_has_provenance_and_no_source_excerpt(self):
         candidate = export_candidates([event("one")])["candidates"][0]
         self.assertEqual(candidate["analysis_version"], "pipeline-v1+sha256:abc")

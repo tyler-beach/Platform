@@ -18,6 +18,22 @@ class LabeledEvaluationTests(unittest.TestCase):
         self.assertEqual({case["gold_label"] for case in cases}, {"deviation", "no_deviation", "ambiguous"})
         self.assertGreaterEqual(len(cases), 12)
 
+    def test_dataset_fingerprint_is_stable_and_tracks_exact_corpus_bytes(self):
+        first = evaluate.dataset_fingerprint()
+        second = evaluate.dataset_fingerprint()
+        self.assertEqual(first, second)
+        self.assertEqual(len(first), 64)
+        self.assertTrue(all(char in "0123456789abcdef" for char in first))
+
+    def test_metrics_include_behavior_breakdown(self):
+        rows = [
+            {"case_id": "D1", "behavior": "direct_provider", "gold_label": "deviation", "predicted_label": "deviation", "accepted_outcome": "supported_deviation", "score_0_to_100": 80.0},
+            {"case_id": "N1", "behavior": "no_provider", "gold_label": "no_deviation", "predicted_label": "no_deviation", "accepted_outcome": "no_deviation_found", "score_0_to_100": 90.0},
+        ]
+        metrics = evaluate.compute_metrics(rows)
+        self.assertEqual(metrics["by_behavior"]["direct_provider"]["exact_three_way_accuracy"], 1.0)
+        self.assertEqual(metrics["by_behavior"]["no_provider"]["clear_case_binary_metrics"]["tn"], 1)
+
     def test_case_builder_pins_excerpt_hashes_and_links_edges(self):
         case = next(c for c in evaluate.load_cases() if c["case_id"] == "D-01")
         context, artifacts = evaluate.build_case_context(case)

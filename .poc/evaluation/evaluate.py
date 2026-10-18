@@ -41,6 +41,11 @@ def sha(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
+def dataset_fingerprint() -> str:
+    """Fingerprint the exact bytes of the labeled dataset used for this run."""
+    return hashlib.sha256(CASES_PATH.read_bytes()).hexdigest()
+
+
 def load_cases() -> list[dict[str, Any]]:
     cases = [json.loads(line) for line in CASES_PATH.read_text(encoding="utf-8").splitlines() if line.strip()]
     ids = [case.get("case_id") for case in cases]
@@ -248,6 +253,29 @@ def compute_metrics(results: list[dict[str, Any]]) -> dict[str, Any]:
         sum(r["predicted_label"] == "ambiguous" for r in ambiguous) / len(ambiguous)
         if ambiguous else None
     )
+    # Break down outcomes by the deterministic scenario family so a good
+    # aggregate score cannot hide a systematic failure in one graph pattern.
+    by_behavior: dict[str, list[dict[str, Any]]] = {}
+    for result in results:
+        by_behavior.setdefault(str(result.get("behavior", "unspecified")), []).append(result)
+    behavior_metrics = {}
+    for behavior, rows in sorted(by_behavior.items()):
+        row_total = len(rows)
+        row_correct = sum(r["predicted_label"] == r["gold_label"] for r in rows)
+        row_clear = [r for r in rows if r["gold_label"] != "ambiguous"]
+        row_binary = score_binary(
+            [r["gold_label"] for r in row_clear],
+            [r["predicted_label"] == "deviation" for r in row_clear],
+        )
+        behavior_metrics[behavior] = {
+            "case_count": row_total,
+            "three_way_correct": row_correct,
+            "exact_three_way_accuracy": row_correct / row_total if row_total else None,
+            "label_counts": dict(Counter(r["gold_label"] for r in rows)),
+            "clear_case_binary_metrics": row_binary,
+            "ambiguous_case_count": sum(r["gold_label"] == "ambiguous" for r in rows),
+            "ambiguous_escalated": sum(r["gold_label"] == "ambiguous" and r["predicted_label"] == "ambiguous" for r in rows),
+        }
     threshold_sweep = []
     for threshold in (0, 50, 60, 70, 80, 85, 90, 95, 100):
         accepted = [
@@ -275,6 +303,7 @@ def compute_metrics(results: list[dict[str, Any]]) -> dict[str, Any]:
         "ambiguous_case_count": len(ambiguous),
         "ambiguous_case_escalation_rate": ambiguous_escalation_rate,
         "review_gate_threshold_sweep": threshold_sweep,
+        "by_behavior": behavior_metrics,
         "interpretation": (
             "Evidence-strength scores are not probabilities. Threshold results show only how a "
             "score gate changes findings sent forward for human review; they do not establish "
@@ -293,11 +322,23 @@ def write_report(path: Path, provider: str, results: list[dict[str, Any]], metri
         "",
         f"- Provider: {provider}",
         f"- Dataset: {CASES_PATH.relative_to(ROOT)}",
+        f"- Dataset SHA-256: {dataset_fingerprint()}",
         f"- Cases: {metrics['case_count']}",
         f"- Labels: {json.dumps(metrics['label_counts'], sort_keys=True)}",
         f"- Three-way exact accuracy: {metrics['exact_three_way_accuracy']:.1%}",
         f"- Clear-case decision coverage: {metrics['clear_case_decision_coverage']:.1%}",
         f"- Escalation rate on ambiguous gold cases: {metrics['ambiguous_case_escalation_rate']:.1%}",
+        "",
+        "## Results by scenario family",
+        "",
+        "| Family | Cases | Exact accuracy | TP | FP | FN | TN |",
+        "|---|---:|---:|---:|---:|---:|---:|",
+        *[
+            f"| {family} | {row['case_count']} | {fmt_metric(row['exact_three_way_accuracy'])} | "
+            f"{row['clear_case_binary_metrics']['tp']} | {row['clear_case_binary_metrics']['fp']} | "
+            f"{row['clear_case_binary_metrics']['fn']} | {row['clear_case_binary_metrics']['tn']} |"
+            for family, row in sorted(metrics.get("by_behavior", {}).items())
+        ],
         "",
         "> **Interpretation guardrail:** These are initial synthetic, hand-authored evaluation cases. They are a regression harness, not an independently adjudicated benchmark or a calibration claim. Evidence scores are not probabilities; threshold results describe review gating only.",
         "",
@@ -411,10 +452,18 @@ def main() -> None:
             "limitations": assessment.get("limitations", []),
             "summary": assessment.get("summary", ""),
             "rationale": assessment.get("rationale", ""),
+            "behavior": case.get("behavior", "unspecified"),
         })
     metrics = compute_metrics(results)
     payload = {
-        "benchmark_version": "labeled-adr-evaluation-v1.0.0",
+        "benchmark_version": "labeled-adr-evaluation-v1.1.0",
+        "dataset_fingerprint_sha256": dataset_fingerprint(),
+        "analysis_configuration": {
+            "provider": args.provider,
+            "max_output_tokens": args.max_output_tokens,
+            "score_algorithm": confidence.ALGORITHM_VERSION,
+            "outcome_mapping_version": "outcome-label-map-v1",
+        },
         "provider": args.provider,
         "score_algorithm": confidence.ALGORITHM_VERSION,
         "dataset_path": str(CASES_PATH.relative_to(ROOT)),
