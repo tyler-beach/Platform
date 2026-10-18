@@ -337,5 +337,36 @@ class SessionTTLInvestigationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "source content must be valid JSON"):
             investigate.investigate(case)
 
+    def test_result_contract_rejects_policy_tampering(self):
+        result = investigate.investigate(fixture(720))
+        result["policy"]["limit_seconds"] = 1
+        with self.assertRaisesRegex(ValueError, "pinned policy"):
+            investigate.validate_result(result)
+
+    def test_result_contract_rejects_fabricated_accepted_evidence(self):
+        result = investigate.investigate(fixture(720))
+        result["accepted_evidence_ids"] = ["EV-FABRICATED"]
+        with self.assertRaisesRegex(ValueError, "subsets of considered"):
+            investigate.validate_result(result)
+
+    def test_result_contract_rejects_relationship_outcome_mismatch(self):
+        result = investigate.investigate(fixture(720))
+        result["relationship"] = "consistent_with"
+        with self.assertRaisesRegex(ValueError, "inconsistent with outcome"):
+            investigate.validate_result(result)
+
+    def test_result_contract_rejects_confident_outcome_with_rejected_observation(self):
+        result = investigate.investigate(fixture(-1))
+        result["outcome"] = "no_deviation_found"
+        result["relationship"] = "consistent_with"
+        result["uncertainty"] = []
+        with self.assertRaisesRegex(ValueError, "rejected observations require"):
+            investigate.validate_result(result)
+
+    def test_boundary_values_are_deterministic(self):
+        for ttl, expected in ((0, "no_deviation_found"), (599, "no_deviation_found"), (600, "no_deviation_found"), (601, "supported_deviation")):
+            with self.subTest(ttl=ttl):
+                self.assertEqual(investigate.investigate(fixture(ttl))["outcome"], expected)
+
 if __name__ == "__main__":
     unittest.main()
