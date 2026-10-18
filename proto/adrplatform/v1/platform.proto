@@ -86,6 +86,46 @@ enum FindingOutcome {
   FINDING_OUTCOME_INCONCLUSIVE = 4;
 }
 
+// ApplicabilityDisposition describes whether an ADR governs the analyzed subject.
+enum ApplicabilityDisposition {
+  // Applicability has not been determined.
+  APPLICABILITY_DISPOSITION_UNSPECIFIED = 0;
+  // The ADR applies to the subject and environment.
+  APPLICABILITY_DISPOSITION_IN_SCOPE = 1;
+  // The ADR does not apply to the subject and environment.
+  APPLICABILITY_DISPOSITION_OUT_OF_SCOPE = 2;
+  // Available evidence cannot resolve applicability.
+  APPLICABILITY_DISPOSITION_UNCERTAIN = 3;
+}
+
+// EvidenceRelationshipType describes the relationship between a requirement and observation.
+enum EvidenceRelationshipType {
+  // Relationship has not been established.
+  EVIDENCE_RELATIONSHIP_TYPE_UNSPECIFIED = 0;
+  // Observation supports the requirement being satisfied.
+  EVIDENCE_RELATIONSHIP_TYPE_SUPPORTS = 1;
+  // Observation contradicts the requirement.
+  EVIDENCE_RELATIONSHIP_TYPE_CONTRADICTS = 2;
+  // Observation provides context but does not establish compliance or deviation.
+  EVIDENCE_RELATIONSHIP_TYPE_CONTEXTUAL = 3;
+  // Relationship cannot be established from current evidence.
+  EVIDENCE_RELATIONSHIP_TYPE_UNCERTAIN = 4;
+}
+
+// AdjudicationStatus is separate from the detector outcome and reviewer disposition.
+enum AdjudicationStatus {
+  // Adjudication state has not been set.
+  ADJUDICATION_STATUS_UNSPECIFIED = 0;
+  // No adjudication is required by policy.
+  ADJUDICATION_STATUS_NOT_REQUIRED = 1;
+  // A reviewer disposition awaits an authorized adjudicator.
+  ADJUDICATION_STATUS_PENDING = 2;
+  // An authorized adjudicator approved the disposition.
+  ADJUDICATION_STATUS_APPROVED = 3;
+  // An authorized adjudicator rejected the proposed disposition.
+  ADJUDICATION_STATUS_REJECTED = 4;
+}
+
 // FindingSeverity describes impact and is independent from confidence/outcome.
 enum FindingSeverity {
   // Severity has not been assigned.
@@ -237,6 +277,18 @@ message EvidenceRef {
   string excerpt_sha256 = 9;
 }
 
+// EvidenceLink binds a normative requirement to a specific source observation.
+message EvidenceLink {
+  // Evidence ID of the requirement in the immutable evidence package.
+  string requirement_evidence_id = 1;
+  // Evidence ID of the source observation in the same package.
+  string observation_evidence_id = 2;
+  // Explicit relationship; the server validates both referenced IDs.
+  EvidenceRelationshipType relationship = 3;
+  // Explanation of what the relationship establishes and does not establish.
+  string explanation = 4;
+}
+
 // Finding is a validated assessment with evidence references and review state.
 message Finding {
   // Stable finding ID.
@@ -267,6 +319,20 @@ message Finding {
   string finding_fingerprint = 13;
   // Finding creation timestamp.
   google.protobuf.Timestamp created_at = 14;
+  // Applicability is resolved independently from compliance outcome.
+  ApplicabilityDisposition applicability = 15;
+  // Version of the analysis logic and policy used for this finding.
+  string analysis_version = 16;
+  // SHA-256 fingerprint of canonical immutable analysis inputs.
+  string input_fingerprint_sha256 = 17;
+  // Typed requirement-to-observation relationships used to justify the outcome.
+  repeated EvidenceLink evidence_links = 18;
+  // Authorized adjudication state; never inferred from reviewer disposition.
+  AdjudicationStatus adjudication_status = 19;
+  // Explicit limitations, missing evidence, or unresolved assumptions.
+  repeated string limitations = 20;
+  // Evidence that may contradict the claim or narrow its scope.
+  repeated EvidenceRef counter_evidence = 21;
 }
 
 // ListFindingsRequest requests a page of findings for one authorized job.
