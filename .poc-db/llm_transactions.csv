@@ -1,0 +1,1 @@
+transaction_id,run_id,provider,model,request_id,status,prompt_sha256,input_chars,output_chars,estimated_input_tokens,actual_input_tokens,actual_output_tokens,duration_ms,error,created_at

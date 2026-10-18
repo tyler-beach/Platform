@@ -1,0 +1,1 @@
+coverage_id,run_id,source_type,collector,collector_version,complete,scope_root,inspected_count,emitted_count,unresolved_count,approximate_count,redacted_value_count,unsupported_files_json,failed_files_json,missing_source_refs_json,diagnostics_json

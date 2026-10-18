@@ -1,0 +1,1 @@
+edge_id,run_id,caller_symbol_id,callee_symbol_id,call_expression,path,line,resolution_status,resolution_basis,dispatch_kind,is_transitive

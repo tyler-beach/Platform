@@ -1,0 +1,1 @@
+reservation_id,run_id,provider,model,max_input_tokens,max_output_tokens,estimated_input_tokens,reserved_at,status,actual_input_tokens,actual_output_tokens
