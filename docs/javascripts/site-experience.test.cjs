@@ -70,7 +70,7 @@ test('Run Explorer is a separate route backed by live Actions metadata', () => {
   assert.ok(app.includes('Run Explorer'));
   const explorer = fs.readFileSync(path.join(root, 'src/components/RunExplorer.jsx'), 'utf8');
   assert.ok(explorer.includes('/actions/runs?per_page=50'));
-  assert.ok(explorer.includes('/actions/runs/${selectedRun.id}/jobs'));
+  assert.ok(explorer.includes('/attempts/${selectedAttempt}/jobs'));
   assert.ok(explorer.includes('STEP INSPECTOR'));
   assert.ok(explorer.includes('Evidence boundary'));
   assert.ok(css.includes('.run-workspace'));
@@ -89,4 +89,9 @@ test('Run Explorer inspects logs, artifact payloads, attempts, and provenance wi
   assert.ok(explorer.includes('Source commit'));
   assert.ok(css.includes('.run-log-file'));
   assert.ok(css.includes('.run-attempt-picker'));
+  assert.ok(explorer.includes('Compare executions'));
+  assert.ok(explorer.includes('run-comparison__table'));
+  assert.ok(explorer.includes('Faster in selected run'));
+  assert.ok(explorer.includes('File contents match'));
+  assert.ok(css.includes('.run-comparison__table'));
 });
