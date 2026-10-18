@@ -103,6 +103,8 @@ def validate_evidence(case: dict[str, Any], adr: dict[str, Any], source: dict[st
         if evidence_id in by_id:
             raise ValueError("evidence IDs must be unique")
         artifact_id = item.get("artifact_id")
+        if not isinstance(artifact_id, str):
+            raise ValueError(f"evidence {evidence_id} artifact_id must be a string")
         if artifact_id not in {adr["artifact_id"], source["artifact_id"]}:
             raise ValueError(f"evidence {evidence_id} points outside the pinned artifacts")
         expected_revision = adr["revision"] if artifact_id == adr["artifact_id"] else source["revision"]
@@ -141,9 +143,8 @@ def validate_case(case: Any) -> tuple[dict[str, Any], dict[str, Any], list[dict[
         raise ValueError("case must be a JSON object")
     adr = validate_pinned_artifact(case.get("adr"), "adr")
     source = validate_pinned_artifact(case.get("source"), "source")
-    for artifact_name, artifact in (("adr", adr), ("source", source)):
-        if artifact["artifact_id"] == "":
-            raise ValueError(f"{artifact_name}.artifact_id must not be empty")
+    if adr["artifact_id"] == source["artifact_id"]:
+        raise ValueError("ADR and source artifact IDs must be distinct")
     if not isinstance(adr.get("status"), str) or not adr["status"].strip():
         raise ValueError("adr.status must be a non-empty string")
     if type(case.get("scope_match")) is not bool:
@@ -154,6 +155,10 @@ def validate_case(case: Any) -> tuple[dict[str, Any], dict[str, Any], list[dict[
     supplied_limit = case.get("max_ttl_seconds", MAX_TTL_SECONDS)
     if type(supplied_limit) is not int or supplied_limit != MAX_TTL_SECONDS:
         raise ValueError(f"max_ttl_seconds must equal the {MAX_TTL_SECONDS}-second limit in {POLICY_VERSION}")
+    try:
+        json.loads(source["content"], object_pairs_hook=_reject_duplicate_json_keys)
+    except (json.JSONDecodeError, ValueError) as exc:
+        raise ValueError("source content must be valid JSON") from exc
     evidence, requested = validate_evidence(case, adr, source)
     return {"case_id": case_id, "scope_match": case["scope_match"]}, {"adr": adr, "source": source}, evidence, requested
 
