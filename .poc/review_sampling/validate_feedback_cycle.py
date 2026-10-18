@@ -26,42 +26,64 @@ def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def sampled_unit_ids(batch: dict[str, Any]) -> set[str]:
-    units = set()
+def validate_sample_manifest(batch: dict[str, Any]) -> tuple[set[str], list[str]]:
+    errors: list[str] = []
+    if not isinstance(batch.get("seed"), str) or not batch["seed"]:
+        errors.append("sample manifest is missing its reproducible seed")
+    frame = batch.get("frame")
+    if not isinstance(frame, dict) or not isinstance(frame.get("fingerprint_sha256"), str) or len(frame["fingerprint_sha256"]) != 64:
+        errors.append("sample manifest is missing its frame fingerprint")
+    units: set[str] = set()
     for queue in ("probability_sample", "risk_sample"):
-        for item in batch.get(queue, []):
-            unit_id = item.get("unit_id")
+        rows = batch.get(queue, [])
+        if not isinstance(rows, list):
+            errors.append(f"{queue} must be a list")
+            continue
+        for item in rows:
+            unit_id = item.get("unit_id") if isinstance(item, dict) else None
             if not isinstance(unit_id, str) or not unit_id:
-                raise ValueError(f"{queue} contains an invalid unit_id")
+                errors.append(f"{queue} contains an invalid unit_id")
+                continue
             units.add(unit_id)
-    return units
+            if queue == "probability_sample":
+                probability = item.get("inclusion_probability")
+                weight = item.get("design_weight")
+                if not isinstance(probability, (int, float)) or not 0 < probability <= 1:
+                    errors.append(f"{unit_id}: probability sample requires a valid inclusion_probability")
+                elif not isinstance(weight, (int, float)) or abs(weight - (1.0 / probability)) > 1e-8:
+                    errors.append(f"{unit_id}: design_weight must be the reciprocal of inclusion_probability")
+                if item.get("selection_reason") != "STRATIFIED_RANDOM":
+                    errors.append(f"{unit_id}: probability sample has an unexpected selection reason")
+            else:
+                if item.get("population_inclusion_probability", "missing") is not None:
+                    errors.append(f"{unit_id}: risk-only selection must not claim a population inclusion probability")
+                if item.get("selection_reason") != "RISK_TRIAGE":
+                    errors.append(f"{unit_id}: risk sample has an unexpected selection reason")
+    return units, errors
 
 
 def validate_cycle(events: list[dict[str, Any]], batch: dict[str, Any]) -> dict[str, Any]:
-    selected = sampled_unit_ids(batch)
-    dispositions: dict[str, list[dict[str, Any]]] = {}
-    adjudications = []
-    errors = []
-    for event in events:
+    selected, errors = validate_sample_manifest(batch)
+    dispositions: dict[str, list[tuple[int, dict[str, Any]]]] = {}
+    adjudications: list[tuple[int, dict[str, Any]]] = []
+    for index, event in enumerate(events):
         unit_id = event.get("unit_id")
         if unit_id not in selected:
             errors.append(f"{event.get('event_id')}: unit is not in the supplied sample manifest")
         if event.get("event_type") == "review.dispositioned":
-            dispositions.setdefault(unit_id, []).append(event)
+            dispositions.setdefault(unit_id, []).append((index, event))
         elif event.get("event_type") == "review.adjudicated":
-            adjudications.append(event)
-    for event in adjudications:
-        prior = dispositions.get(event.get("unit_id"), [])
+            adjudications.append((index, event))
+    for index, event in adjudications:
+        prior = [(position, item) for position, item in dispositions.get(event.get("unit_id"), []) if position < index]
         if not prior:
-            errors.append(f"{event.get('event_id')}: adjudication has no prior disposition for this unit")
+            errors.append(f"{event.get('event_id')}: adjudication has no earlier disposition for this unit")
             continue
-        if not any(
-            item.get("event_id") != event.get("event_id")
-            and item.get("actor_id") != event.get("adjudicator_id")
-            and item.get("event_hash") != event.get("event_hash")
-            for item in prior
+        adjudicator = event.get("adjudicator_id")
+        if not isinstance(adjudicator, str) or not adjudicator.strip() or not any(
+            item.get("actor_id") != adjudicator for _, item in prior
         ):
-            errors.append(f"{event.get('event_id')}: adjudicator must be distinct from the disposition reviewer")
+            errors.append(f"{event.get('event_id')}: adjudicator must be identified and distinct from the disposition reviewer")
         if event.get("adjudication_status") != "adjudicated":
             errors.append(f"{event.get('event_id')}: adjudication status is not final")
     return {

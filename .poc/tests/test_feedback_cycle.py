@@ -14,7 +14,7 @@ class FeedbackCycleTests(unittest.TestCase):
         self.batch = {
             "seed": "test-seed",
             "frame": {"fingerprint_sha256": "a" * 64},
-            "probability_sample": [{"unit_id": "unit-1"}],
+            "probability_sample": [{"unit_id": "unit-1", "inclusion_probability": 0.5, "design_weight": 2.0, "selection_reason": "STRATIFIED_RANDOM"}],
             "risk_sample": [],
         }
         self.disposition = {
@@ -45,7 +45,18 @@ class FeedbackCycleTests(unittest.TestCase):
     def test_rejects_adjudication_without_prior_disposition(self):
         result = validate_cycle([self.adjudication], self.batch)
         self.assertFalse(result["valid"])
-        self.assertTrue(any("no prior disposition" in error for error in result["errors"]))
+        self.assertTrue(any("earlier disposition" in error for error in result["errors"]))
+
+    def test_rejects_disposition_that_appears_after_adjudication(self):
+        result = validate_cycle([self.adjudication, self.disposition], self.batch)
+        self.assertFalse(result["valid"])
+        self.assertTrue(any("earlier disposition" in error for error in result["errors"]))
+
+    def test_rejects_invalid_sampling_weight(self):
+        batch = {**self.batch, "probability_sample": [{**self.batch["probability_sample"][0], "design_weight": 9.0}]}
+        result = validate_cycle([self.disposition, self.adjudication], batch)
+        self.assertFalse(result["valid"])
+        self.assertTrue(any("reciprocal" in error for error in result["errors"]))
 
 
 if __name__ == "__main__":

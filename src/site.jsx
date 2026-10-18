@@ -17,6 +17,7 @@ import {
   resolveLegacyPath, routeForDocument, titleForDocument,
 } from './content.js';
 import DemoExplorer from './components/DemoExplorer.jsx';
+import EvaluationDashboard from './components/EvaluationDashboard.jsx';
 
 const BRAND = 'Pathfinder';
 const repository = document.querySelector('meta[name="adr-repository"]')?.content || 'tyler-beach/Platform';
@@ -42,6 +43,7 @@ function Header() {
     <nav className={`global-nav ${open ? 'is-open' : ''}`} aria-label="Main navigation">
       <NavLink to="/architecture" className={({ isActive }) => `global-nav__link ${isActive ? 'is-active' : ''}`}><BookOpen size={16} /> Architecture</NavLink>
       <NavLink to="/demo" className={({ isActive }) => `global-nav__link ${isActive ? 'is-active' : ''}`}><Workflow size={16} /> Workflow demo <span className="nav-live-mark" aria-hidden="true" /></NavLink>
+      <NavLink to="/evaluation" className={({ isActive }) => `global-nav__link ${isActive ? 'is-active' : ''}`}><ShieldCheck size={16} /> Evaluation</NavLink>
     </nav>
     <div className="header-actions"><a className="github-link" href={repo} target="_blank" rel="noreferrer"><Github size={16} /><span>Repository</span><ArrowUpRight size={13} /></a></div>
   </header>;
@@ -237,6 +239,10 @@ function DemoRoute() {
   return <Shell wide><DemoExplorer /></Shell>;
 }
 
+function EvaluationRoute() {
+  return <Shell wide><EvaluationDashboard /></Shell>;
+}
+
 function LegacyRoute() {
   const location = useLocation();
   const resolved = resolveLegacyPath(location.pathname, documentPaths, BASE_URL);
@@ -259,5 +265,5 @@ function categoryForPath(path) {
 }
 
 export default function App() {
-  return <Routes><Route path="/" element={<Home />} /><Route path="/architecture/*" element={<Shell wide><ArchitectureRouter /></Shell>} /><Route path="/demo/*" element={<DemoRoute />} /><Route path="/not-found" element={<NotFound />} /><Route path="*" element={<LegacyRoute />} /></Routes>;
+  return <Routes><Route path="/" element={<Home />} /><Route path="/architecture/*" element={<Shell wide><ArchitectureRouter /></Shell>} /><Route path="/demo/*" element={<DemoRoute />} /><Route path="/evaluation/*" element={<EvaluationRoute />} /><Route path="/not-found" element={<NotFound />} /><Route path="*" element={<LegacyRoute />} /></Routes>;
 }

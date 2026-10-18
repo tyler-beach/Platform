@@ -20,3 +20,7 @@ The examples use synthetic source data. The API contract is the production targe
 ## Review quality and learning
 
 - [Human review sampling and feedback loop](../REVIEW_SAMPLING_AND_FEEDBACK.md) — stratified random sampling across outcomes, a separate risk-based queue, reviewer dispositions, unbiased quality estimates, and gated feedback promotion.
+
+## Evaluation and feedback
+
+Open the [interactive evaluation workspace](/evaluation/) to compare the detector regression suite, inspect evidence-collection coverage, understand the quarantined holdout, and walk through the human review lifecycle. It links to the underlying GitHub Actions workflows and does not display synthetic metrics as live results.
