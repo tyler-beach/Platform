@@ -78,9 +78,10 @@ class GenericRequirementEngineTests(unittest.TestCase):
     def test_numeric_boolean_is_not_accepted_as_number(self):
         requirement = {"requirement_id": "ADR-TTL-001", "kind": "numeric_max",
                        "predicate": "session.ttl_seconds", "subject": "web-session", "limit": 600}
-        with self.assertRaisesRegex(ValueError, "invalid value type"):
-            engine.evaluate(requirement, [observation(True, predicate="session.ttl_seconds", subject="web-session")],
-                            adr_status="accepted", scope_match=True)
+        result = engine.evaluate(requirement, [observation(True, predicate="session.ttl_seconds", subject="web-session")],
+                                 adr_status="accepted", scope_match=True)
+        self.assertEqual(result["outcome"], "inconclusive")
+        self.assertEqual(result["relationship"], "invalid_observation")
 
 if __name__ == "__main__":
     unittest.main()
