@@ -33,9 +33,10 @@ def obs(value, *, evidence_id="EV-1", predicate="security.encryption_at_rest.ena
 class SharedEvaluationSpineTests(unittest.TestCase):
     def test_registry_lists_domain_collectors_not_adr_ids(self):
         caps = predicate_registry.list_capabilities()
-        self.assertEqual(caps["registry_version"], "predicate-registry-v1")
+        self.assertEqual(caps["registry_version"], "predicate-registry-v2")
         self.assertIn("config_json", caps["collectors"])
         self.assertIn("kubernetes_manifest", caps["collectors"])
+        self.assertIn("structured_package", caps["collectors"])
         self.assertNotIn("ADR-TTL-001", str(caps))
 
     def test_unknown_predicate_fails_closed(self):

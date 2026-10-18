@@ -11,9 +11,16 @@ import json
 import re
 from typing import Any
 
-ENGINE_VERSION = "generic-requirement-engine-v2"
+ENGINE_VERSION = "generic-requirement-engine-v3"
 RESULT_SCHEMA_VERSION = "adr-requirement-result-v1"
-KINDS = {"numeric_max", "resource_present", "boolean_required", "set_membership"}
+KINDS = {
+    "numeric_max",
+    "numeric_min",
+    "resource_present",
+    "boolean_required",
+    "set_membership",
+    "dependency_forbidden",
+}
 OUTCOMES = {"supported_deviation", "no_deviation_found", "not_applicable", "inconclusive"}
 
 
@@ -38,9 +45,10 @@ def _validate_requirement(requirement: Any) -> str:
     kind = requirement["kind"]
     if kind not in KINDS:
         raise ValueError("unsupported requirement kind")
-    if kind == "numeric_max" and (type(requirement.get("limit")) not in (int, float) or requirement["limit"] < 0):
-        raise ValueError("numeric_max requires a non-negative numeric limit")
-    if kind in {"resource_present", "boolean_required"} and "limit" in requirement:
+    if kind in {"numeric_max", "numeric_min"}:
+        if type(requirement.get("limit")) not in (int, float) or isinstance(requirement.get("limit"), bool) or requirement["limit"] < 0:
+            raise ValueError(f"{kind} requires a non-negative numeric limit")
+    if kind in {"resource_present", "boolean_required", "dependency_forbidden"} and "limit" in requirement:
         raise ValueError(f"{kind} does not accept a limit")
     if kind == "set_membership":
         approved = requirement.get("approved_set")
@@ -52,9 +60,9 @@ def _validate_requirement(requirement: Any) -> str:
 
 
 def _value_valid(kind: str, value: Any) -> bool:
-    if kind == "numeric_max":
+    if kind in {"numeric_max", "numeric_min"}:
         return type(value) in (int, float) and not isinstance(value, bool) and value >= 0
-    if kind in {"resource_present", "boolean_required"}:
+    if kind in {"resource_present", "boolean_required", "dependency_forbidden"}:
         return type(value) is bool
     if kind == "set_membership":
         return _nonempty_string(value)
@@ -64,21 +72,20 @@ def _value_valid(kind: str, value: Any) -> bool:
 def _deviates(kind: str, requirement: dict[str, Any], value: Any) -> bool:
     if kind == "numeric_max":
         return value > requirement["limit"]
+    if kind == "numeric_min":
+        return value < requirement["limit"]
     if kind in {"resource_present", "boolean_required"}:
         return value is False
+    if kind == "dependency_forbidden":
+        # true means the forbidden relationship/pattern is present
+        return value is True
     if kind == "set_membership":
         return value not in requirement["approved_set"]
     raise ValueError("unsupported requirement kind")
 
 
 def evaluate(requirement: Any, observations: Any, *, adr_status: str, scope_match: bool) -> dict[str, Any]:
-    """Evaluate a typed requirement against normalized evidence conservatively.
-
-    Supported kinds:
-      * numeric_max: numeric observations must not exceed requirement.limit
-      * resource_present / boolean_required: boolean observation must be true
-      * set_membership: string observation must be in requirement.approved_set
-    """
+    """Evaluate a typed requirement against normalized evidence conservatively."""
     kind = _validate_requirement(requirement)
     if not isinstance(observations, list):
         raise ValueError("observations must be a list")
