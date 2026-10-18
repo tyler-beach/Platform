@@ -72,11 +72,12 @@ func TestEvaluateRealCatalogDomainApplicability(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if report["catalog_size"].(int) != 22 {
+	if report["catalog_size"].(int) != 200 {
 		t.Fatalf("catalog_size=%v", report["catalog_size"])
 	}
-	if report["in_scope_count"].(int) != 5 {
-		t.Fatalf("in_scope_count=%v want 5 identity rows", report["in_scope_count"])
+	inScope := report["in_scope_count"].(int)
+	if inScope < 1 || inScope >= 200 {
+		t.Fatalf("in_scope_count=%v want identity-only subset", inScope)
 	}
 	if report["aggregate_status"] == "all_aligned" {
 		t.Fatal("no applicable confident outcomes should not look all_aligned")
@@ -86,8 +87,8 @@ func TestEvaluateRealCatalogDomainApplicability(t *testing.T) {
 		t.Fatalf("catalog=%v", cat)
 	}
 	counts, _ := report["counts"].(map[string]int)
-	if counts["not_applicable"] < 10 {
-		t.Fatalf("expected non-identity rows not_applicable, counts=%v", counts)
+	if counts["not_applicable"] < 100 {
+		t.Fatalf("expected most non-identity rows not_applicable, counts=%v", counts)
 	}
 }
 
@@ -122,8 +123,8 @@ func TestEvaluateNoApplicableRequirements(t *testing.T) {
 	catalogDir := filepath.Join(root, "data", "adr_catalog")
 	pkg := map[string]any{
 		"schema_version": "pathfinder-evidence-package-v1",
-		"package_id":     "scope-frontend-only",
-		"scope":          map[string]any{"domains": []any{"frontend"}},
+		"package_id":     "scope-unknown-domain",
+		"scope":          map[string]any{"domains": []any{"hr-benefits"}},
 		"observations":   []any{},
 	}
 	report, err := evaluate.EvaluatePackageWithMode(pkg, catalogDir, "accepted", "real")

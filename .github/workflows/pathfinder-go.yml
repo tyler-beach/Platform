@@ -65,7 +65,7 @@ jobs:
           r = json.load(open("/tmp/pathfinder-real-report.json"))
           assert r["catalog"]["mode"] == "real"
           assert r["catalog"]["catalog_id"] == "platform-real-adr-v1"
-          assert r["catalog_size"] == 22
+          assert r["catalog_size"] == 200
           assert r["observation_count"] >= 5
           confident = sum(r["counts"].get(k, 0) for k in ("supported_deviation", "no_deviation_found"))
           assert confident >= 1

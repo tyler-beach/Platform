@@ -50,9 +50,9 @@ const tracks = {
   paste: {
     eyebrow: 'ISSUE / PR → CATALOG (GITHUB BACKBONE)',
     title: 'Submit a sample through Issues—or a same-repo PR.',
-    description: 'Open a Pathfinder analyze issue with a tech-spec, a single code sample, and/or a same-repo pull request. Go on Actions extracts allowlisted observations, evaluates the prototype real ADR pack by default (20 platform-style ADRs; synthetic demo opt-in), comments aggregate results, and appends a lean job ledger. Pages only prepares the issue and hosts a redacted fixture snapshot—execution stays on GitHub.',
+    description: 'Open a Pathfinder analyze issue with a tech-spec, a single code sample, and/or a same-repo pull request. Go on Actions extracts allowlisted observations, evaluates the prototype real ADR pack by default (200 org-style ADRs; synthetic demo opt-in), comments aggregate results, and appends a lean job ledger. Pages only prepares the issue and hosts a redacted fixture snapshot—execution stays on GitHub.',
     facts: [
-      ['20', 'prototype real ADRs'],
+      ['200', 'prototype real ADRs'],
       ['Go', 'production evaluate runtime'],
       ['Actions', 'stages + comment + ledger'],
     ],

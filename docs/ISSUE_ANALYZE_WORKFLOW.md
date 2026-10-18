@@ -1,6 +1,6 @@
 # Issue → package → catalog evaluation
 
-Submit a **pinned evidence package** through a GitHub Issue and receive a catalog evaluation comment. The default pack is the **prototype real ADR corpus** (`data/adr_catalog`, 20 ADRs). Synthetic ADR-101–200 remains an explicit demo opt-in. Start with `docs/PATHFINDER_FIRST_RUN.md`.
+Submit a **pinned evidence package** through a GitHub Issue and receive a catalog evaluation comment. The default pack is the **prototype real ADR corpus** (`data/adr_catalog`, 200 ADRs). Synthetic ADR-101–200 remains an explicit demo opt-in. Start with `docs/PATHFINDER_FIRST_RUN.md`.
 
 ## Safety (public repository)
 
