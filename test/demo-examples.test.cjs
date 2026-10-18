@@ -8,6 +8,7 @@ const spec = fs.readFileSync(path.join(__dirname, "../docs/demo/realistic-sessio
 const api = fs.readFileSync(path.join(__dirname, "../docs/demo/api-payload-examples.md"), "utf8");
 const review = fs.readFileSync(path.join(__dirname, "../docs/demo/finding-review-playbook.md"), "utf8");
 const lineage = fs.readFileSync(path.join(__dirname, "../docs/demo/evidence-lineage-example.md"), "utf8");
+const reviewSampling = fs.readFileSync(path.join(__dirname, "../docs/REVIEW_SAMPLING_AND_FEEDBACK.md"), "utf8");
 const component = fs.readFileSync(path.join(__dirname, "../src/components/DemoExplorer.jsx"), "utf8");
 const openapi = fs.readFileSync(path.join(__dirname, "../docs/openapi.yaml"), "utf8");
 const apiContract = fs.readFileSync(path.join(__dirname, "../docs/contracts/API_CONTRACT.md"), "utf8");
@@ -95,4 +96,19 @@ test("API docs describe the production target without claiming the service is de
   assert.ok(openapi.includes("Production-target REST/JSON mapping"));
   assert.ok(apiContract.includes("Production-target v1 contract"));
   assert.ok(apiContract.includes("rather than a deployed service"));
+});
+
+test("review sampling design separates probability samples from risk triage and gates feedback promotion", () => {
+  for (const phrase of [
+    "Probability sample (quality measurement)",
+    "Risk/learning sample (diagnosis)",
+    "requirement × analyzed artifact snapshot × analysis run",
+    "inclusion probability",
+    "missed_deviation",
+    "append-only",
+    "holdout cases",
+    "Start in shadow mode"
+  ]) assert.ok(reviewSampling.includes(phrase), "missing review-quality control: " + phrase);
+  assert.ok(reviewSampling.includes("Do not treat the current evidence-strength score as a probability"));
+  assert.ok(reviewSampling.includes("never be presented as representative quality measurement"));
 });

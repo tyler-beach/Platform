@@ -16,3 +16,7 @@ Use these longer examples to follow multiple requirements through evidence, find
 - [Evidence lineage walkthrough](evidence-lineage-example.md) — follow pinned inputs, evidence references, a finding envelope, validation invariants, and a separate reviewer audit event.
 
 The examples use synthetic source data. The API contract is the production target; these payloads are mock responses, not responses from a running service.
+
+## Review quality and learning
+
+- [Human review sampling and feedback loop](../REVIEW_SAMPLING_AND_FEEDBACK.md) — stratified random sampling across outcomes, a separate risk-based queue, reviewer dispositions, unbiased quality estimates, and gated feedback promotion.
