@@ -34,16 +34,34 @@ def mock_assess(context: dict[str,Any]) -> dict[str,Any]:
     edges=context.get("graph",{}).get("edges",[])
     reachable=[e for e in edges if e.get("reachable_from_entry") and e.get("resolution_status") in {"resolved","resolved_static","resolved_approximate"}]
     names=" ".join(str(e.get("callee_qualified_name",e.get("callee_symbol_id",""))) for e in reachable).lower()
-    has_provider_path=any(x in names for x in ("anthropic","provider","assess","complete","generate"))
+    has_provider_path=any(x in names for x in ("anthropic","provider","remoteprovider","complete","generate","invoke"))
     root_ids=set(context.get("graph",{}).get("entry_symbol_ids",[]))
+    def provider_call(edge: dict[str, Any]) -> bool:
+        target=(str(edge.get("callee_qualified_name",""))+" "+str(edge.get("call_expression",""))).lower()
+        # Generic names such as Assess/Assessment are not enough: local validators
+        # and orchestration helpers must not be mistaken for remote provider calls.
+        return any(token in target for token in ("anthropic","remoteprovider","remote_provider","providerclient","provider_client")) or (
+            "provider" in target and any(token in target for token in ("assess","complete","generate","invoke","call"))
+        )
     entry_provider_edges=[
         e for e in context.get("graph",{}).get("reachable_edges",[])
         if e.get("caller_symbol_id") in root_ids
-        and any(x in (str(e.get("callee_qualified_name",""))+" "+str(e.get("call_expression",""))).lower()
-                for x in ("anthropic","provider","assess","complete","generate","invoke"))
+        and provider_call(e)
         and e.get("resolution_status") in {"resolved","resolved_static","resolved_approximate"}
     ]
     has_entry_provider_call=bool(entry_provider_edges)
+    entry_edges=[e for e in context.get("graph",{}).get("reachable_edges",[]) if e.get("caller_symbol_id") in root_ids]
+    has_explicit_async_boundary=any(
+        any(token in (str(e.get("callee_qualified_name",""))+" "+str(e.get("call_expression",""))).lower()
+            for token in ("queue.enqueue","queue.enqueue","enqueue(","outbox","publish(","schedule(","dispatch("))
+        and e.get("resolution_status") in {"resolved","resolved_static"}
+        for e in entry_edges
+    )
+    uncertain_dispatch=any(
+        e.get("dispatch_kind") in {"conditional","dynamic","cha","interface","virtual"}
+        or e.get("resolution_status")=="resolved_approximate"
+        for e in entry_provider_edges
+    )
     requires_async=any(x in req for x in ("asynchronous","asynchronously","queue","queued","must not block","non-blocking"))
     explicit_sync=any(x in req for x in ("synchronous","synchronously","inline","before returning","blocking"))
     limitations=[]
@@ -64,14 +82,23 @@ def mock_assess(context: dict[str,Any]) -> dict[str,Any]:
                        0 if e.get("evidence_type")=="resolved_call_edge" else 1))
     ids.extend(e["evidence_id"] for e in scored_edges if e.get("evidence_id"))
     ids.extend(e["evidence_id"] for e in evidence_items if e.get("evidence_type")=="diff_line" and e.get("evidence_id"))
-    if requires_async and has_entry_provider_call:
+    if requires_async and has_entry_provider_call and uncertain_dispatch:
+        outcome="potential_deviation";summary="A provider-shaped call appears at the entry, but conditional or approximate dispatch prevents a definitive deviation decision."
+        rationale="The call target is provider-shaped, but its execution condition or runtime target is not established by the supplied graph. Preserve the finding for review rather than treating a possible edge as a confirmed violation."
+        limitations.append("Conditional, dynamic, or approximate dispatch requires branch/runtime evidence before a definitive disposition.")
+        confidence=0.52
+    elif requires_async and has_entry_provider_call:
         outcome="supported_deviation";summary="The selected entry function directly invokes a provider-shaped assessment method despite an asynchronous/non-blocking requirement."
-        rationale="A resolved call edge originates at the selected request entry and targets a provider/assessment method. The entry path therefore contains a direct provider call instead of only delegating to the expected queue/worker path. Review the exact source excerpt and dispatch basis; the analyzer does not execute the application."
+        rationale="A resolved call edge originates at the selected request entry and targets a provider/assessment method. The entry path therefore contains a direct provider call instead of only delegating to the expected queue/worker path. Review the exact source excerpt; the analyzer does not execute the application."
+        confidence=0.78 if not limitations else 0.62
+    elif requires_async and has_explicit_async_boundary and has_provider_path:
+        outcome="no_deviation_found";summary="The entry path schedules work through a queue or outbox, while the provider call is below that boundary."
+        rationale="The resolved entry edge enqueues, publishes, schedules, or dispatches work, and the provider call appears downstream rather than on the request entry edge. This supports the stated asynchronous pattern; it does not prove runtime delivery or worker behavior."
         confidence=0.78 if not limitations else 0.62
     elif requires_async and has_provider_path:
-        outcome="potential_deviation";summary="A provider assessment is reachable below the entry point, but the graph does not show a direct entry-to-provider call."
-        rationale="The provider call occurs through another function or worker. The graph alone does not prove that the entry waits for that call or bypasses the required asynchronous boundary."
-        limitations.append("The model did not identify a direct provider call at the selected entry; inspect queue/enqueue boundaries before treating this as a violation.")
+        outcome="potential_deviation";summary="A provider assessment is reachable below the entry point, but the graph does not establish the asynchronous boundary."
+        rationale="The provider call occurs through another function. The graph alone does not prove that the entry waits for that call or bypasses the required asynchronous boundary."
+        limitations.append("The provider is reachable transitively; inspect helper scheduling and wait semantics before treating this as a violation.")
         confidence=0.52
     elif not context.get("graph",{}).get("functions") and any(e.get("evidence_type")=="configuration_property" for e in evidence_items):
         generic_config_only=True
