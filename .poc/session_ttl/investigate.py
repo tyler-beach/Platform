@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Deterministic, evidence-bound session TTL investigation vertical slice.
+"""Session TTL investigation adapter over the shared requirement engine.
 
-Synthetic/offline reference implementation. It evaluates normalized evidence;
-it does not semantically extract requirements from arbitrary ADR prose.
+Synthetic/offline reference implementation. Case validation and the TTL result
+contract remain here for replay compatibility. Deviation decisions are produced
+by engine.evaluate(kind=numeric_max), not an ADR-specific comparator.
 """
 from __future__ import annotations
 
@@ -10,15 +11,31 @@ import argparse
 import hashlib
 import json
 import re
+import sys
 from pathlib import Path
 from typing import Any
+
+ENGINE_DIR = Path(__file__).resolve().parents[1] / "requirement_engine"
+if str(ENGINE_DIR) not in sys.path:
+    sys.path.insert(0, str(ENGINE_DIR))
+
+import engine  # noqa: E402
+import predicate_registry  # noqa: E402
 
 POLICY_VERSION = "session-ttl-policy-v1"
 MAX_TTL_SECONDS = 600
 NORMALIZATION_CONTRACT_VERSION = "session-ttl-normalized-input-v1"
 RESULT_SCHEMA_VERSION = "session-ttl-investigation-v1"
 TTL_PREDICATE = "session.ttl_seconds"
+TTL_SUBJECT = "session"
 OUTCOMES = {"supported_deviation", "no_deviation_found", "not_applicable", "inconclusive"}
+TTL_REQUIREMENT = {
+    "requirement_id": "ADR-TTL-001",
+    "kind": "numeric_max",
+    "predicate": TTL_PREDICATE,
+    "subject": TTL_SUBJECT,
+    "limit": MAX_TTL_SECONDS,
+}
 
 
 def canonical(value: Any) -> str:
@@ -184,37 +201,73 @@ def resolve_ttl_observations(evidence: list[dict[str, Any]], requested_ids: list
     return accepted, sorted(rejected, key=lambda item: item["evidence_id"])
 
 
-def evaluate(applicable: bool, ttl_values: list[dict[str, Any]]) -> dict[str, str]:
-    if not applicable:
-        return {
-            "outcome": "not_applicable",
-            "relationship": "not_applicable",
-            "rationale": "The ADR is not applicable to this source revision; no compliance conclusion is asserted.",
-        }
-    if not ttl_values:
-        return {
-            "outcome": "inconclusive",
-            "relationship": "insufficient_evidence",
-            "rationale": "No valid, pinned session TTL value is present in the supplied evidence.",
-        }
-    if len({item["value"] for item in ttl_values}) != 1:
-        return {
-            "outcome": "inconclusive",
-            "relationship": "conflicting_evidence",
-            "rationale": "Pinned evidence contains conflicting session TTL values.",
-        }
-    ttl = ttl_values[0]["value"]
-    if ttl > MAX_TTL_SECONDS:
-        return {
-            "outcome": "supported_deviation",
-            "relationship": "contradicts",
-            "rationale": f"Observed session TTL is {ttl} seconds, exceeding the applicable maximum of {MAX_TTL_SECONDS} seconds.",
-        }
-    return {
-        "outcome": "no_deviation_found",
-        "relationship": "consistent_with",
-        "rationale": f"Observed session TTL is {ttl} seconds, within the applicable maximum of {MAX_TTL_SECONDS} seconds.",
+def _engine_observations(ttl_values: list[dict[str, Any]], source: dict[str, Any]) -> list[dict[str, Any]]:
+    """Map validated TTL evidence rows onto the shared engine observation contract."""
+    predicate_registry.asserts_compatible("numeric_max", TTL_PREDICATE)
+    observations: list[dict[str, Any]] = []
+    for item in ttl_values:
+        locator = item.get("locator") if isinstance(item.get("locator"), dict) else {"kind": "json_pointer"}
+        observations.append({
+            "evidence_id": item["evidence_id"],
+            "predicate": TTL_PREDICATE,
+            "subject": TTL_SUBJECT,
+            "value": item["value"],
+            "artifact_id": source["artifact_id"],
+            "revision": source["revision"],
+            "path": source["path"],
+            "source_sha256": source["sha256"],
+            "locator": locator if locator.get("kind") else {"kind": "json_pointer", "value": locator.get("value", "")},
+        })
+    return observations
+
+
+def evaluate_with_engine(*, adr_status: str, scope_match: bool, ttl_values: list[dict[str, Any]], source: dict[str, Any]) -> dict[str, Any]:
+    """Decide via shared engine; return engine outcome fields plus optional TTL rationale detail."""
+    result = engine.evaluate(
+        TTL_REQUIREMENT,
+        _engine_observations(ttl_values, source),
+        adr_status=adr_status,
+        scope_match=scope_match,
+    )
+    decision = {
+        "outcome": result["outcome"],
+        "relationship": result["relationship"],
+        "rationale": result["rationale"],
+        "engine_version": result["engine_version"],
+        "engine_result_sha256": result["result_sha256"],
     }
+    if result["outcome"] in {"supported_deviation", "no_deviation_found"} and ttl_values:
+        ttl = ttl_values[0]["value"]
+        if result["outcome"] == "supported_deviation":
+            decision["rationale"] = (
+                f"Observed session TTL is {ttl} seconds, exceeding the applicable maximum of {MAX_TTL_SECONDS} seconds."
+            )
+        else:
+            decision["rationale"] = (
+                f"Observed session TTL is {ttl} seconds, within the applicable maximum of {MAX_TTL_SECONDS} seconds."
+            )
+    elif result["outcome"] == "not_applicable":
+        decision["rationale"] = (
+            "The ADR is not applicable to this source revision; no compliance conclusion is asserted."
+        )
+    elif result["relationship"] == "insufficient_evidence":
+        decision["rationale"] = "No valid, pinned session TTL value is present in the supplied evidence."
+    elif result["relationship"] == "conflicting_evidence":
+        decision["rationale"] = "Pinned evidence contains conflicting session TTL values."
+    return decision
+
+
+def evaluate(applicable: bool, ttl_values: list[dict[str, Any]]) -> dict[str, str]:
+    """Compatibility wrapper; prefer evaluate_with_engine from investigate()."""
+    source = {"artifact_id": "compat", "revision": "compat", "path": "compat.json",
+              "sha256": hashlib.sha256(b"compat").hexdigest()}
+    decision = evaluate_with_engine(
+        adr_status="accepted" if applicable else "proposed",
+        scope_match=applicable,
+        ttl_values=ttl_values,
+        source=source,
+    )
+    return {key: decision[key] for key in ("outcome", "relationship", "rationale")}
 
 
 def validate_result(result: Any) -> None:
@@ -323,12 +376,19 @@ def fingerprint_result(result: dict[str, Any]) -> dict[str, Any]:
 
 
 def investigate(case: dict[str, Any]) -> dict[str, Any]:
-    """Evaluate normalized, pinned evidence and return a deterministic result."""
+    """Evaluate normalized, pinned evidence via the shared engine and return a deterministic result."""
     normalized, artifacts, evidence, requested_ids = validate_case(case)
     adr, source = artifacts["adr"], artifacts["source"]
     applicable = adr["status"] == "accepted" and normalized["scope_match"]
     ttl_values, rejected = resolve_ttl_observations(evidence, requested_ids, source)
-    decision = evaluate(applicable, ttl_values)
+    decision = evaluate_with_engine(
+        adr_status=adr["status"],
+        scope_match=normalized["scope_match"],
+        ttl_values=ttl_values,
+        source=source,
+    )
+    decision.pop("engine_version", None)
+    decision.pop("engine_result_sha256", None)
     if applicable and rejected:
         decision = {
             "outcome": "inconclusive",

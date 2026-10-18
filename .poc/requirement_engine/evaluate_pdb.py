@@ -16,12 +16,14 @@ if str(HERE) not in sys.path:
     sys.path.insert(0, str(HERE))
 
 import engine
+import predicate_registry
 from pdb_collector import ManifestError, collect_pdb_observation
 
+PDB_PREDICATE = "kubernetes.pod_disruption_budget.present"
 PDB_REQUIREMENT = {
     "requirement_id": "ADR-PDB-001",
     "kind": "resource_present",
-    "predicate": "kubernetes.pod_disruption_budget.present",
+    "predicate": PDB_PREDICATE,
 }
 
 
@@ -44,6 +46,10 @@ def evaluate_pdb(
         **PDB_REQUIREMENT,
         "subject": f"{namespace}/{workload_name}",
     }
+    # Bind through the shared capability map; collectors are domain-scoped, not ADR-scoped.
+    predicate_registry.asserts_compatible(requirement["kind"], requirement["predicate"])
+    if predicate_registry.collector_for(requirement["predicate"]) != "kubernetes_manifest":
+        raise predicate_registry.CapabilityError("PDB evaluation requires the kubernetes_manifest collector")
 
     # Applicability is decided before collection: out-of-scope ADRs do not need
     # implementation evidence and must not be reported as compliant/deviating.

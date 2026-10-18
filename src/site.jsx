@@ -115,17 +115,18 @@ function Home() {
 
 function PipelineCanvas() {
   const steps = [
-    { code: '01', icon: <FileCode2 size={16} />, title: 'Pin source versions', text: 'ADR · spec · code revision', state: 'LOCKED' },
-    { code: '02', icon: <Search size={16} />, title: 'Assemble evidence', text: 'Scope · changes · observations', state: 'TRACEABLE' },
-    { code: '03', icon: <Sparkles size={16} />, title: 'Assess with limits', text: 'Bounded mock or provider call', state: 'BOUNDED' },
-    { code: '04', icon: <ShieldCheck size={16} />, title: 'Validate and review', text: 'Evidence IDs · versions · outcome', state: 'AUDITABLE' },
+    { code: '01', icon: <FileCode2 size={16} />, title: 'Pin sources & scope', text: 'ADR · revision · applicability', state: 'LOCKED' },
+    { code: '02', icon: <Braces size={16} />, title: 'Normalize requirement', text: 'Kind · predicate · approval', state: 'TYPED' },
+    { code: '03', icon: <Search size={16} />, title: 'Collect by domain', text: 'Config · k8s · shared predicates', state: 'TRACEABLE' },
+    { code: '04', icon: <Sparkles size={16} />, title: 'Evaluate by kind', text: 'Shared engine · not ADR forks', state: 'DETERMINISTIC' },
+    { code: '05', icon: <ShieldCheck size={16} />, title: 'Validate and review', text: 'Evidence IDs · disposition', state: 'AUDITABLE' },
   ];
-  return <div className="pipeline-visual" aria-label="Four-stage evidence-first analysis pipeline">
+  return <div className="pipeline-visual" aria-label="Five-stage shared evaluation spine">
     <div className="pipeline-orbit pipeline-orbit--one" /><div className="pipeline-orbit pipeline-orbit--two" />
     <div className="pipeline-card">
-      <div className="pipeline-card__top"><span><span className="pulse-dot" /> ANALYSIS PIPELINE</span><span className="pipeline-label">DESIGN + POC</span></div>
+      <div className="pipeline-card__top"><span><span className="pulse-dot" /> SHARED EVALUATION SPINE</span><span className="pipeline-label">KIND + COLLECTOR</span></div>
       <div className="pipeline-steps">{steps.map((step, index) => <React.Fragment key={step.code}><div className="pipeline-step"><span className="pipeline-step__number">{step.code}</span><span className="pipeline-step__icon">{step.icon}</span><div className="pipeline-step__copy"><strong>{step.title}</strong><span>{step.text}</span></div><span className="pipeline-step__state">{step.state}</span></div>{index < steps.length - 1 && <div className="pipeline-wire"><i /></div>}</React.Fragment>)}</div>
-      <div className="pipeline-card__bottom"><span><GitBranch size={13} /> REVIEWABLE RESULT</span><span>source → evidence → assessment</span></div>
+      <div className="pipeline-card__bottom"><span><GitBranch size={13} /> REVIEWABLE RESULT</span><span>normalize → collect → evaluate by kind</span></div>
     </div>
   </div>;
 }
