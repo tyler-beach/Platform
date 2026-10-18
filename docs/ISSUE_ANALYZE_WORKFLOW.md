@@ -46,7 +46,7 @@ Unmatched requirements stay `inconclusive`. Aggregate status is often `mixed` fo
 
 Production evaluate runs on **GitHub Actions** via the Go Pathfinder runtime (`go/pathfinder`), orchestrated as staged reusable workflow jobs (intake → ensure observations → evaluate → publish → job ledger). AWS is not required. Python under `.poc/` remains an offline oracle, not the production entrypoint.
 
-Lean job index lines append to the `pathfinder-jobs` branch (`jobs/jobs.jsonl`). Full reports stay in workflow artifacts. Findings are advisory (`synthetic_unadjudicated`); they do not block merges. Same-repo PR file intake is a follow-on milestone.
+Lean job index lines append to the `pathfinder-jobs` branch (`jobs/jobs.jsonl`). Full reports stay in workflow artifacts. Findings are advisory (`synthetic_unadjudicated`); they do not block merges. Same-repo PR changed-file intake is supported (forks denied); multi-file code arrives only through that adapter.
 
 ## Local dry-run
 
@@ -74,16 +74,17 @@ Messy fixtures used in tests:
 
 ## Try it from GitHub Pages
 
-On `/demo` panel **04 / Paste → catalog evaluation**:
+On `/demo` panel **04 / Issue / PR → catalog evaluation**:
 
 1. Check the public/synthetic attestation box.
-2. Paste a tech-spec and/or Go/Python/YAML sample (or **Load sample fixture**).
-3. **Copy issue body** and/or **Open on GitHub** (short bodies are URL-embedded; large bodies are copied, then the issue form opens).
-4. Submit the GitHub issue. Actions extracts observations and comments results.
+2. Optionally enter a same-repo pull request URL or number.
+3. Paste a tech-spec and/or Go/Python/YAML sample (or **Load sample fixture**). Tech spec is optional when a same-repo PR is provided.
+4. **Copy issue body** and/or **Open on GitHub** (short bodies are URL-embedded; large bodies are copied, then the issue form opens).
+5. Submit the GitHub issue. Go on Actions extracts observations, evaluates the catalog, comments results, and appends a lean job ledger record.
 
-Pages still only prepares the submission. Live evaluation runs only through GitHub Issues + Actions.
+Pages still only prepares the submission. Live evaluation runs only through GitHub Issues + Actions (Go runtime).
 
 ## Related
 
 - Catalog evaluation CLI: `docs/REUSABLE_REQUIREMENT_EVALUATION.md`
-- OpenSpec: `openspec/specs/paste-observation-extraction/`, `openspec/changes/pages-paste-eval-bridge/`
+- OpenSpec: `openspec/specs/paste-observation-extraction/`, `openspec/specs/pages-paste-eval-bridge/`, `openspec/specs/pathfinder-job-ledger/`

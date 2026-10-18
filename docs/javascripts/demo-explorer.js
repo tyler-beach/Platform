@@ -958,13 +958,13 @@
     function renderPasteEval(data) {
       if (!byId("demo-paste-eval-status")) return;
       if (!data || data.schema_version !== "pathfinder-paste-eval-demo-v1") {
-        setText("demo-paste-eval-status", "Paste-evaluation snapshot unavailable. Rebuild Pages demo data.");
+        setText("demo-paste-eval-status", "Catalog-evaluation snapshot unavailable. Rebuild Pages demo data.");
         return;
       }
       const counts = data.counts || {};
       setText(
         "demo-paste-eval-status",
-        `Fixture snapshot · aggregate ${data.aggregate_status} · ${data.observation_count} extracted observations · catalog ${data.catalog_size}. Live runs use GitHub Issues/Actions.`
+        `Fixture snapshot · aggregate ${data.aggregate_status} · ${data.observation_count} extracted observations · catalog ${data.catalog_size}. Live runs use GitHub Issues/Actions (Go).`
       );
       const countList = byId("demo-paste-eval-counts");
       if (countList) {
@@ -1001,7 +1001,7 @@
       .then((data) => { if (generation !== demoGeneration || doc.getElementById("demo-explorer") !== mount) return; renderPasteEval(data); })
       .catch((error) => {
         if (generation !== demoGeneration || doc.getElementById("demo-explorer") !== mount) return;
-        setText("demo-paste-eval-status", `${error.message} Rebuild Pages to regenerate the paste-eval snapshot.`);
+        setText("demo-paste-eval-status", `${error.message} Rebuild Pages to regenerate the catalog-eval snapshot.`);
       });
 
     async function copyText(value) {

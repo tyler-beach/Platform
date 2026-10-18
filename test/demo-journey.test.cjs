@@ -30,6 +30,7 @@ test("guided ADR journey explains the investigation in five plain-language steps
     assert.ok(component.includes(`id="${id}"`), "missing technical workflow link: " + id);
   }
   assert.ok(component.includes("pathfinder-analyze.yml"), "demo should deep-link Pathfinder analyze issue template");
+  assert.ok(component.includes("Issue / PR → catalog evaluation"), "demo panel should name issue/PR catalog path");
   assert.ok(component.includes("never evaluates in the browser"), "prepare helper must keep evaluation on GitHub");
   assert.ok(component.includes("No source excerpt supplied for this example"));
 });

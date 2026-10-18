@@ -14,7 +14,7 @@ test("offers the Functional Analysis Demo workflow alongside the audit workflows
   assert.ok(core.workflows.some(workflow => workflow.id === "functional-analysis-demo.yml"));
 });
 
-test("offers Pathfinder issue package evaluation workflow for paste catalog runs", () => {
+test("offers Pathfinder issue package evaluation workflow for catalog runs", () => {
   assert.ok(core.workflows.some(workflow => workflow.id === "pathfinder-issue-analyze.yml"));
   assert.match(source, /paste-eval-snapshot\.json/);
   assert.match(source, /pathfinder-analyze\.yml/);
