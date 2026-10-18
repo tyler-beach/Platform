@@ -161,7 +161,7 @@ def investigate(case: dict[str, Any]) -> dict[str, Any]:
         "relationship": relation,
         "rationale": rationale,
         # Only evidence that participated in an applicable decision is cited here.
-        "evidence_ids": sorted(item["evidence_id"] for item in ttl_values) if applicability and outcome != "inconclusive" else [],
+        "evidence_ids": sorted(item["evidence_id"] for item in ttl_values) if applicability else [],
         "uncertainty": [] if outcome != "inconclusive" else [relation],
     }
     result["result_sha256"] = sha256(canonical(result).encode("utf-8"))
