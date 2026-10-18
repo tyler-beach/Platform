@@ -60,6 +60,16 @@ Messy fixtures used in tests:
 - `.poc/issue_analyze/fixtures/real_paste_session.go`
 - `.poc/issue_analyze/fixtures/real_paste_session.py`
 
+## Pages demo passphrase gate (optional)
+
+The published GitHub Pages site can require a shared passphrase before the React demo and `pathfinder-flow/` load. This is scraper friction only—not real authentication—and does not protect GitHub Issues/Actions URLs by itself.
+
+1. Add a repository secret named `DEMO_GATE_PASSPHRASE`.
+2. Redeploy Pages (`docs.yml` build reads the secret and writes `demo-gate.json`).
+3. Visitors unlock once per browser session.
+
+When the secret is unset, the site stays open (local/CI default).
+
 ## Try it from GitHub Pages
 
 On `/demo` panel **04 / Paste → catalog evaluation**:

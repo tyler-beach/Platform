@@ -236,6 +236,20 @@ button { color: inherit; }
 .architecture-document-list { min-width: 0; padding: 18px; border: 1px solid #e0e7ee; border-radius: 12px; background: #fff; }.section-heading--compact { margin-bottom: 12px; }.section-heading--compact h2 { font-size: 18px; }
 .topic-links { display: grid; }.topic-links a { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; border-top: 1px solid #edf0f4; color: #42536a; font-size: 10px; text-decoration: none; }.topic-links a span:last-child { display: inline-flex; align-items: center; gap: 6px; color: #8997a8; font: 9px var(--mono); }.topic-links a:hover { color: #087c75; }
 
+/* Optional Pages demo passphrase gate */
+.demo-gate { min-height: 70vh; display: grid; place-items: center; padding: 32px 16px; }
+.demo-gate__card { width: min(440px, 100%); display: grid; gap: 12px; padding: 24px; border: 1px solid #d7e3ea; border-radius: 14px; background: #f7fafb; box-shadow: 0 10px 30px rgba(16, 36, 54, .06); }
+.demo-gate__icon { display: grid; width: 42px; height: 42px; place-items: center; border-radius: 11px; color: #0f766e; background: #d9f0ec; }
+.demo-gate__card h1 { margin: 0; color: #14253a; font: 750 24px var(--display); letter-spacing: -.04em; }
+.demo-gate__card > p { margin: 0; color: #607487; font-size: 12px; line-height: 1.65; }
+.demo-gate__field { display: grid; gap: 6px; color: #33545a; font-size: 11px; font-weight: 700; }
+.demo-gate__field input { min-height: 40px; padding: 0 12px; border: 1px solid #d0dde4; border-radius: 8px; color: #14253a; background: #fff; font: 13px/1.4 Inter, system-ui, sans-serif; }
+.demo-gate__submit { min-height: 40px; border: 0; border-radius: 8px; color: #06241f; background: #14b8a6; font-size: 12px; font-weight: 750; cursor: pointer; }
+.demo-gate__submit:disabled { opacity: .55; cursor: not-allowed; }
+.demo-gate__error { margin: 0; color: #b45309; font-size: 11px; }
+.demo-gate__note { display: inline-flex; align-items: center; gap: 7px; margin: 0; color: #6b7c8d; font-size: 10px; }
+.demo-gate__muted { color: #718196; font-size: 12px; }
+
 /* React-hosted workflow console */
 .demo-experience { --demo-ink: #e9f1fa; --demo-muted: #66778d; --demo-accent: #09847b; min-width: 0; padding: 22px 0 72px; }
 .demo-hero { position: relative; display: grid; grid-template-columns: minmax(0,1fr) 355px; align-items: center; min-height: 342px; overflow: hidden; padding: 39px clamp(28px,5vw,68px) 63px; border: 1px solid #1d3854; border-radius: 20px; color: white; background: radial-gradient(circle at 78% 40%, rgba(32,107,153,.37), transparent 300px), radial-gradient(circle at 4% 92%, rgba(10,141,130,.21), transparent 260px), linear-gradient(120deg,#091524,#0e2138 55%,#112c43); }

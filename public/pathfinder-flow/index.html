@@ -24,9 +24,66 @@
 .canvas-tools{pointer-events:auto;display:flex;gap:5px;align-items:center}.canvas-tools .control{min-width:30px;padding:6px 9px;background:#1b2331eF}.canvas-wrap{cursor:grab}.canvas-wrap.is-panning{cursor:grabbing}.diagram{transform-origin:0 0;will-change:transform}.canvas-topline{align-items:center}.stage{cursor:pointer;user-select:none}.stage:focus-visible{outline:2px solid #b5a4ff;outline-offset:2px}.playback-controls input[type=range]{min-width:90px}.edge:focus-visible{stroke:#fff;stroke-width:3;opacity:1}.node-search input{min-height:30px}
 @media(max-width:760px){.canvas-topline{position:sticky;left:0;width:100%;min-width:720px}.canvas-tools .control{min-width:34px}.canvas-wrap{overscroll-behavior:contain}}
 
+.demo-flow-gate{position:fixed;inset:0;z-index:40;display:grid;place-items:center;padding:24px;background:radial-gradient(ellipse at 48% 0%,#22263a 0,transparent 50%),#10141d;color:#edf2fb}
+.demo-flow-gate[hidden]{display:none!important}
+.demo-flow-gate__card{width:min(420px,100%);display:grid;gap:12px;padding:22px;border:1px solid #354155;border-radius:14px;background:#1a202c}
+.demo-flow-gate__card h1{margin:0;font-size:22px;letter-spacing:-.03em}
+.demo-flow-gate__card p{margin:0;color:#8f9bb0;font-size:12px;line-height:1.6}
+.demo-flow-gate__card label{display:grid;gap:6px;font-size:11px;color:#a5b0c2}
+.demo-flow-gate__card input{min-height:38px;padding:0 12px;border:1px solid #3a4659;border-radius:8px;background:#141b27;color:#edf2fb}
+.demo-flow-gate__card button{min-height:38px;border:0;border-radius:8px;background:#14b8a6;color:#06241f;font-weight:700;cursor:pointer}
+.demo-flow-gate__error{color:#f1a65c;font-size:11px}
 </style>
 </head>
 <body>
+<div id="demo-flow-gate" class="demo-flow-gate" hidden>
+  <form class="demo-flow-gate__card" id="demo-flow-gate-form">
+    <h1>Demo access</h1>
+    <p>Enter the shared passphrase to open the workflow explorer. Lightweight scraper friction—not real authentication.</p>
+    <label>Passphrase <input id="demo-flow-gate-input" type="password" autocomplete="current-password" required></label>
+    <p id="demo-flow-gate-error" class="demo-flow-gate__error" hidden></p>
+    <button type="submit">Unlock demo</button>
+  </form>
+</div>
+<script>
+(async function () {
+  const STORAGE_KEY = "pathfinder-demo-gate-unlocked-v1";
+  const gate = document.getElementById("demo-flow-gate");
+  const form = document.getElementById("demo-flow-gate-form");
+  const input = document.getElementById("demo-flow-gate-input");
+  const error = document.getElementById("demo-flow-gate-error");
+  const page = document.querySelector(".page");
+  async function sha256Hex(value) {
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(String(value || "")));
+    return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
+  }
+  let config = { enabled: false, hash: "" };
+  try {
+    const response = await fetch("../demo-gate.json", { cache: "no-store" });
+    if (response.ok) {
+      const raw = await response.json();
+      const hash = typeof raw.hash === "string" ? raw.hash.trim().toLowerCase() : "";
+      config = { enabled: raw.enabled === true && /^[0-9a-f]{64}$/.test(hash), hash };
+    }
+  } catch (_) {}
+  if (!config.enabled || sessionStorage.getItem(STORAGE_KEY) === "1") return;
+  if (page) page.hidden = true;
+  gate.hidden = false;
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    error.hidden = true;
+    const actual = await sha256Hex(input.value);
+    if (actual !== config.hash) {
+      error.textContent = "Passphrase did not match.";
+      error.hidden = false;
+      return;
+    }
+    sessionStorage.setItem(STORAGE_KEY, "1");
+    gate.hidden = true;
+    if (page) page.hidden = false;
+  });
+})();
+</script>
 <div class="page">
 <header class="masthead">
  <div class="brand"><img class="brand-mark-image" src="../content/assets/brand-mark.svg" alt=""><div><strong>PATHFINDER</strong><small>EXPLORE HOW A CHECK WORKS</small></div></div>

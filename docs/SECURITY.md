@@ -24,6 +24,8 @@ Prompt wording is not the only defense; the architecture must deny source conten
 ## Access and privacy
 Determine access from authenticated identity and server-side authorization, not user-supplied repository names alone. Limit data sent to the model to what is needed. Confirm organizational data-processing and retention requirements for direct Anthropic use before sending proprietary source.
 
+The optional GitHub Pages demo passphrase (`DEMO_GATE_PASSPHRASE`) is scraper friction only. It is not authentication, does not make the site confidential, and does not protect GitHub Issues/Actions endpoints.
+
 ## Secrets and logs
 - Store API keys in AWS Secrets Manager or approved secret store; use separate environment credentials.
 - Never commit credentials or put them in prompts, fixtures or logs.
