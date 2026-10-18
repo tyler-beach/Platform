@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -23,14 +24,15 @@ def artifact(artifact_id: str, revision: str, path: str, content: str) -> dict:
 def fixture(ttl: int | None = 720, **overrides) -> dict:
     adr = artifact("ADR-SESSION-001", "git:abc123", "adrs/session-ttl.md", "Session TTL must not exceed 600 seconds.")
     adr["status"] = overrides.pop("adr_status", "accepted")
-    source = artifact("service-config", "git:def456", "config/session.json", '{"session_ttl_seconds": 720}')
+    source_content = json.dumps({"observations": [] if ttl is None else [{"predicate": "session.ttl_seconds", "value": ttl}]}, separators=(",", ":"))
+    source = artifact("service-config", "git:def456", "config/session.json", source_content)
     evidence = []
     if ttl is not None:
         evidence.append({
             "evidence_id": "EV-TTL-1",
             "artifact_id": source["artifact_id"],
             "revision": source["revision"],
-            "locator": {"kind": "json_pointer", "value": "/session_ttl_seconds"},
+            "locator": {"kind": "json_pointer", "value": "/observations/0/value"},
             "predicate": "session.ttl_seconds",
             "value": ttl,
         })
@@ -56,11 +58,15 @@ class SessionTTLInvestigationTests(unittest.TestCase):
     def test_ttl_at_limit_is_compliant(self):
         self.assertEqual(investigate.investigate(fixture(600))["outcome"], "no_deviation_found")
 
-    def test_out_of_scope_or_superseded_decision_is_not_applied(self):
-        case = fixture(720, scope_match=False)
-        result = investigate.investigate(case)
+    def test_out_of_scope_decision_is_not_applied(self):
+        result = investigate.investigate(fixture(720, scope_match=False))
         self.assertFalse(result["applicability"]["applicable"])
         self.assertEqual(result["outcome"], "no_deviation_found")
+        self.assertEqual(result["relationship"], "not_applicable")
+
+    def test_superseded_decision_is_not_applied(self):
+        result = investigate.investigate(fixture(720, adr_status="superseded"))
+        self.assertFalse(result["applicability"]["applicable"])
         self.assertEqual(result["relationship"], "not_applicable")
 
     def test_missing_ttl_is_inconclusive(self):
@@ -70,11 +76,16 @@ class SessionTTLInvestigationTests(unittest.TestCase):
 
     def test_conflicting_ttl_values_are_inconclusive(self):
         case = fixture(720)
+        source_content = json.dumps({"observations": [
+            {"predicate": "session.ttl_seconds", "value": 720},
+            {"predicate": "session.ttl_seconds", "value": 300},
+        ]}, separators=(",", ":"))
+        case["source"] = artifact("service-config", "git:def456", "config/session.json", source_content)
         case["evidence"].append({
             "evidence_id": "EV-TTL-2",
             "artifact_id": case["source"]["artifact_id"],
             "revision": case["source"]["revision"],
-            "locator": {"kind": "line", "start": 8, "end": 8},
+            "locator": {"kind": "json_pointer", "value": "/observations/1/value"},
             "predicate": "session.ttl_seconds",
             "value": 300,
         })
