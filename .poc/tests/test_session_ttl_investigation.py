@@ -109,6 +109,18 @@ class SessionTTLInvestigationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "does not match pinned source locator"):
             investigate.investigate(case)
 
+    def test_json_pointer_rejects_negative_array_index(self):
+        case = fixture(720)
+        case["evidence"][0]["locator"]["value"] = "/observations/-1/value"
+        with self.assertRaisesRegex(ValueError, "does not resolve"):
+            investigate.investigate(case)
+
+    def test_json_pointer_rejects_invalid_escape(self):
+        case = fixture(720)
+        case["evidence"][0]["locator"]["value"] = "/observations/0~2/value"
+        with self.assertRaisesRegex(ValueError, "does not resolve"):
+            investigate.investigate(case)
+
     def test_boolean_source_value_cannot_be_relabelled_as_integer_ttl(self):
         case = fixture(1)
         source_content = json.dumps({"observations": [{"predicate": "session.ttl_seconds", "value": True}]}, separators=(",", ":"))
