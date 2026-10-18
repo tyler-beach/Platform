@@ -16,8 +16,7 @@ from typing import Any
 
 POLICY_VERSION = "session-ttl-policy-v1"
 MAX_TTL_SECONDS = 600
-PARSER_VERSION = "explicit-ttl-fixture-v1"
-OUTCOMES = {"supported_deviation", "no_deviation_found", "not_applicable", "inconclusive"}
+NORMALIZATION_CONTRACT_VERSION = "session-ttl-normalized-input-v1"
 
 
 def canonical(value: Any) -> str:
@@ -69,6 +68,8 @@ def validate_json_pointer_evidence(item: dict[str, Any], source: dict[str, Any])
 
 def investigate(case: dict[str, Any]) -> dict[str, Any]:
     """Evaluate a normalized, pinned fixture and return a deterministic result."""
+    if not isinstance(case, dict):
+        raise ValueError("case must be a JSON object")
     adr = case.get("adr")
     source = case.get("source")
     if not isinstance(adr, dict) or not isinstance(source, dict):
@@ -122,6 +123,26 @@ def investigate(case: dict[str, Any]) -> dict[str, Any]:
         and not isinstance(item.get("value"), bool)
         and item["value"] >= 0
     ]
+    ttl_candidates = [
+        item for item in evidence
+        if item.get("predicate") == "session.ttl_seconds"
+        and item.get("artifact_id") == source["artifact_id"]
+        and item.get("evidence_id") in requested_ids
+    ]
+    rejected_observations = []
+    for item in ttl_candidates:
+        value = item.get("value")
+        reason = None
+        if type(value) is not int:
+            reason = "unexpected_numeric_type"
+        elif value < 0:
+            reason = "negative_value"
+        if reason:
+            rejected_observations.append({
+                "evidence_id": item["evidence_id"],
+                "reason_code": reason,
+            })
+
     rationale: str
     if not applicability:
         outcome = "not_applicable"
@@ -150,7 +171,7 @@ def investigate(case: dict[str, Any]) -> dict[str, Any]:
         "schema_version": "session-ttl-investigation-v1",
         "policy_version": POLICY_VERSION,
         "policy": {"predicate": "session.ttl_seconds", "operator": "maximum", "limit_seconds": limit},
-        "parser_version": PARSER_VERSION,
+        "normalization_contract_version": NORMALIZATION_CONTRACT_VERSION,
         "case_id": case.get("case_id", "unnamed"),
         "inputs": [
             {"artifact_id": artifact["artifact_id"], "revision": artifact["revision"], "path": artifact["path"], "sha256": artifact["sha256"]}
@@ -161,7 +182,8 @@ def investigate(case: dict[str, Any]) -> dict[str, Any]:
         "relationship": relation,
         "rationale": rationale,
         # Only evidence that participated in an applicable decision is cited here.
-        "evidence_ids": sorted(item["evidence_id"] for item in ttl_values) if applicability else [],
+        "evidence_ids": sorted(item["evidence_id"] for item in ttl_candidates) if applicability else [],
+        "rejected_observations": sorted(rejected_observations, key=lambda item: item["evidence_id"]) if applicability else [],
         "uncertainty": [] if outcome != "inconclusive" else [relation],
     }
     result["result_sha256"] = sha256(canonical(result).encode("utf-8"))
