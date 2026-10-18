@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: checkout-session
+spec:
+  replicas: 2
+  template:
+    spec:
+      containers:
+        - name: api
+          image: checkout:1.4.2
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: checkout-session-pdb
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: checkout-session

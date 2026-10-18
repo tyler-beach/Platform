@@ -115,7 +115,9 @@ jobs:
       - name: Build redacted paste-evaluation demo snapshot
         run: |
           mkdir -p site/demo/data
-          python .poc/demo/export_paste_eval_snapshot.py --output site/demo/data/paste-eval-snapshot.json
+          python .poc/demo/export_paste_eval_snapshot.py \
+            --output site/demo/data/paste-eval-snapshot.json \
+            --prepare-fixture-output site/demo/data/paste-prepare-fixture.json
       - name: Validate generated walkthrough data
         run: |
           python - <<'PY'

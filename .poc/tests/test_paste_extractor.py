@@ -66,6 +66,26 @@ class PasteExtractorTests(unittest.TestCase):
             self.assertIs(by_pred.get("security.secret_in_source.present"), True, lang)
             self.assertIs(by_pred.get("api.auth_middleware.present"), True, lang)
 
+    def test_kubernetes_yaml_extracts_replicas_and_probes(self):
+        yaml_text = (FIXTURES / "real_paste_deploy.yaml").read_text(encoding="utf-8")
+        package = {
+            "schema_version": "pathfinder-evidence-package-v1",
+            "package_id": "k8s-yaml",
+            "code": [{
+                "artifact_id": "code-0",
+                "path": "issue/manifest.yaml",
+                "content": yaml_text,
+            }],
+            "observations": [],
+        }
+        obs = paste_extractor.extract_observations(package)
+        by_pred = {item["predicate"]: item["value"] for item in obs}
+        self.assertEqual(by_pred["kubernetes.deployment.replicas"], 2)
+        self.assertIs(by_pred["kubernetes.readiness_probe.present"], True)
+        self.assertIs(by_pred["kubernetes.pod_disruption_budget.present"], True)
+        self.assertEqual(by_pred["kubernetes.pod_disruption_budget.max_unavailable"], 1)
+        self.assertEqual(paste_extractor.EXTRACTOR_VERSION, "paste-heuristic-v2")
+
     def test_no_secret_match_does_not_emit_false(self):
         package = {
             "schema_version": "pathfinder-evidence-package-v1",

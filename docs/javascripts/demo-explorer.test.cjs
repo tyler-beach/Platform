@@ -20,6 +20,32 @@ test("offers Pathfinder issue package evaluation workflow for paste catalog runs
   assert.match(source, /pathfinder-analyze\.yml/);
 });
 
+test("builds and validates Pathfinder analyze issue bodies for GitHub submission", () => {
+  const error = core.validatePastePrepare({ techSpec: "", code: "", attested: false });
+  assert.match(error, /attestation/i);
+  const body = core.buildPasteIssueBody({
+    techSpec: "Sessions expire after 12 minutes.",
+    code: "package main",
+    domains: "identity",
+    attested: true,
+  });
+  assert.match(body, /\[X\]/);
+  assert.match(body, /### Tech spec \(markdown\)/);
+  assert.match(body, /Sessions expire after 12 minutes/);
+  const shortPlan = core.githubPasteIssuePlan("tyler-beach/Platform", {
+    title: "[Pathfinder analyze] demo",
+    body: "short",
+  });
+  assert.equal(shortPlan.mode, "url_body");
+  assert.equal(shortPlan.copyRequired, false);
+  const longPlan = core.githubPasteIssuePlan("tyler-beach/Platform", {
+    title: "[Pathfinder analyze] demo",
+    body: "x".repeat(6000),
+  });
+  assert.equal(longPlan.mode, "copy_then_template");
+  assert.equal(longPlan.copyRequired, true);
+});
+
 test("uses the configured private clone identity for workflow links", () => {
   const configured = { content: "example-org/adr-platform" };
   const document = { readyState: "loading", querySelector: () => configured, addEventListener() {} };

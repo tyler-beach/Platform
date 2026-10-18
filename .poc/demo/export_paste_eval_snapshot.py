@@ -110,16 +110,44 @@ def build_snapshot() -> dict[str, Any]:
     return snapshot
 
 
+def build_prepare_fixture() -> dict[str, Any]:
+    """Public synthetic fixture text for the Pages prepare helper Load button."""
+    tech = (FIXTURES / "real_paste_tech_spec.md").read_text(encoding="utf-8")
+    go = (FIXTURES / "real_paste_session.go").read_text(encoding="utf-8")
+    return {
+        "schema_version": "pathfinder-paste-prepare-fixture-v1",
+        "synthetic": True,
+        "domains": "identity, security, reliability, messaging, api, privacy",
+        "tech_spec": tech,
+        "code": go,
+        "warning": "Synthetic fixture only. Do not paste real secrets into public GitHub Issues.",
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument(
+        "--prepare-fixture-output",
+        type=Path,
+        help="Optional path for Pages prepare-helper fixture JSON (includes synthetic source text)",
+    )
     args = parser.parse_args(argv)
     snapshot = build_snapshot()
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(snapshot, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    prepare_path = args.prepare_fixture_output
+    if prepare_path is None:
+        prepare_path = args.output.parent / "paste-prepare-fixture.json"
+    prepare_path.parent.mkdir(parents=True, exist_ok=True)
+    prepare_path.write_text(
+        json.dumps(build_prepare_fixture(), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     print(json.dumps({
         "ok": True,
         "output": str(args.output),
+        "prepare_fixture": str(prepare_path),
         "aggregate_status": snapshot["aggregate_status"],
         "observation_count": snapshot["observation_count"],
     }))

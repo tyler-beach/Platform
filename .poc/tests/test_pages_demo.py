@@ -103,8 +103,13 @@ class PagesSnapshotTests(unittest.TestCase):
         ):
             self.assertIn(link, demo_app)
         self.assertIn("demo-paste-eval", demo_app)
+        self.assertIn("demo-paste-prepare", demo_app)
+        self.assertIn("demo-paste-copy-body", demo_app)
+        self.assertIn("demo-paste-open-github", demo_app)
         self.assertIn("pathfinder-issue-analyze.yml", javascript)
         self.assertIn("paste-eval-snapshot.json", javascript)
+        self.assertIn("paste-prepare-fixture.json", javascript)
+        self.assertIn("buildPasteIssueBody", javascript)
         self.assertIn("pathfinder-analyze.yml", demo_app)
         self.assertNotIn("https://github.com/tyler-beach/Platform/actions/workflows/", page)
         self.assertIn("aria-live", demo_app)
