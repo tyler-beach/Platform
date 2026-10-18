@@ -114,6 +114,8 @@ def _guess_code_path(code: str) -> str:
         return "issue/sample.go"
     if re.search(r"^\s*(def|class|import|from)\s+", code, re.M) or "async def" in code:
         return "issue/sample.py"
+    if re.search(r"(?m)^(apiVersion|kind):\s*\S+", code):
+        return "issue/manifest.yaml"
     if code.lstrip().startswith("{"):
         return "issue/config.json"
     return "issue/sample-code.txt"

@@ -17,7 +17,7 @@ from typing import Any
 import catalog
 
 EXTRACTOR_ID = "paste_heuristic_v1"
-EXTRACTOR_VERSION = "paste-heuristic-v1"
+EXTRACTOR_VERSION = "paste-heuristic-v2"
 
 # Presence/forbidden predicates that may only be emitted as True when a match is found.
 TRUE_ONLY_PREDICATES = frozenset({
@@ -168,6 +168,8 @@ def _detect_language(path: str, content: str) -> str:
         return "python"
     if lower.endswith(".go"):
         return "go"
+    if lower.endswith((".yaml", ".yml")):
+        return "yaml"
     if lower.endswith((".md", ".markdown", ".txt")):
         return "markdown"
     if "package main" in content or re.search(r"\bfunc\s+\w+\s*\(", content):
@@ -176,7 +178,70 @@ def _detect_language(path: str, content: str) -> str:
         return "python"
     if content.lstrip().startswith("{") or content.lstrip().startswith("["):
         return "json"
+    if re.search(r"(?m)^(apiVersion|kind):\s*\S+", content) and re.search(r"(?m)^metadata:\s*$", content):
+        return "yaml"
     return "markdown"
+
+
+def extract_kubernetes_yaml(text: str, artifact: dict[str, Any], subjects: dict[str, str]) -> list[dict[str, Any]]:
+    """Fail-closed heuristics for pasted Kubernetes YAML snippets."""
+    hits: list[dict[str, Any]] = []
+
+    def add(predicate: str, value: Any, match: re.Match[str]) -> None:
+        item = _candidate(
+            predicate=predicate,
+            value=value,
+            artifact=artifact,
+            text=text,
+            start=match.start(),
+            end=match.end(),
+            subjects=subjects,
+            evidence_prefix="EXT-yaml",
+        )
+        if item:
+            hits.append(item)
+
+    # Only treat as k8s-ish when kind/apiVersion or common workload keys appear.
+    k8s_signal = bool(
+        re.search(r"(?m)^(apiVersion|kind):\s*\S+", text)
+        or re.search(r"(?m)^\s*(replicas|readinessProbe|livenessProbe|maxUnavailable|minAvailable):\s*", text)
+        or "PodDisruptionBudget" in text
+        or "HorizontalPodAutoscaler" in text
+    )
+    if not k8s_signal:
+        return hits
+
+    for match in re.finditer(r"(?m)^\s*replicas:\s*(\d+)\s*$", text):
+        add("kubernetes.deployment.replicas", int(match.group(1)), match)
+    if re.search(r"(?m)^\s*readinessProbe:\s*$", text) or re.search(r"(?i)readinessProbe:", text):
+        match = re.search(r"(?i)readinessProbe:", text)
+        if match:
+            add("kubernetes.readiness_probe.present", True, match)
+    if re.search(r"(?i)livenessProbe:", text):
+        match = re.search(r"(?i)livenessProbe:", text)
+        if match:
+            add("kubernetes.liveness_probe.present", True, match)
+    if "PodDisruptionBudget" in text or re.search(r"(?i)kind:\s*PodDisruptionBudget", text):
+        match = re.search(r"(?i)PodDisruptionBudget", text)
+        if match:
+            add("kubernetes.pod_disruption_budget.present", True, match)
+    for match in re.finditer(r"(?m)^\s*maxUnavailable:\s*(\d+)\s*$", text):
+        add("kubernetes.pod_disruption_budget.max_unavailable", int(match.group(1)), match)
+    for match in re.finditer(r"(?m)^\s*minAvailable:\s*(\d+)\s*$", text):
+        add("kubernetes.pod_disruption_budget.min_available", int(match.group(1)), match)
+    if "HorizontalPodAutoscaler" in text or re.search(r"(?i)kind:\s*HorizontalPodAutoscaler", text):
+        match = re.search(r"(?i)HorizontalPodAutoscaler", text)
+        if match:
+            add("kubernetes.hpa.present", True, match)
+    if "NetworkPolicy" in text or re.search(r"(?i)kind:\s*NetworkPolicy", text):
+        match = re.search(r"(?i)NetworkPolicy", text)
+        if match:
+            add("kubernetes.network_policy.present", True, match)
+    if re.search(r"(?i)kind:\s*Ingress", text) and re.search(r"(?i)tls:", text):
+        match = re.search(r"(?i)tls:", text)
+        if match:
+            add("kubernetes.ingress.tls_enabled", True, match)
+    return hits
 
 
 def extract_markdown(text: str, artifact: dict[str, Any], subjects: dict[str, str]) -> list[dict[str, Any]]:
@@ -630,6 +695,11 @@ def extract_observations(package: dict[str, Any]) -> list[dict[str, Any]]:
         text = artifact["content"]
         if lang == "markdown":
             candidates.extend(extract_markdown(text, artifact, subjects))
+            candidates.extend(extract_kubernetes_yaml(text, artifact, subjects))
+            candidates.extend(extract_secrets(text, artifact, subjects))
+        elif lang == "yaml":
+            candidates.extend(extract_kubernetes_yaml(text, artifact, subjects))
+            candidates.extend(extract_markdown(text, artifact, subjects))
             candidates.extend(extract_secrets(text, artifact, subjects))
         elif lang == "python":
             candidates.extend(extract_python(text, artifact, subjects))
@@ -640,6 +710,7 @@ def extract_observations(package: dict[str, Any]) -> list[dict[str, Any]]:
             candidates.extend(extract_secrets(text, artifact, subjects))
         else:
             candidates.extend(extract_markdown(text, artifact, subjects))
+            candidates.extend(extract_kubernetes_yaml(text, artifact, subjects))
             candidates.extend(extract_secrets(text, artifact, subjects))
     return _resolve_conflicts(candidates)
 

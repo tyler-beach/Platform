@@ -25,6 +25,63 @@
       workflow: `${base}/actions/workflows/pathfinder-issue-analyze.yml`,
     };
   }
+
+  const PASTE_ATTESTATION = "I attest this submission contains only synthetic or explicitly public content and no secrets or confidential source.";
+  const PASTE_MAX_URL_BODY_CHARS = 5500;
+
+  function buildPasteIssueBody({ techSpec = "", code = "", domains = "", attested = false } = {}) {
+    const check = attested ? "[X]" : "[ ]";
+    const domainsText = String(domains || "").trim();
+    const tech = String(techSpec || "").trim();
+    const sample = String(code || "").trim();
+    return [
+      "### Public / synthetic attestation",
+      "",
+      `- ${check} ${PASTE_ATTESTATION}`,
+      "",
+      "### Domains (optional scope filter)",
+      "",
+      domainsText || "_Leave blank to evaluate all domains._",
+      "",
+      "### Tech spec (markdown)",
+      "",
+      tech || "_No tech spec provided._",
+      "",
+      "### Sample code",
+      "",
+      sample || "_No sample code provided._",
+      "",
+      "### Observations JSON array (optional)",
+      "",
+      "_Left empty so Actions can run paste extraction._",
+      "",
+    ].join("\n");
+  }
+
+  function validatePastePrepare({ techSpec = "", code = "", attested = false } = {}) {
+    if (!attested) return "Public/synthetic attestation is required before opening GitHub.";
+    if (!String(techSpec || "").trim() && !String(code || "").trim()) {
+      return "Provide a tech spec and/or sample code.";
+    }
+    return "";
+  }
+
+  function githubPasteIssuePlan(repository, { title, body, labels = "pathfinder-analyze" }) {
+    const base = `https://github.com/${safeRepository(repository)}/issues/new`;
+    const enc = (value) => encodeURIComponent(String(value ?? ""));
+    if (String(body || "").length <= PASTE_MAX_URL_BODY_CHARS) {
+      return {
+        mode: "url_body",
+        url: `${base}?title=${enc(title)}&labels=${enc(labels)}&body=${enc(body)}`,
+        copyRequired: false,
+      };
+    }
+    return {
+      mode: "copy_then_template",
+      url: `${base}?template=${enc("pathfinder-analyze.yml")}&title=${enc(title)}`,
+      copyRequired: true,
+    };
+  }
   const API = (repository) => `https://api.github.com/repos/${repository}`;
   const WORKFLOWS = workflowDefinitions(`${OWNER}/${REPOSITORY}`);
   const RUN_STATES = new Set(["queued", "in_progress", "completed", "waiting", "requested", "pending"]);
@@ -441,7 +498,12 @@
     return item.conclusion || item.status || "unknown";
   }
 
-  const core = { normalizeRuns, normalizeLedgerRuns, normalizeJobs, historyProjection, normalizeScenarioGallery, galleryArtifactOrder, galleryArtifactNode, evidenceForFinding, fetchSiteJson, fetchWorkflowRuns, fetchRunJobs, safeRunUrl, formatDate, statusText, workflows: WORKFLOWS };
+  const core = {
+    normalizeRuns, normalizeLedgerRuns, normalizeJobs, historyProjection, normalizeScenarioGallery,
+    galleryArtifactOrder, galleryArtifactNode, evidenceForFinding, fetchSiteJson, fetchWorkflowRuns,
+    fetchRunJobs, safeRunUrl, formatDate, statusText, workflows: WORKFLOWS,
+    buildPasteIssueBody, validatePastePrepare, githubPasteIssuePlan,
+  };
   root.ADRDemoCore = core;
 
   function init() {
@@ -936,6 +998,92 @@
         if (generation !== demoGeneration || doc.getElementById("demo-explorer") !== mount) return;
         setText("demo-paste-eval-status", `${error.message} Rebuild Pages to regenerate the paste-eval snapshot.`);
       });
+
+    async function copyText(value) {
+      if (root.navigator && root.navigator.clipboard && typeof root.navigator.clipboard.writeText === "function") {
+        await root.navigator.clipboard.writeText(value);
+        return;
+      }
+      throw new Error("Clipboard API unavailable in this browser.");
+    }
+
+    function readPastePrepareFields() {
+      return {
+        techSpec: byId("demo-paste-tech") ? byId("demo-paste-tech").value : "",
+        code: byId("demo-paste-code") ? byId("demo-paste-code").value : "",
+        domains: byId("demo-paste-domains") ? byId("demo-paste-domains").value : "",
+        attested: !!(byId("demo-paste-attest") && byId("demo-paste-attest").checked),
+      };
+    }
+
+    if (byId("demo-paste-load-fixture")) {
+      byId("demo-paste-load-fixture").addEventListener("click", async () => {
+        setText("demo-paste-prepare-status", "Loading synthetic fixture…");
+        try {
+          const fixture = await fetchSiteJson(root.fetch.bind(root), siteDataUrl("paste-prepare-fixture.json"), root.location.origin);
+          if (!fixture || fixture.schema_version !== "pathfinder-paste-prepare-fixture-v1") {
+            throw new Error("Prepare fixture has an unsupported version.");
+          }
+          if (byId("demo-paste-domains")) byId("demo-paste-domains").value = fixture.domains || "";
+          if (byId("demo-paste-tech")) byId("demo-paste-tech").value = fixture.tech_spec || "";
+          if (byId("demo-paste-code")) byId("demo-paste-code").value = fixture.code || "";
+          if (byId("demo-paste-attest")) byId("demo-paste-attest").checked = true;
+          setText("demo-paste-prepare-status", "Loaded synthetic fixture. Review it, then copy or open on GitHub.");
+        } catch (error) {
+          setText("demo-paste-prepare-status", error.message || "Could not load prepare fixture.");
+        }
+      });
+    }
+
+    if (byId("demo-paste-copy-body")) {
+      byId("demo-paste-copy-body").addEventListener("click", async () => {
+        const fields = readPastePrepareFields();
+        const error = validatePastePrepare(fields);
+        if (error) {
+          setText("demo-paste-prepare-status", error);
+          return;
+        }
+        const body = buildPasteIssueBody(fields);
+        try {
+          await copyText(body);
+          setText("demo-paste-prepare-status", "Issue body copied. Open the Pathfinder analyze form and paste it, or use Open on GitHub.");
+        } catch (copyError) {
+          setText("demo-paste-prepare-status", copyError.message || "Copy failed.");
+        }
+      });
+    }
+
+    if (byId("demo-paste-open-github")) {
+      byId("demo-paste-open-github").addEventListener("click", async () => {
+        const fields = readPastePrepareFields();
+        const error = validatePastePrepare(fields);
+        if (error) {
+          setText("demo-paste-prepare-status", error);
+          return;
+        }
+        const body = buildPasteIssueBody(fields);
+        const plan = githubPasteIssuePlan(activeRepository, {
+          title: "[Pathfinder analyze] Pages paste submission",
+          body,
+        });
+        try {
+          if (plan.copyRequired) {
+            await copyText(body);
+            setText("demo-paste-prepare-status", "Body too large for the URL. Copied to clipboard—paste into the GitHub form that opens.");
+          } else {
+            setText("demo-paste-prepare-status", "Opening GitHub Issues with the prepared body. Evaluation runs on Actions after you submit.");
+          }
+          if (root.window && typeof root.window.open === "function") {
+            root.window.open(plan.url, "_blank", "noopener,noreferrer");
+          } else if (root.location) {
+            root.location.href = plan.url;
+          }
+        } catch (openError) {
+          setText("demo-paste-prepare-status", openError.message || "Could not open GitHub.");
+        }
+      });
+    }
+
     loadHistory();
   }
 

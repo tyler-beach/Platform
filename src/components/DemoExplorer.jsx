@@ -80,16 +80,28 @@ export default function DemoExplorer() {
           <ul className="technical-trace__notes"><li>Check artifact versions, digests, line locators, and same-job evidence references</li><li>Separate the machine-generated finding from the human review event</li><li>See why missing evidence remains inconclusive—not compliant by default</li></ul>
           <a href={`${BASE_URL}demo/evidence-lineage-example/`}>Open the evidence lineage walkthrough <ArrowUpRight size={13} /></a>
         </article>
-        <article className="technical-trace__panel" id="demo-paste-eval">
+        <article className="technical-trace__panel technical-trace__panel--wide" id="demo-paste-eval">
           <div className="technical-trace__panel-title"><Workflow size={17} /><div><strong>04 / Paste → catalog evaluation</strong><small>GitHub Issues + Actions backbone</small></div></div>
-          <p className="technical-trace__explain">Paste a real tech-spec or Go/Python sample into a Pathfinder analyze issue. Actions extracts allowlisted observations, evaluates ADR-101–200, and comments results. This page shows a redacted fixture snapshot only—live evaluation stays on GitHub.</p>
+          <p className="technical-trace__explain">Prepare a real tech-spec or Go/Python/YAML sample here, then open GitHub. Actions extracts allowlisted observations, evaluates ADR-101–200, and comments results. This page never evaluates in the browser.</p>
           <div className="demo-paste-eval-summary" aria-live="polite">
             <p id="demo-paste-eval-status" className="demo-muted">Loading paste-evaluation snapshot…</p>
             <ul id="demo-paste-eval-counts" className="technical-trace__notes" />
             <ul id="demo-paste-eval-predicates" className="technical-trace__notes" />
           </div>
+          <form id="demo-paste-prepare" className="demo-paste-prepare" onSubmit={(event) => event.preventDefault()}>
+            <label className="demo-paste-prepare__check"><input id="demo-paste-attest" type="checkbox" /> I attest this paste is synthetic or explicitly public (no secrets / confidential source).</label>
+            <label className="demo-paste-prepare__field"><span>Domains (optional)</span><input id="demo-paste-domains" type="text" placeholder="identity, security, reliability" autoComplete="off" /></label>
+            <label className="demo-paste-prepare__field"><span>Tech spec (markdown)</span><textarea id="demo-paste-tech" rows={5} placeholder="Sessions expire after 12 minutes…" spellCheck="false" /></label>
+            <label className="demo-paste-prepare__field"><span>Sample code (Go / Python / YAML)</span><textarea id="demo-paste-code" rows={5} placeholder="package main…" spellCheck="false" /></label>
+            <p id="demo-paste-prepare-status" className="demo-muted" role="status" />
+            <div className="demo-paste-prepare__actions">
+              <button id="demo-paste-load-fixture" type="button" className="demo-button">Load sample fixture</button>
+              <button id="demo-paste-copy-body" type="button" className="demo-button">Copy issue body</button>
+              <button id="demo-paste-open-github" type="button" className="demo-launch-button demo-launch-button--primary">Open on GitHub <ArrowUpRight size={13} /></button>
+            </div>
+          </form>
           <div className="demo-workflow-links">
-            <a id="demo-open-paste-issue" href={`https://github.com/${repository}/issues/new?template=pathfinder-analyze.yml`}>Open Pathfinder analyze issue <ArrowUpRight size={13} /></a>
+            <a id="demo-open-paste-issue" href={`https://github.com/${repository}/issues/new?template=pathfinder-analyze.yml`}>Open empty Pathfinder analyze form <ArrowUpRight size={13} /></a>
             <a id="demo-open-paste-workflow" href={`https://github.com/${repository}/actions/workflows/pathfinder-issue-analyze.yml`}>Open issue-analyze workflow <ArrowUpRight size={13} /></a>
             <Link to="/architecture/issue_analyze_workflow">How paste evaluation works <ArrowRight size={13} /></Link>
           </div>

@@ -62,7 +62,14 @@ Messy fixtures used in tests:
 
 ## Try it from GitHub Pages
 
-The workflow demo pages (`/demo`, `/evaluation`, `pathfinder-flow/`) show a **redacted fixture snapshot** and deep-link here. Live evaluation still runs only through this GitHub Issue + Actions path—the browser does not execute the extractor.
+On `/demo` panel **04 / Paste → catalog evaluation**:
+
+1. Check the public/synthetic attestation box.
+2. Paste a tech-spec and/or Go/Python/YAML sample (or **Load sample fixture**).
+3. **Copy issue body** and/or **Open on GitHub** (short bodies are URL-embedded; large bodies are copied, then the issue form opens).
+4. Submit the GitHub issue. Actions extracts observations and comments results.
+
+Pages still only prepares the submission. Live evaluation runs only through GitHub Issues + Actions.
 
 ## Related
 
