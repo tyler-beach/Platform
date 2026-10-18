@@ -1300,3 +1300,15 @@ button.run-graph-node:hover { border-color:#64cdbd; background:#143043; }
 @media(max-width:620px) { .run-inputs-grid { grid-template-columns:minmax(0,1fr); } }
 
 .run-download-file { display:inline-flex; align-items:center; gap:6px; margin:10px 12px 12px; padding:7px 9px; border:1px solid #2e5262; border-radius:6px; color:#a9e4da; background:#0d2533; font-size:10px; cursor:pointer; }
+
+.run-artifact-card { margin-top:9px; border:1px solid #243b4b; border-radius:8px; overflow:hidden; background:#091924; }
+.run-artifact-card .run-artifact { margin:0; border:0; border-radius:0; }
+.run-artifact-card > .run-inline-alert { margin:0 10px 10px; }
+.run-artifact-files { display:grid; gap:7px; padding:0 10px 10px; }
+.run-artifact-files__heading { display:grid; gap:4px; padding:10px 0 3px; border-top:1px solid #213747; }
+.run-artifact-files__heading strong { color:#cfe2eb; font-size:10px; }
+.run-artifact-files__heading small { color:#809bad; font-size:9px; }
+.run-artifact-files .run-log-file { margin:0; }
+.run-artifact-files .run-log-file pre { max-height:360px; }
+.run-artifact-card .run-artifact-inspect { display:inline-flex; align-items:center; gap:6px; white-space:nowrap; }
+@media(max-width:620px) { .run-artifact-card .run-artifact { flex-wrap:wrap; } .run-artifact-card .run-artifact-inspect { margin-left:30px; } }
