@@ -22,6 +22,7 @@ if str(HERE) not in sys.path:
 import catalog
 import engine
 import package_collector
+import paste_extractor
 
 
 def _scope_match(row: dict[str, Any], package: dict[str, Any]) -> bool:
@@ -63,6 +64,7 @@ def evaluate_package(
     adr_status: str = "accepted",
 ) -> dict[str, Any]:
     reqs = requirements if requirements is not None else catalog.load_requirements()
+    package = paste_extractor.ensure_observations(package)
     observations = package_collector.collect_package_observations(package)
     results: list[dict[str, Any]] = []
     for row in reqs:
@@ -98,6 +100,7 @@ def evaluate_package(
         "package_id": package.get("package_id", "unnamed"),
         "catalog_size": len(reqs),
         "observation_count": len(observations),
+        "extraction": package.get("extraction"),
         "aggregate_status": aggregate_status(outcomes),
         "aggregate_meaning": {
             "all_aligned": "All in-scope requirements with sufficient evidence are aligned.",
