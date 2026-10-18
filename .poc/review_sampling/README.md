@@ -16,7 +16,7 @@ Required fields: `unit_id`, `outcome` (`deviation`, `no_deviation`, `potential`,
 
 ```sh
 python .poc/review_sampling/sample.py --input frame.jsonl --output review-batch.json --seed pilot-2026-01 --per-stratum 2
-python -m unittest .poc.tests.test_review_sampling -v
+python -m unittest discover -s .poc/tests -p 'test_review_sampling.py' -v
 ```
 
 The batch manifest includes a canonical frame fingerprint, per-stratum population/selected counts, inclusion probabilities, inverse-probability design weights, and the actual selected unit IDs. A seed is useful for reproducibility, but the stored manifest remains the record of what was selected.
