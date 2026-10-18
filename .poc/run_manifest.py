@@ -17,6 +17,8 @@ from pathlib import Path
 
 INPUT_FIELDS = {
     "comparison": "INPUT_COMPARISON",
+    "sample_case": "INPUT_SAMPLE_CASE",
+    "create_review_issue": "INPUT_CREATE_REVIEW_ISSUE",
     "language": "INPUT_LANGUAGE",
     "source_path": "INPUT_SOURCE_PATH",
     "config_source": "INPUT_CONFIG_SOURCE",

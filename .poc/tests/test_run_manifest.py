@@ -36,6 +36,7 @@ class RunManifestTests(unittest.TestCase):
             self.assertEqual(manifest["schema"], "pathfinder.execution-manifest/v1")
             self.assertEqual(manifest["run"]["run_attempt"], 2)
             self.assertEqual(manifest["inputs"]["comparison"], "spec-vs-implementation")
+            self.assertIn("sample_case", manifest["inputs"])
             self.assertEqual(manifest["inputs"]["model_provider"], "mock")
             self.assertEqual(manifest["output_count"], 1)
             self.assertEqual(manifest["outputs"][0]["path"], "evidence-package.json")
