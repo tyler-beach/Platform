@@ -101,7 +101,7 @@ function Home() {
             <div className="experience-art experience-art--demo" aria-hidden="true"><span /><span /><span /><b /><b /></div>
           </Link>
           <Link className="experience-card experience-card--evaluation" to="/evaluation">
-            <div className="experience-icon"><ShieldCheck size={21} /></div><span className="experience-index">04 / EVALUATION & REPLAY</span><h3>Inspect quality and replay</h3><p>Explore evaluation views for test coverage, evidence quality, and repeatable example runs.</p><span className="experience-card__link">Open evaluation <ArrowRight size={16} /></span>
+            <div className="experience-icon"><ShieldCheck size={21} /></div><span className="experience-index">04 / EVALUATION & REPLAY</span><h3>Inspect quality and replay</h3><p>Explore regression corpora, evidence coverage, and the live Issue/PR catalog path that runs on GitHub Actions.</p><span className="experience-card__link">Open evaluation <ArrowRight size={16} /></span>
             <div className="experience-art experience-art--docs" aria-hidden="true"><span /><span /><span /><i /><i /></div>
           </Link>
         </div>

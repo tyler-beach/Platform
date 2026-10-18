@@ -26,18 +26,20 @@ New ADRs MUST reuse an existing kind + registered predicate whenever possible. U
 
 `.poc/requirement_catalog/` contains **100** synthetic ADRs (`ADR-101`–`ADR-200`) with approved typed requirements and a predicate seed file. Label status is `synthetic_unadjudicated`.
 
-Evaluate a tech-spec/code evidence package against the whole catalog:
+Evaluate a tech-spec/code evidence package against the whole catalog (production CLI is Go; Python under `.poc` remains an offline oracle):
 
 ```sh
-python3 .poc/requirement_engine/evaluate_package.py \
-  .poc/requirement_catalog/sample_packages/multi-domain-session-service/package.json
+cd go/pathfinder
+go build -o /tmp/pathfinder-evaluate-package ./cmd/pathfinder-evaluate-package
+/tmp/pathfinder-evaluate-package \
+  ../../.poc/requirement_catalog/sample_packages/multi-domain-session-service/package.json
 ```
 
 Per-requirement outcomes remain `supported_deviation`, `no_deviation_found`, `not_applicable`, or `inconclusive`. Aggregate status may be `mixed` (product language for partial alignment: some aligned, others deviant and/or inconclusive). Regenerate with `python3 .poc/requirement_catalog/generate_catalog.py`.
 
 ### GitHub Issue intake
 
-Open a **Pathfinder analyze package** issue (public/synthetic content only). Paste a real tech-spec and/or Go/Python sample; a deterministic paste extractor (`paste_heuristic_v1`) fills allowlisted observations when you omit hand-written observation JSON. Actions evaluates the catalog, comments aggregate status + outcome counts, and uploads the full report artifact. Unextracted predicates stay `inconclusive`. See `docs/ISSUE_ANALYZE_WORKFLOW.md`.
+Open a **Pathfinder analyze package** issue (public/synthetic content only). Provide a tech-spec, optional **same-repo pull request** (changed text files), and/or a single sample code snippet. A deterministic paste extractor (`paste_heuristic_v1`) fills allowlisted observations when you omit hand-written observation JSON. Go on Actions evaluates the catalog, comments aggregate status + outcome counts, uploads the full report artifact, and appends a lean job record on `pathfinder-jobs`. Unextracted predicates stay `inconclusive`. See `docs/ISSUE_ANALYZE_WORKFLOW.md`.
 
 ## Requirement kinds
 

@@ -1,17 +1,18 @@
 # pages-paste-eval-bridge Specification
 
 ## Purpose
-GitHub Pages workflow demos deep-link paste→catalog evaluation that executes on Issues/Actions, and may show a redacted build-time fixture snapshot without embedding source bodies.
+GitHub Pages workflow demos deep-link issue/PR→catalog evaluation that executes on Issues/Actions with the Go Pathfinder runtime, and may show a redacted build-time fixture snapshot without embedding source bodies.
 ## Requirements
 ### Requirement: Pages surface paste evaluation through GitHub backbone
 
-The GitHub Pages workflow demos MUST explain and deep-link paste→catalog evaluation that executes on GitHub Issues and Actions. Pages MAY show a redacted, build-time snapshot from checked-in fixtures, but MUST NOT claim in-browser evaluation or embed full tech-spec/code bodies from the fixtures.
+The GitHub Pages workflow demos MUST explain and deep-link issue/PR→catalog evaluation that executes on GitHub Issues and Actions using the Go Pathfinder runtime. Pages MAY show a redacted, build-time snapshot from checked-in fixtures, but MUST NOT claim in-browser evaluation or embed full tech-spec/code bodies from the fixtures.
 
 #### Scenario: Demo page links to analyze issue and workflow
 - **GIVEN** the published `/demo` page
-- **WHEN** a visitor inspects the paste evaluation section
+- **WHEN** a visitor inspects the issue/PR catalog evaluation section
 - **THEN** links exist to the Pathfinder analyze issue form and the `pathfinder-issue-analyze` workflow
 - **AND** copy states that GitHub Issues/Actions perform the live evaluation
+
 
 #### Scenario: Build publishes a redacted paste-eval snapshot
 - **GIVEN** the Pages documentation build

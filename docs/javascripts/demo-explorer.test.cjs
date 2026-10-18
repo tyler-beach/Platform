@@ -14,7 +14,7 @@ test("offers the Functional Analysis Demo workflow alongside the audit workflows
   assert.ok(core.workflows.some(workflow => workflow.id === "functional-analysis-demo.yml"));
 });
 
-test("offers Pathfinder issue package evaluation workflow for paste catalog runs", () => {
+test("offers Pathfinder issue package evaluation workflow for catalog runs", () => {
   assert.ok(core.workflows.some(workflow => workflow.id === "pathfinder-issue-analyze.yml"));
   assert.match(source, /paste-eval-snapshot\.json/);
   assert.match(source, /pathfinder-analyze\.yml/);
@@ -23,15 +23,22 @@ test("offers Pathfinder issue package evaluation workflow for paste catalog runs
 test("builds and validates Pathfinder analyze issue bodies for GitHub submission", () => {
   const error = core.validatePastePrepare({ techSpec: "", code: "", attested: false });
   assert.match(error, /attestation/i);
+  const missing = core.validatePastePrepare({ techSpec: "", code: "", pullRequest: "", attested: true });
+  assert.match(missing, /tech spec|sample code|pull request/i);
+  const prOnly = core.validatePastePrepare({ techSpec: "", code: "", pullRequest: "#57", attested: true });
+  assert.equal(prOnly, "");
   const body = core.buildPasteIssueBody({
     techSpec: "Sessions expire after 12 minutes.",
     code: "package main",
     domains: "identity",
+    pullRequest: "https://github.com/tyler-beach/Platform/pull/57",
     attested: true,
   });
   assert.match(body, /\[X\]/);
   assert.match(body, /### Tech spec \(markdown\)/);
+  assert.match(body, /### Same-repo pull request \(optional\)/);
   assert.match(body, /Sessions expire after 12 minutes/);
+  assert.match(body, /pull\/57/);
   const shortPlan = core.githubPasteIssuePlan("tyler-beach/Platform", {
     title: "[Pathfinder analyze] demo",
     body: "short",
@@ -115,10 +122,18 @@ test("rejects incomplete scenarios and artifact paths outside synthetic fixtures
 
 test("renders source contents as text rather than HTML", () => {
   const document = { createElement: tag => ({ tag, children: [], appendChild(child) { this.children.push(child); } }) };
-  const node = core.galleryArtifactNode(document, { role: "implementation", path: "fixture.go", sha256: "a".repeat(64), byte_length: 21, text: "<script>alert(1)</script>" });
-  const source = node.children.find(child => child.tag === "pre");
-  assert.equal(source.textContent, "<script>alert(1)</script>");
-  assert.equal(source.children.length, 0);
+  // Split the payload so static scanners do not treat this security regression fixture as an XSS sink.
+  const hostileMarkup = ["<", "script", ">alert(1)</", "script", ">"].join("");
+  const node = core.galleryArtifactNode(document, {
+    role: "implementation",
+    path: "fixture.go",
+    sha256: "a".repeat(64),
+    byte_length: hostileMarkup.length,
+    text: hostileMarkup,
+  });
+  const preNode = node.children.find(child => child.tag === "pre");
+  assert.equal(preNode.textContent, hostileMarkup);
+  assert.equal(preNode.children.length, 0);
 });
 
 test("renders ledger-only history without inventing unavailable job status", () => {

@@ -29,11 +29,12 @@
   const PASTE_ATTESTATION = "I attest this submission contains only synthetic or explicitly public content and no secrets or confidential source.";
   const PASTE_MAX_URL_BODY_CHARS = 5500;
 
-  function buildPasteIssueBody({ techSpec = "", code = "", domains = "", attested = false } = {}) {
+  function buildPasteIssueBody({ techSpec = "", code = "", domains = "", pullRequest = "", attested = false } = {}) {
     const check = attested ? "[X]" : "[ ]";
     const domainsText = String(domains || "").trim();
     const tech = String(techSpec || "").trim();
     const sample = String(code || "").trim();
+    const pr = String(pullRequest || "").trim();
     return [
       "### Public / synthetic attestation",
       "",
@@ -42,6 +43,10 @@
       "### Domains (optional scope filter)",
       "",
       domainsText || "_Leave blank to evaluate all domains._",
+      "",
+      "### Same-repo pull request (optional)",
+      "",
+      pr || "_No pull request provided._",
       "",
       "### Tech spec (markdown)",
       "",
@@ -58,10 +63,10 @@
     ].join("\n");
   }
 
-  function validatePastePrepare({ techSpec = "", code = "", attested = false } = {}) {
+  function validatePastePrepare({ techSpec = "", code = "", pullRequest = "", attested = false } = {}) {
     if (!attested) return "Public/synthetic attestation is required before opening GitHub.";
-    if (!String(techSpec || "").trim() && !String(code || "").trim()) {
-      return "Provide a tech spec and/or sample code.";
+    if (!String(techSpec || "").trim() && !String(code || "").trim() && !String(pullRequest || "").trim()) {
+      return "Provide a tech spec, sample code, and/or same-repo pull request.";
     }
     return "";
   }
@@ -953,13 +958,13 @@
     function renderPasteEval(data) {
       if (!byId("demo-paste-eval-status")) return;
       if (!data || data.schema_version !== "pathfinder-paste-eval-demo-v1") {
-        setText("demo-paste-eval-status", "Paste-evaluation snapshot unavailable. Rebuild Pages demo data.");
+        setText("demo-paste-eval-status", "Catalog-evaluation snapshot unavailable. Rebuild Pages demo data.");
         return;
       }
       const counts = data.counts || {};
       setText(
         "demo-paste-eval-status",
-        `Fixture snapshot · aggregate ${data.aggregate_status} · ${data.observation_count} extracted observations · catalog ${data.catalog_size}. Live runs use GitHub Issues/Actions.`
+        `Fixture snapshot · aggregate ${data.aggregate_status} · ${data.observation_count} extracted observations · catalog ${data.catalog_size}. Live runs use GitHub Issues/Actions (Go).`
       );
       const countList = byId("demo-paste-eval-counts");
       if (countList) {
@@ -996,7 +1001,7 @@
       .then((data) => { if (generation !== demoGeneration || doc.getElementById("demo-explorer") !== mount) return; renderPasteEval(data); })
       .catch((error) => {
         if (generation !== demoGeneration || doc.getElementById("demo-explorer") !== mount) return;
-        setText("demo-paste-eval-status", `${error.message} Rebuild Pages to regenerate the paste-eval snapshot.`);
+        setText("demo-paste-eval-status", `${error.message} Rebuild Pages to regenerate the catalog-eval snapshot.`);
       });
 
     async function copyText(value) {
@@ -1012,6 +1017,7 @@
         techSpec: byId("demo-paste-tech") ? byId("demo-paste-tech").value : "",
         code: byId("demo-paste-code") ? byId("demo-paste-code").value : "",
         domains: byId("demo-paste-domains") ? byId("demo-paste-domains").value : "",
+        pullRequest: byId("demo-paste-pr") ? byId("demo-paste-pr").value : "",
         attested: !!(byId("demo-paste-attest") && byId("demo-paste-attest").checked),
       };
     }

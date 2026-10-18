@@ -17,6 +17,8 @@ test('evaluation page keeps evaluation tracks separate and explicit', () => {
   assert.match(dashboard, /holdout stays quarantined/);
   assert.match(dashboard, /pathfinder-analyze\.yml/);
   assert.match(dashboard, /pathfinder-issue-analyze\.yml/);
+  assert.match(dashboard, /Issue \/ PR catalog/);
+  assert.match(dashboard, /Go on Actions/);
   assert.match(dashboard, /Four checks, four different questions/);
 });
 

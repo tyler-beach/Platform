@@ -4,7 +4,7 @@ This catalog contains **100** synthetic ADRs (`ADR-101`–`ADR-200`) with approv
 
 - **Not** independently adjudicated production policy.
 - Collectors bind by **predicate**, not ADR ID.
-- Evaluate with `.poc/requirement_engine/evaluate_package.py`.
+- Evaluate with the Go CLI (`go/pathfinder/cmd/pathfinder-evaluate-package`). Python `.poc/requirement_engine/evaluate_package.py` remains an offline oracle.
 
 ## Domain coverage
 

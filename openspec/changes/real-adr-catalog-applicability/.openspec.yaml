@@ -1,0 +1,4 @@
+schema: spec-driven
+created: 2026-10-18
+goal: Applicability-filtered evaluation against org ADR store without inventing
+  compliance from silence.

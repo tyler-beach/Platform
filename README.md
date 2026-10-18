@@ -19,6 +19,8 @@ The documentation source is in the docs folder and is presented through a React 
 - [Adversarial design review](https://tyler-beach.github.io/Platform/ADVERSARIAL_DESIGN_REVIEW/)
 - [Architecture diagrams](https://tyler-beach.github.io/Platform/diagrams/architecture/)
 - [PoC analysis workflow (GitHub Actions)](https://github.com/tyler-beach/Platform/actions/workflows/poc-analysis.yml)
+- [Pathfinder issue / PR catalog evaluation (Go on Actions)](https://github.com/tyler-beach/Platform/actions/workflows/pathfinder-issue-analyze.yml)
+- [Issue analyze workflow docs](docs/ISSUE_ANALYZE_WORKFLOW.md)
 - [Executable semantic-analysis PoC](https://tyler-beach.github.io/Platform/EXECUTABLE_POC/)
 
 This public Pages deployment contains the synthetic mock walkthrough. Actions history and detailed CSV run-data exports are disabled by default; the workflow rejects those exports unless the repository is an organization-owned private/internal repository with Pages visibility and explicit opt-ins configured. Before using real source data for a demo, clone the project into the intended private organization and verify its Pages visibility settings. The REST/OpenAPI document is a proposed façade, not a claim of a deployed HTTP server.
@@ -97,7 +99,7 @@ Code changes and plain-English technical specifications are both first-class inp
 
 ## Status
 
-Design baseline plus runnable GitHub Actions PoC. The PoC runs deterministic code or YAML/JSON configuration analysis, writes an auditable CSV ledger and run bundle, and provides an interactive Pages walkthrough. It does not provide the proposed production gRPC server, generated Go clients, deployed AWS infrastructure, or a production Step Functions workflow. Pull requests run the deterministic tests, language-validation matrix, OpenAPI validation, OpenSpec validation, labeled fixture evaluation, and React Pages build; Pages deployment occurs only on eligible default-branch runs.
+Design baseline plus runnable GitHub Actions demos. The Pathfinder analyze path evaluates issue paste and same-repo PR inputs with a Go runtime (comment + artifacts + `pathfinder-jobs` ledger). Older PoCs still cover deterministic code/YAML analysis and CSV ledgers. Pages is a prepare/walkthrough surface—not in-browser evaluation. The proposed production gRPC server, generated Go clients, deployed AWS infrastructure, and Step Functions workflow are not provided by this GitHub-only path. Pull requests run deterministic tests, OpenAPI/OpenSpec validation, labeled fixture evaluation, Go Pathfinder tests, and the React Pages build; Pages deployment occurs only on eligible default-branch runs.
 
 ## Guiding rule
 

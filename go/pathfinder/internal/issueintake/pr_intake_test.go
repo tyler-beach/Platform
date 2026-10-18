@@ -3,6 +3,7 @@ package issueintake_test
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/tyler-beach/Platform/go/pathfinder/internal/adapt/pr"
@@ -75,5 +76,23 @@ identity, security
 	}
 	if _, hasTech := pkg["tech_spec"]; hasTech {
 		t.Fatal("tech_spec should be optional/absent")
+	}
+	report := map[string]any{
+		"aggregate_status":  "mixed",
+		"aggregate_meaning": "test",
+		"catalog_size":      100,
+		"observation_count": 1,
+		"report_sha256":     "abc",
+		"counts": map[string]int{
+			"supported_deviation": 1, "no_deviation_found": 0, "inconclusive": 0, "not_applicable": 0,
+		},
+		"results": []map[string]any{},
+	}
+	comment, err := issueintake.RenderResultComment(report, pkg, "https://example.invalid/run")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(comment, "github_pr_changed_files") || !strings.Contains(comment, "#12") {
+		t.Fatalf("comment missing adapter summary: %s", comment)
 	}
 }

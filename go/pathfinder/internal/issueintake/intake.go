@@ -410,6 +410,20 @@ func RenderResultComment(report, packageObj map[string]any, runURL string) (stri
 			extraction["extractor"], extraction["observation_count"],
 		))
 	}
+	if adapter, ok := packageObj["adapter"].(map[string]any); ok {
+		lines = append(lines, fmt.Sprintf("- **Input adapter:** `%v`", adapter["kind"]))
+		if n, ok := adapter["pr_number"]; ok {
+			lines = append(lines, fmt.Sprintf("- **Pull request:** `#%v` @ `%v`", n, adapter["head_sha"]))
+		}
+		if n, ok := adapter["file_count"]; ok {
+			lines = append(lines, fmt.Sprintf("- **PR files packed:** %v", n))
+		}
+		if lims, ok := adapter["limitations"].([]any); ok && len(lims) > 0 {
+			lines = append(lines, fmt.Sprintf("- **Adapter limitations:** %d (see package artifact)", len(lims)))
+		} else if lims, ok := adapter["limitations"].([]string); ok && len(lims) > 0 {
+			lines = append(lines, fmt.Sprintf("- **Adapter limitations:** %d (see package artifact)", len(lims)))
+		}
+	}
 	lines = append(lines,
 		"",
 		"### Outcome counts",

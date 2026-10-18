@@ -48,20 +48,20 @@ const tracks = {
     status: 'Quarantined · excluded from tuning and routine regression scoring',
   },
   paste: {
-    eyebrow: 'PASTE → CATALOG (GITHUB BACKBONE)',
-    title: 'Submit a real sample through Issues.',
-    description: 'Paste a tech-spec or Go/Python sample into a Pathfinder analyze issue. Actions extracts allowlisted observations, evaluates the 100-ADR catalog, and comments aggregate results. Pages only hosts a redacted fixture snapshot—execution stays on GitHub.',
+    eyebrow: 'ISSUE / PR → CATALOG (GITHUB BACKBONE)',
+    title: 'Submit a sample through Issues—or a same-repo PR.',
+    description: 'Open a Pathfinder analyze issue with a tech-spec, a single code sample, and/or a same-repo pull request. Go on Actions extracts allowlisted observations, evaluates the synthetic 100-ADR catalog, comments aggregate results, and appends a lean job ledger. Pages only prepares the issue and hosts a redacted fixture snapshot—execution stays on GitHub.',
     facts: [
       ['100', 'synthetic catalog ADRs'],
-      ['Issues', 'intake surface'],
-      ['Actions', 'evaluate + comment'],
+      ['Go', 'production evaluate runtime'],
+      ['Actions', 'stages + comment + ledger'],
     ],
     actions: [
       { label: 'Open Pathfinder analyze issue', href: 'https://github.com/tyler-beach/Platform/issues/new?template=pathfinder-analyze.yml', primary: true },
-      { label: 'Open issue-analyze workflow', href: 'https://github.com/tyler-beach/Platform/actions/workflows/pathfinder-issue-analyze.yml' },
-      { label: 'Read paste workflow docs', href: 'https://github.com/tyler-beach/Platform/blob/main/docs/ISSUE_ANALYZE_WORKFLOW.md' },
+      { label: 'Open analyze workflow', href: 'https://github.com/tyler-beach/Platform/actions/workflows/pathfinder-issue-analyze.yml' },
+      { label: 'Read issue-analyze docs', href: 'https://github.com/tyler-beach/Platform/blob/main/docs/ISSUE_ANALYZE_WORKFLOW.md' },
     ],
-    status: 'Public/synthetic content only · unextracted predicates stay inconclusive',
+    status: 'Public/synthetic only · forks denied · unextracted predicates stay inconclusive',
   },
 };
 
@@ -86,7 +86,7 @@ export default function EvaluationDashboard() {
       <p>Run the offline checks, compare the candidate with the base revision, and trace reviewer feedback without turning an unverified opinion into a new baseline.</p>
       <div className="evaluation-hero__actions">
         <a className="evaluation-action evaluation-action--primary" href="https://github.com/tyler-beach/Platform/actions/workflows/poc-evaluation.yml" target="_blank" rel="noreferrer"><Play size={15} /> Run evaluation workflow <ArrowUpRight size={14}/></a>
-        <a className="evaluation-action" href="https://github.com/tyler-beach/Platform/issues/new?template=pathfinder-analyze.yml" target="_blank" rel="noreferrer"><GitPullRequest size={15}/> Paste analyze issue <ArrowUpRight size={14}/></a>
+        <a className="evaluation-action" href="https://github.com/tyler-beach/Platform/issues/new?template=pathfinder-analyze.yml" target="_blank" rel="noreferrer"><GitPullRequest size={15}/> Pathfinder analyze issue <ArrowUpRight size={14}/></a>
         <a className="evaluation-action" href="https://github.com/tyler-beach/Platform/issues?q=is%3Aissue+label%3Apathfinder-review" target="_blank" rel="noreferrer"><GitPullRequest size={15}/> Review issues <ArrowUpRight size={14}/></a>
       </div>
       <div className="evaluation-trust-note"><LockKeyhole size={15}/><span>Offline mock by default · no paid model calls · holdout stays quarantined</span></div>
@@ -98,7 +98,7 @@ export default function EvaluationDashboard() {
         <button type="button" role="tab" aria-selected={track === 'regression'} onClick={() => setTrack('regression')}>Detector regression</button>
         <button type="button" role="tab" aria-selected={track === 'coverage'} onClick={() => setTrack('coverage')}>Evidence coverage</button>
         <button type="button" role="tab" aria-selected={track === 'holdout'} onClick={() => setTrack('holdout')}>Locked holdout</button>
-        <button type="button" role="tab" aria-selected={track === 'paste'} onClick={() => setTrack('paste')}>Paste catalog</button>
+        <button type="button" role="tab" aria-selected={track === 'paste'} onClick={() => setTrack('paste')}>Issue / PR catalog</button>
       </div>
       <article className="evaluation-track-panel" role="tabpanel">
         <div className="evaluation-track-panel__intro"><span className="evaluation-kicker">{current.eyebrow}</span><h3>{current.title}</h3><p>{current.description}</p></div>

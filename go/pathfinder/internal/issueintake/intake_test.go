@@ -53,6 +53,7 @@ func TestPackageFromPasteFixtureNoSourceEcho(t *testing.T) {
 	if !strings.Contains(comment, issueintake.CommentMarker) {
 		t.Fatal("missing comment marker")
 	}
+	_ = comment
 	if tech, ok := pkg["tech_spec"].(map[string]any); ok {
 		if c, ok := tech["content"].(string); ok && len(c) > 40 && strings.Contains(comment, c) {
 			t.Fatal("comment echoed tech_spec")
