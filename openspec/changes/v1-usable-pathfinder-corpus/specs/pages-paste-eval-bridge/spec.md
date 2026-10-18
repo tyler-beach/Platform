@@ -9,3 +9,10 @@ The GitHub Pages workflow demos MUST explain and deep-link issue/PR→catalog ev
 - **WHEN** a visitor inspects the issue/PR catalog evaluation section
 - **THEN** links exist to the Pathfinder analyze issue form and the `pathfinder-issue-analyze` workflow
 - **AND** copy states that GitHub Issues/Actions perform the live evaluation
+
+#### Scenario: Build publishes a redacted paste-eval snapshot
+- **GIVEN** the Pages documentation build
+- **WHEN** paste-eval snapshot export runs against checked-in fixtures
+- **THEN** `site/demo/data/paste-eval-snapshot.json` is produced
+- **AND** the snapshot includes aggregate status and extracted predicate names/values
+- **AND** the snapshot does not include full tech-spec or code source bodies
