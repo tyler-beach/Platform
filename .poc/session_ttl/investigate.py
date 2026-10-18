@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 POLICY_VERSION = "session-ttl-policy-v1"
+MAX_TTL_SECONDS = 600
 PARSER_VERSION = "explicit-ttl-fixture-v1"
 OUTCOMES = {"supported_deviation", "no_deviation_found", "inconclusive"}
 
@@ -74,9 +75,12 @@ def investigate(case: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("case requires adr and source objects")
     validate_pinned_artifact(adr, "adr")
     validate_pinned_artifact(source, "source")
-    limit = case.get("max_ttl_seconds", 600)
-    if not isinstance(limit, int) or isinstance(limit, bool) or limit < 0:
-        raise ValueError("max_ttl_seconds must be a non-negative integer")
+    # This version represents one fixed policy; fixtures cannot silently
+    # change its threshold independently of the policy version.
+    supplied_limit = case.get("max_ttl_seconds", MAX_TTL_SECONDS)
+    if type(supplied_limit) is not int or supplied_limit != MAX_TTL_SECONDS:
+        raise ValueError(f"max_ttl_seconds must equal the {MAX_TTL_SECONDS}-second limit in {POLICY_VERSION}")
+    limit = MAX_TTL_SECONDS
 
     evidence = case.get("evidence", [])
     if not isinstance(evidence, list):
@@ -93,6 +97,8 @@ def investigate(case: dict[str, Any]) -> dict[str, Any]:
             raise ValueError(f"evidence {item['evidence_id']} points to a stale artifact revision")
         if not isinstance(item.get("locator"), dict) or not item["locator"].get("kind"):
             raise ValueError(f"evidence {item['evidence_id']} requires a typed locator")
+        if item.get("predicate") == "session.ttl_seconds" and item.get("artifact_id") == source["artifact_id"] and item["locator"].get("kind") != "json_pointer":
+            raise ValueError(f"evidence {item['evidence_id']} uses an unsupported locator for session TTL")
         validate_json_pointer_evidence(item, source)
         evidence_by_id[item["evidence_id"]] = item
 
@@ -143,6 +149,7 @@ def investigate(case: dict[str, Any]) -> dict[str, Any]:
     result = {
         "schema_version": "session-ttl-investigation-v1",
         "policy_version": POLICY_VERSION,
+        "policy": {"predicate": "session.ttl_seconds", "operator": "maximum", "limit_seconds": limit},
         "parser_version": PARSER_VERSION,
         "case_id": case.get("case_id", "unnamed"),
         "inputs": [
@@ -153,7 +160,8 @@ def investigate(case: dict[str, Any]) -> dict[str, Any]:
         "outcome": outcome,
         "relationship": relation,
         "rationale": rationale,
-        "evidence_ids": sorted(requested_ids),
+        # Only evidence that participated in an applicable decision is cited here.
+        "evidence_ids": sorted(item["evidence_id"] for item in ttl_values) if applicability and outcome != "inconclusive" else [],
         "uncertainty": [] if outcome != "inconclusive" else [relation],
     }
     result["result_sha256"] = sha256(canonical(result).encode("utf-8"))
