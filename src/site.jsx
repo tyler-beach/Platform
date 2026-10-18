@@ -25,7 +25,7 @@ const pageAsset = (relative) => `${BASE_URL}${relative.replace(/^\//, '')}`;
 
 function Logo({ compact = false }) {
   return <Link className="brand" to="/" aria-label={`${BRAND} home`}>
-    <img src={pageAsset('content/assets/pathfinder-mark.svg')} alt="" />
+    <img src={pageAsset('content/assets/brand-mark.svg')} alt="" />
     {!compact && <span><strong>Pathfinder</strong><small>From intent to reality</small></span>}
   </Link>;
 }
