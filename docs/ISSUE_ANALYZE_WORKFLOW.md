@@ -13,11 +13,13 @@ Submit a **pinned evidence package** through a GitHub Issue and receive a catalo
 
 1. Open **New issue** → **Pathfinder analyze package**.
 2. Check the public/synthetic attestation box.
-3. Paste your **Tech spec (markdown)** and/or **Sample code** (Go, Python, or JSON). Domains optional.
+3. Either:
+   - Link a **same-repo pull request** (changed text files are fetched at the PR head; forks denied), and/or
+   - Paste **Tech spec (markdown)** and/or a single **Sample code** snippet. Domains optional.
 4. Leave **Observations JSON** empty unless you want to override extraction.
 5. Submit. The workflow extracts allowlisted predicates, evaluates the catalog, and comments results.
 
-You can still paste a complete `pathfinder-evidence-package-v1` in **Full package JSON** if you prefer.
+Tech spec is optional when a same-repo PR is provided. Multi-file code must come from the PR adapter (not zip/bundles). You can still paste a complete `pathfinder-evidence-package-v1` in **Full package JSON** if you prefer.
 
 Re-run via **Actions → Pathfinder Issue Package Evaluation → Run workflow** with an issue number.
 

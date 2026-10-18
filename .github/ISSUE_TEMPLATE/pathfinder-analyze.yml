@@ -13,8 +13,10 @@ body:
 
         You can either:
         1. Paste a full JSON package in the **Full package JSON** field, or
-        2. Paste a real **Tech spec** and/or **Sample code** (Go/Python/markdown) and optionally Domains.
+        2. Link a **same-repo pull request** (changed text files are fetched), and/or
+        3. Paste a **Tech spec** and/or single **Sample code** snippet, and optionally Domains.
 
+        Multi-file code must come from a same-repo PR (forks are rejected). Tech spec is optional when a PR is provided.
         A deterministic paste extractor turns high-confidence claims into typed observations.
         Hand-written **Observations JSON** is optional and overrides extraction when provided.
         Unextracted predicates stay `inconclusive` (silence is not treated as compliance).
@@ -34,6 +36,14 @@ body:
       placeholder: identity, security, reliability
     validations:
       required: false
+  - type: input
+    id: pull_request
+    attributes:
+      label: Same-repo pull request (optional)
+      description: Same-repository PR URL, `owner/repo#n`, `#n`, or `n`. Changed text files are packed (caps + secret-path denylist). Forks and cross-repo PRs are denied.
+      placeholder: https://github.com/OWNER/REPO/pull/123
+    validations:
+      required: false
   - type: textarea
     id: package_json
     attributes:
@@ -46,7 +56,7 @@ body:
     id: tech_spec
     attributes:
       label: Tech spec (markdown)
-      description: Optional if Full package JSON is provided. Max ~50KB.
+      description: Optional if Full package JSON or a same-repo PR is provided. Max ~50KB.
       placeholder: "# Service tech spec\n\nSessions expire after 12 minutes..."
     validations:
       required: false
@@ -54,7 +64,7 @@ body:
     id: code
     attributes:
       label: Sample code
-      description: Optional code snippet. Max ~50KB. Prefer synthetic examples.
+      description: Optional single snippet (not a multi-file bundle). Max ~50KB. Prefer synthetic examples. For multiple files, use a same-repo PR.
       render: javascript
     validations:
       required: false

@@ -8,10 +8,17 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/tyler-beach/Platform/go/pathfinder/internal/adapt/pr"
 	"github.com/tyler-beach/Platform/go/pathfinder/internal/collect/pkgcollect"
 	"github.com/tyler-beach/Platform/go/pathfinder/internal/extract/paste"
 	"github.com/tyler-beach/Platform/go/pathfinder/internal/predicates"
 )
+
+// Options configures optional GitHub adapters for intake.
+type Options struct {
+	Repo     string    // trusted owner/repo (GITHUB_REPOSITORY)
+	PRClient pr.Client // nil disables PR adapter
+}
 
 const (
 	MaxFieldChars   = 50_000
@@ -125,7 +132,7 @@ func guessCodePath(code string) string {
 	return "issue/sample-code.txt"
 }
 
-func buildPackageFromFields(sections map[string]string, issueNumber int) (map[string]any, error) {
+func buildPackageFromFields(sections map[string]string, issueNumber int, allowEmpty bool) (map[string]any, error) {
 	tech, err := bounded("tech spec", firstSection(sections, "tech spec (markdown)", "tech spec"))
 	if err != nil {
 		return nil, err
@@ -136,8 +143,8 @@ func buildPackageFromFields(sections map[string]string, issueNumber int) (map[st
 	}
 	obsRaw := firstSection(sections, "observations json array", "observations json", "observations")
 	domains := parseDomains(firstSection(sections, "domains (optional scope filter)", "domains"))
-	if strings.TrimSpace(tech) == "" && strings.TrimSpace(code) == "" && strings.TrimSpace(obsRaw) == "" {
-		return nil, &Error{Msg: "provide tech spec and/or sample code (or full package JSON / observations)"}
+	if !allowEmpty && strings.TrimSpace(tech) == "" && strings.TrimSpace(code) == "" && strings.TrimSpace(obsRaw) == "" {
+		return nil, &Error{Msg: "provide tech spec and/or sample code (or full package JSON / observations / pull request)"}
 	}
 	var observations []any
 	if strings.TrimSpace(obsRaw) != "" {
@@ -299,7 +306,7 @@ func pinArtifactHashes(packageObj map[string]any) map[string]any {
 }
 
 // PackageFromIssue builds a pinned package; catalogDir used for paste subjects + collector validation.
-func PackageFromIssue(body string, issueNumber int, catalogDir string, subjects map[string]string, reg *predicates.Registry) (map[string]any, error) {
+func PackageFromIssue(body string, issueNumber int, catalogDir string, subjects map[string]string, reg *predicates.Registry, opts Options) (map[string]any, error) {
 	sections := ParseFormSections(body)
 	if !AttestationAccepted(body, sections) {
 		return nil, &Error{Msg: "public/synthetic attestation checkbox is required"}
@@ -309,9 +316,31 @@ func PackageFromIssue(body string, issueNumber int, catalogDir string, subjects 
 		return nil, err
 	}
 	if pkg == nil {
-		pkg, err = buildPackageFromFields(sections, issueNumber)
-		if err != nil {
-			return nil, err
+		prText := firstSection(sections,
+			"same-repo pull request (optional)",
+			"same-repo pull request",
+			"pull request",
+			"pr",
+		)
+		var prPkg map[string]any
+		if strings.TrimSpace(prText) != "" {
+			if opts.PRClient == nil || strings.TrimSpace(opts.Repo) == "" {
+				return nil, &Error{Msg: "pull request adapter requires repository context"}
+			}
+			res, rerr := pr.Resolve(opts.PRClient, opts.Repo, prText, issueNumber)
+			if rerr != nil {
+				return nil, &Error{Msg: rerr.Error()}
+			}
+			prPkg = res.Package
+		}
+		fieldPkg, ferr := buildPackageFromFields(sections, issueNumber, prPkg != nil)
+		if ferr != nil {
+			return nil, ferr
+		}
+		if prPkg != nil {
+			pkg = mergePRAndFields(prPkg, fieldPkg)
+		} else {
+			pkg = fieldPkg
 		}
 	}
 	pkg = cloneMap(pkg)
@@ -331,6 +360,29 @@ func PackageFromIssue(body string, issueNumber int, catalogDir string, subjects 
 	}
 	_ = catalogDir
 	return pkg, nil
+}
+
+func mergePRAndFields(prPkg, fieldPkg map[string]any) map[string]any {
+	out := cloneMap(prPkg)
+	if tech, ok := fieldPkg["tech_spec"].(map[string]any); ok {
+		out["tech_spec"] = tech
+	}
+	code := asSlice(out["code"])
+	for _, raw := range asSlice(fieldPkg["code"]) {
+		code = append(code, raw)
+	}
+	if len(code) > 0 {
+		out["code"] = code
+	}
+	if scope, ok := fieldPkg["scope"].(map[string]any); ok {
+		if domains, ok := scope["domains"].([]any); ok && len(domains) > 0 {
+			out["scope"] = scope
+		}
+	}
+	if obs := asSlice(fieldPkg["observations"]); len(obs) > 0 {
+		out["observations"] = obs
+	}
+	return out
 }
 
 // RenderResultComment builds markdown without embedding source bodies.

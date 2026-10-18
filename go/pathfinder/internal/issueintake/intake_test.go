@@ -38,7 +38,7 @@ func TestPackageFromPasteFixtureNoSourceEcho(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pkg, err := issueintake.PackageFromIssue(string(body), 42, catalogDir, catalog.SubjectMap(rows), reg)
+	pkg, err := issueintake.PackageFromIssue(string(body), 42, catalogDir, catalog.SubjectMap(rows), reg, issueintake.Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
