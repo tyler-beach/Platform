@@ -169,7 +169,8 @@ class SessionTTLInvestigationTests(unittest.TestCase):
         result = investigate.investigate(case)
         self.assertEqual(result["outcome"], "inconclusive")
         self.assertEqual(result["relationship"], "insufficient_evidence")
-        self.assertEqual(result["evidence_ids"], [])
+        self.assertEqual(result["evidence_ids"], ["EV-TTL-1"])
+        self.assertEqual(result["rejected_observations"], [{"evidence_id": "EV-TTL-1", "reason_code": "negative_value"}])
 
     def test_float_ttl_observation_is_inconclusive_not_compliant(self):
         case = fixture(720)
@@ -180,12 +181,23 @@ class SessionTTLInvestigationTests(unittest.TestCase):
         result = investigate.investigate(case)
         self.assertEqual(result["outcome"], "inconclusive")
         self.assertEqual(result["relationship"], "insufficient_evidence")
-        self.assertEqual(result["evidence_ids"], [])
+        self.assertEqual(result["evidence_ids"], ["EV-TTL-1"])
+        self.assertEqual(result["rejected_observations"], [{"evidence_id": "EV-TTL-1", "reason_code": "unexpected_numeric_type"}])
 
     def test_mutated_pinned_artifact_hash_is_rejected(self):
         case = fixture(720)
         case["source"]["content"] += " "
         with self.assertRaisesRegex(ValueError, "content hash"):
+            investigate.investigate(case)
+
+    def test_non_object_case_is_rejected_with_contract_error(self):
+        with self.assertRaisesRegex(ValueError, "case must be a JSON object"):
+            investigate.investigate([])
+
+    def test_malformed_evidence_locator_is_rejected_without_attribute_error(self):
+        case = fixture(720)
+        case["evidence"][0]["locator"] = {"kind": []}
+        with self.assertRaisesRegex(ValueError, "requires a typed locator"):
             investigate.investigate(case)
 
     def test_replay_is_deterministic_for_identical_pinned_inputs(self):
