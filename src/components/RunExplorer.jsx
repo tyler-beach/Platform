@@ -74,6 +74,10 @@ export default function RunExplorer() {
   const [runs, setRuns] = useState([]);
   const [selectedId, setSelectedId] = useState('');
   const [selectedAttempt, setSelectedAttempt] = useState(1);
+  const [compareEnabled, setCompareEnabled] = useState(false);
+  const [compareId, setCompareId] = useState('');
+  const [compareAttempt, setCompareAttempt] = useState(1);
+  const [compareDetails, setCompareDetails] = useState({ jobs: [], artifacts: [], loading: false, error: '' });
   const [jobs, setJobs] = useState([]);
   const [artifacts, setArtifacts] = useState([]);
   const [selectedStepKey, setSelectedStepKey] = useState('');
@@ -92,17 +96,60 @@ export default function RunExplorer() {
   const [lastUpdated, setLastUpdated] = useState('');
 
   const selectedRun = runs.find((run) => String(run.id) === selectedId) || null;
+  const comparisonRun = runs.find((run) => String(run.id) === compareId) || null;
   const allSteps = useMemo(() => jobs.flatMap((job) => (job.steps || []).map((step, index) => ({
     ...step, jobName: job.name, jobId: job.id, jobConclusion: job.conclusion,
     key: `${job.id}:${step.number ?? index}`, jobUrl: job.html_url,
   }))), [jobs]);
   const selectedStep = allSteps.find((step) => step.key === selectedStepKey) || allSteps[0] || null;
+  const matchingStepLogs = useMemo(() => {
+    if (!selectedStep) return [];
+    return jobLogs.filter((entry) => {
+      const base = entry.name.split('/').pop() || entry.name;
+      const numberMatch = base.match(/^(\d+)[_ .-]/);
+      return numberMatch && Number(numberMatch[1]) === Number(selectedStep.number);
+    });
+  }, [jobLogs, selectedStep]);
+  const visibleStepLogs = matchingStepLogs.length ? matchingStepLogs : jobLogs;
   const filteredRuns = runs.filter((run) => {
     const label = [run.name, run.display_title, run.head_branch, run.head_sha, run.id].join(' ').toLowerCase();
     return label.includes(query.toLowerCase());
   });
   const completedSteps = allSteps.filter((step) => step.status === 'completed').length;
   const failedSteps = allSteps.filter((step) => step.conclusion === 'failure').length;
+  const compareSteps = useMemo(() => {
+    if (!compareEnabled || !comparisonRun) return [];
+    const normalize = (value) => String(value || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    const primaryJobs = new Map(jobs.map((job) => [normalize(job.name), job]));
+    const otherJobs = new Map(compareDetails.jobs.map((job) => [normalize(job.name), job]));
+    const rows = [];
+    for (const jobName of new Set([...primaryJobs.keys(), ...otherJobs.keys()])) {
+      const primary = primaryJobs.get(jobName), other = otherJobs.get(jobName);
+      const primarySteps = new Map((primary?.steps || []).map((step) => [normalize(step.name), step]));
+      const otherSteps = new Map((other?.steps || []).map((step) => [normalize(step.name), step]));
+      for (const stepName of new Set([...primarySteps.keys(), ...otherSteps.keys()])) {
+        const left = primarySteps.get(stepName), right = otherSteps.get(stepName);
+        const leftStatus = left?.conclusion || left?.status || 'missing';
+        const rightStatus = right?.conclusion || right?.status || 'missing';
+        const leftMs = left?.started_at ? Math.max(0, new Date(left.completed_at || Date.now()) - new Date(left.started_at)) : null;
+        const rightMs = right?.started_at ? Math.max(0, new Date(right.completed_at || Date.now()) - new Date(right.started_at)) : null;
+        let change = 'Unchanged';
+        if (!left) change = 'Added in selected run';
+        else if (!right) change = 'Missing in selected run';
+        else if (leftStatus !== rightStatus) change = 'Outcome changed';
+        else if (leftMs !== null && rightMs !== null && Math.abs(leftMs - rightMs) >= 1000) change = leftMs > rightMs ? 'Faster in selected run' : 'Slower in selected run';
+        rows.push({ key: jobName + '::' + stepName, jobName: primary?.name || other?.name || jobName, stepName: left?.name || right?.name || stepName, leftStatus, rightStatus, leftMs, rightMs, change, severity: !left || !right || leftStatus !== rightStatus ? 'changed' : change !== 'Unchanged' ? 'timing' : 'same' });
+      }
+    }
+    return rows;
+  }, [compareEnabled, comparisonRun, jobs, compareDetails.jobs]);
+  const compareSummary = useMemo(() => ({
+    changed: compareSteps.filter((row) => row.change === 'Outcome changed').length,
+    added: compareSteps.filter((row) => row.change === 'Added in selected run').length,
+    missing: compareSteps.filter((row) => row.change === 'Missing in selected run').length,
+    faster: compareSteps.filter((row) => row.change === 'Faster in selected run').length,
+    slower: compareSteps.filter((row) => row.change === 'Slower in selected run').length,
+  }), [compareSteps]);
 
   async function loadRuns() {
     setLoadingRuns(true);
@@ -155,6 +202,47 @@ export default function RunExplorer() {
     }).finally(() => { if (active) setLoadingDetails(false); });
     return () => { active = false; };
   }, [selectedId, selectedAttempt]);
+
+  useEffect(() => {
+    if (!runs.length) return;
+    setCompareId((current) => {
+      if (current && current !== selectedId && runs.some((run) => String(run.id) === current)) return current;
+      const alternative = runs.find((run) => String(run.id) !== selectedId);
+      return alternative ? String(alternative.id) : '';
+    });
+  }, [runs, selectedId]);
+
+  useEffect(() => {
+    if (comparisonRun) setCompareAttempt(comparisonRun.run_attempt || 1);
+  }, [comparisonRun?.id]);
+
+  useEffect(() => {
+    if (!compareEnabled || !comparisonRun) { setCompareDetails({ jobs: [], artifacts: [], loading: false, error: '' }); return undefined; }
+    if (String(comparisonRun.id) === String(selectedRun?.id) && compareAttempt === selectedAttempt) {
+      setCompareDetails({ jobs: [], artifacts: [], loading: false, error: 'Choose a different run or attempt for a meaningful comparison.' });
+      return undefined;
+    }
+    let active = true;
+    setCompareDetails((current) => ({ ...current, loading: true, error: '' }));
+    const jobsUrl = API + '/repos/' + OWNER_REPO + '/actions/runs/' + comparisonRun.id + '/attempts/' + compareAttempt + '/jobs?per_page=100';
+    const artifactsUrl = API + '/repos/' + OWNER_REPO + '/actions/runs/' + comparisonRun.id + '/artifacts?per_page=100';
+    Promise.all([
+      fetch(jobsUrl, { headers: { Accept: 'application/vnd.github+json' } }),
+      fetch(artifactsUrl, { headers: { Accept: 'application/vnd.github+json' } }),
+    ]).then(async ([jobResponse, artifactResponse]) => {
+      if (!jobResponse.ok) throw new Error('Could not load comparison jobs (HTTP ' + jobResponse.status + ').');
+      const jobPayload = await jobResponse.json();
+      let artifactItems = [];
+      if (artifactResponse.ok) {
+        const artifactPayload = await artifactResponse.json();
+        artifactItems = Array.isArray(artifactPayload.artifacts) ? artifactPayload.artifacts : [];
+      }
+      if (active) setCompareDetails({ jobs: Array.isArray(jobPayload.jobs) ? jobPayload.jobs : [], artifacts: artifactItems, loading: false, error: '' });
+    }).catch((caught) => {
+      if (active) setCompareDetails({ jobs: [], artifacts: [], loading: false, error: caught instanceof Error ? caught.message : 'Unable to load comparison run.' });
+    });
+    return () => { active = false; };
+  }, [compareEnabled, compareId, compareAttempt, selectedId, selectedAttempt]);
 
   useEffect(() => {
     if (tab !== 'logs' || !selectedStep?.jobId) return undefined;
@@ -247,6 +335,25 @@ export default function RunExplorer() {
         <div className="run-summary__bottom"><span><Clock3 size={14} /> Started {prettyDate(selectedRun.run_started_at || selectedRun.created_at)}</span><div className="run-summary__links"><label className="run-attempt-picker">Attempt <select aria-label="Workflow run attempt" value={selectedAttempt} onChange={(event) => setSelectedAttempt(Number(event.target.value))}>{Array.from({ length: Math.max(1, selectedRun.run_attempt || 1) }, (_, index) => index + 1).map((attempt) => <option key={attempt} value={attempt}>#{attempt}{attempt === (selectedRun.run_attempt || 1) ? ' · latest' : ''}</option>)}</select></label><a href={runUrl} target="_blank" rel="noreferrer">Open run in GitHub <ArrowUpRight size={14} /></a></div></div>
       </section>
 
+      <section className="run-comparison" aria-labelledby="run-comparison-title">
+        <div className="run-comparison__heading"><div><span className="run-explorer__kicker">REGRESSION WORKSPACE</span><h2 id="run-comparison-title">Compare executions</h2><p>Compare actual GitHub-reported step outcomes, timings, revisions, and artifact inventories across runs or rerun attempts.</p></div><label className="run-compare-toggle"><input type="checkbox" checked={compareEnabled} onChange={(event) => setCompareEnabled(event.target.checked)} /> Enable comparison</label></div>
+        {compareEnabled && <>
+          <div className="run-comparison__selectors">
+            <div><span>BASELINE · SELECTED RUN</span><strong>#{selectedRun.run_number} · attempt {selectedAttempt}</strong><small>{selectedRun.head_sha?.slice(0, 12)} · {selectedRun.conclusion || selectedRun.status}</small></div>
+            <div><span>COMPARE AGAINST</span><select aria-label="Run to compare against" value={compareId} onChange={(event) => { setCompareId(event.target.value); setCompareAttempt(runs.find((run) => String(run.id) === event.target.value)?.run_attempt || 1); }}><option value="">Choose another run…</option>{runs.filter((run) => String(run.id) !== selectedId).map((run) => <option key={run.id} value={run.id}>#{run.run_number} · {run.name} · {run.display_title || run.head_branch}</option>)}</select>{comparisonRun && <small>{comparisonRun.head_sha?.slice(0, 12)} · {comparisonRun.conclusion || comparisonRun.status}</small>}</div>
+            {comparisonRun && <label className="run-attempt-picker">Other attempt <select value={compareAttempt} onChange={(event) => setCompareAttempt(Number(event.target.value))}>{Array.from({ length: Math.max(1, comparisonRun.run_attempt || 1) }, (_, index) => index + 1).map((attempt) => <option key={attempt} value={attempt}>#{attempt}{attempt === (comparisonRun.run_attempt || 1) ? ' · latest' : ''}</option>)}</select></label>}
+          </div>
+          {compareDetails.error && <div className="run-inline-alert"><AlertCircle size={15} /><span>{compareDetails.error}</span></div>}
+          {compareDetails.loading && <div className="run-loading run-loading--compact"><LoaderCircle size={16} className="run-spin" /> Loading comparison execution…</div>}
+          {!compareDetails.loading && !compareDetails.error && comparisonRun && <div className="run-comparison__body">
+            <div className="run-comparison__metrics"><div><span>Outcome changes</span><strong>{compareSummary.changed}</strong></div><div><span>Steps added</span><strong>{compareSummary.added}</strong></div><div><span>Steps missing</span><strong>{compareSummary.missing}</strong></div><div><span>Faster / slower</span><strong>{compareSummary.faster} / {compareSummary.slower}</strong></div></div>
+            <div className="run-comparison__revision"><div><span>Selected revision</span><code>{selectedRun.head_sha || 'Unavailable'}</code></div><GitBranch size={16} /><div><span>Comparison revision</span><code>{comparisonRun.head_sha || 'Unavailable'}</code></div></div>
+            <div className="run-comparison__table-wrap"><table className="run-comparison__table"><thead><tr><th>Job / step</th><th>Selected</th><th>Compared</th><th>Selected duration</th><th>Compared duration</th><th>Difference</th></tr></thead><tbody>{compareSteps.map((row) => <tr key={row.key} className={row.severity === 'changed' ? 'is-changed' : ''}><td><strong>{row.stepName}</strong><small>{row.jobName}</small></td><td><Status value={row.leftStatus === 'missing' ? 'unknown' : row.leftStatus} /></td><td><Status value={row.rightStatus === 'missing' ? 'unknown' : row.rightStatus} /></td><td>{row.leftMs === null ? '—' : Math.round(row.leftMs / 1000) + 's'}</td><td>{row.rightMs === null ? '—' : Math.round(row.rightMs / 1000) + 's'}</td><td><span className={'run-change run-change--' + row.severity}>{row.change}</span></td></tr>)}</tbody></table></div>
+            <div className="run-comparison__artifacts"><div><span className="run-explorer__kicker">OUTPUT INVENTORY</span><strong>Artifact changes</strong><p>Artifacts are compared by name and size. Inspect matching bundles from each run’s Artifacts tab to compare individual JSON/file contents.</p></div><div className="run-artifact-diff-list">{Array.from(new Set([...artifacts.map((x) => x.name), ...compareDetails.artifacts.map((x) => x.name)])).map((name) => { const left = artifacts.find((x) => x.name === name); const right = compareDetails.artifacts.find((x) => x.name === name); const change = !left ? 'Only comparison run' : !right ? 'Only selected run' : left.size_in_bytes === right.size_in_bytes ? 'Same size' : (left.size_in_bytes > right.size_in_bytes ? 'Selected run larger' : 'Comparison run larger'); return <div key={name}><strong>{name}</strong><small>Selected: {left ? Math.ceil(left.size_in_bytes / 1024) + ' KB' : '—'} · Compared: {right ? Math.ceil(right.size_in_bytes / 1024) + ' KB' : '—'}</small><span>{change}</span></div>; })}</div></div>
+          </div>}
+        </>}
+      </section>
+
       <section className="run-signal-graph" aria-label="Execution signal flow">
         <div className="run-signal-graph__heading"><div><span className="run-explorer__kicker">SIGNAL FLOW</span><h2>Run → jobs → artifacts</h2></div><span>{jobs.length} jobs · {allSteps.length} steps · {artifacts.length} artifacts</span></div>
         <div className="run-graph-track">
@@ -290,7 +397,7 @@ export default function RunExplorer() {
             {tab === 'evidence' && <div className="run-inspector__body"><div className="run-data-callout"><ShieldAlert size={17} /><div><strong>Execution provenance</strong><p>These fields identify the selected GitHub execution. They establish what GitHub reports about the run, not whether an architectural decision is satisfied.</p></div></div><dl className="run-detail-list"><div><dt>Repository</dt><dd>{OWNER_REPO}</dd></div><div><dt>Workflow</dt><dd>{selectedRun.name}</dd></div><div><dt>Run ID</dt><dd className="run-mono">{selectedRun.id}</dd></div><div><dt>Selected attempt</dt><dd>{selectedAttempt}{selectedAttempt === (selectedRun.run_attempt || 1) ? ' · latest' : ''}</dd></div><div><dt>Latest attempt</dt><dd>{selectedRun.run_attempt || 1}</dd></div><div><dt>Commit SHA</dt><dd className="run-mono">{selectedRun.head_sha}</dd></div><div><dt>Branch</dt><dd>{selectedRun.head_branch || '—'}</dd></div><div><dt>Trigger</dt><dd>{selectedRun.event || '—'}</dd></div><div><dt>Step job ID</dt><dd className="run-mono">{selectedStep.jobId}</dd></div><div><dt>Step name</dt><dd>{selectedStep.name}</dd></div><div><dt>Step result</dt><dd>{selectedStep.conclusion || selectedStep.status || 'Unknown'}</dd></div></dl><div className="run-inspector__actions"><a href={selectedRun.html_url} target="_blank" rel="noreferrer"><ExternalLink size={15} /> Source run</a><a href={`https://github.com/${OWNER_REPO}/commit/${selectedRun.head_sha}`} target="_blank" rel="noreferrer"><GitBranch size={15} /> Source commit</a></div></div>}
             {tab === 'outputs' && <div className="run-inspector__body"><div className="run-data-callout"><FileJson2 size={17} /><div><strong>Structured step outputs</strong><p>GitHub does not return arbitrary step output values through the public job API. Inspect the artifacts below for JSON or other output files uploaded by the workflow.</p></div></div><pre className="run-json"><code>{safeJson(stepOutput)}</code></pre><button className="run-copy-hint" onClick={() => navigator.clipboard?.writeText(safeJson(stepOutput))}>Copy step metadata</button><p className="run-muted-note">No output payload is claimed unless it is present in a real artifact or log.</p></div>}
             {tab === 'artifacts' && <div className="run-inspector__body"><div className="run-artifact-intro"><strong>{artifacts.length} artifacts attached to this run</strong><span>Artifacts are run-level bundles; GitHub does not identify an artifact as belonging to a single step unless the workflow names or manifests it.</span></div>{artifacts.length ? artifacts.map((artifact) => <div className="run-artifact" key={artifact.id}><FileJson2 size={18} /><div><strong>{artifact.name}</strong><span>{Math.max(1, Math.round((artifact.size_in_bytes || 0) / 1024))} KB · expires {prettyDate(artifact.expires_at)}</span></div><a href={runUrl} target="_blank" rel="noreferrer" aria-label={`Open artifact ${artifact.name} in GitHub`}><ArrowDownToLine size={15} /></a></div>) : <div className="run-empty run-empty--compact"><FileJson2 size={21} /><strong>No artifacts reported</strong><span>This run may not upload output bundles.</span></div>}<a className="run-primary-link" href={runUrl} target="_blank" rel="noreferrer">Open run artifacts in GitHub <ArrowUpRight size={14} /></a></div>}
-            {tab === 'logs' && <div className="run-inspector__body"><div className="run-data-callout"><FileText size={17} /><div><strong>Actual job log files</strong><p>Loaded from the GitHub Actions job log archive when the browser and GitHub permit it. Log contents are raw observations, not compliance verdicts.</p></div></div>{logsLoading && <div className="run-loading run-loading--compact"><LoaderCircle size={16} className="run-spin" /> Downloading and reading job logs…</div>}{logsError && <div className="run-inline-alert"><AlertCircle size={15} /><span>{logsError}</span><a href={selectedStep.jobUrl || runUrl} target="_blank" rel="noreferrer">Open in GitHub <ExternalLink size={13} /></a></div>}{!logsLoading && !logsError && jobLogs.length > 0 && <div className="run-log-files">{jobLogs.map((entry) => <details className="run-log-file" key={entry.name}><summary><FileText size={14} />{entry.name}<span>{entry.text.split(String.fromCharCode(10)).length} lines</span></summary><pre><code>{entry.text || '(no output)'}</code></pre></details>)}</div>}{!logsLoading && !logsError && !jobLogs.length && <div className="run-empty run-empty--compact"><FileText size={21} /><strong>No log entries returned</strong><span>GitHub may not retain logs for this run.</span></div>}<a className="run-log-link" href={selectedStep.jobUrl || runUrl} target="_blank" rel="noreferrer"><FileText size={17} /><span><strong>Open {selectedStep.jobName} in GitHub</strong><small>Fallback if log download is unavailable.</small></span><ArrowUpRight size={15} /></a></div>}
+            {tab === 'logs' && <div className="run-inspector__body"><div className="run-data-callout"><FileText size={17} /><div><strong>Actual job log files</strong><p>Loaded from the GitHub Actions job log archive when the browser and GitHub permit it. Log contents are raw observations, not compliance verdicts.</p></div></div>{logsLoading && <div className="run-loading run-loading--compact"><LoaderCircle size={16} className="run-spin" /> Downloading and reading job logs…</div>}{logsError && <div className="run-inline-alert"><AlertCircle size={15} /><span>{logsError}</span><a href={selectedStep.jobUrl || runUrl} target="_blank" rel="noreferrer">Open in GitHub <ExternalLink size={13} /></a></div>}{!logsLoading && !logsError && jobLogs.length > 0 && <div className="run-log-files">{jobLogs.map((entry) => <details className="run-log-file" key={entry.name}><summary><FileText size={14} />{entry.name}<span>{entry.text.split(String.fromCharCode(10)).length} lines</span></summary><pre><code>{entry.text || '(no output)'}</code></pre></details>)}</div>}{!logsLoading && !logsError && !visibleStepLogs.length && <div className="run-empty run-empty--compact"><FileText size={21} /><strong>No log entries returned</strong><span>GitHub may not retain logs for this run.</span></div>}{!logsLoading && !logsError && visibleStepLogs.length > 0 && <>{!matchingStepLogs.length && <p className="run-muted-note">GitHub’s archive did not clearly map files to this step; showing the full log set for its parent job.</p>}<div className="run-log-files">{visibleStepLogs.map((entry) => <details className="run-log-file" key={entry.name} open={matchingStepLogs.length === 1}><summary><FileText size={14} />{entry.name}<span>{entry.text.split(String.fromCharCode(10)).length} lines</span></summary><pre><code>{entry.text}</code></pre></details>)}</div></>}<a className="run-log-link" href={selectedStep.jobUrl || runUrl} target="_blank" rel="noreferrer"><FileText size={17} /><span><strong>Open {selectedStep.jobName} in GitHub</strong><small>Fallback if log download is unavailable.</small></span><ArrowUpRight size={15} /></a></div>}
             {tab === 'artifacts' && <div className="run-inspector__body"><div className="run-artifact-intro"><strong>{artifacts.length} artifacts attached to this run</strong><span>Artifacts belong to the run unless their own manifest identifies a step or source. Open an artifact to inspect real files and parse valid JSON files.</span></div>{artifacts.length ? artifacts.map((artifact) => <div className="run-artifact-wrap" key={artifact.id}><div className="run-artifact"><FileJson2 size={18} /><div><strong>{artifact.name}</strong><span>{Math.max(1, Math.round((artifact.size_in_bytes || 0) / 1024))} KB · expires {prettyDate(artifact.expires_at)}</span><small>Artifact ID {artifact.id} · {artifact.expired ? 'expired' : 'available according to GitHub'}</small></div><button className="run-artifact-inspect" onClick={() => inspectArtifact(artifact)} disabled={artifact.expired || artifactLoading === String(artifact.id)}>{artifactLoading === String(artifact.id) ? <LoaderCircle size={15} className="run-spin" /> : <Search size={15} />}{artifactContents[artifact.id] ? 'Loaded' : 'Inspect files'}</button></div>{artifactErrors[artifact.id] && <div className="run-inline-alert"><AlertCircle size={14} /><span>{artifactErrors[artifact.id]}</span></div>}{artifactContents[artifact.id]?.map((file) => <details className="run-log-file" key={file.name}><summary><FileText size={14} />{file.name}<span>{Math.max(1, Math.round(file.size / 1024))} KB</span></summary>{file.json !== null ? <pre className="run-json"><code>{safeJson(file.json)}</code></pre> : <pre><code>{file.text.slice(0, 300000) || '(empty file)'}</code></pre>}</details>)}</div>) : <div className="run-empty run-empty--compact"><FileJson2 size={21} /><strong>No artifacts reported</strong><span>This run may not upload output bundles.</span></div>}<a className="run-primary-link" href={runUrl} target="_blank" rel="noreferrer">Open run artifacts in GitHub <ArrowUpRight size={14} /></a></div>}
           </> : <div className="run-empty"><CircleDashed size={24} /><strong>Select a workflow step</strong><span>Its execution details will appear here.</span></div>}
         </section>
