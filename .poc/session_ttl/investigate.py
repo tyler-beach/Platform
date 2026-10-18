@@ -286,7 +286,12 @@ def investigate(case: dict[str, Any]) -> dict[str, Any]:
             [entry for entry in evidence if entry.get("predicate") == TTL_PREDICATE and entry.get("artifact_id") == source["artifact_id"] and entry.get("evidence_id") in requested_ids]
             if applicable else []
         )),
-        "considered_evidence_ids": sorted(item["evidence_id"] for item in (\n            [entry for entry in evidence if entry.get("predicate") == TTL_PREDICATE and entry.get("artifact_id") == source["artifact_id"] and entry.get("evidence_id") in requested_ids]\n            if applicable else []\n        )),\n        "accepted_evidence_ids": sorted(item["evidence_id"] for item in (ttl_values if applicable else [])),\n        "rejected_observations": rejected if applicable else [],
+        "considered_evidence_ids": sorted(item["evidence_id"] for item in (
+            [entry for entry in evidence if entry.get("predicate") == TTL_PREDICATE and entry.get("artifact_id") == source["artifact_id"] and entry.get("evidence_id") in requested_ids]
+            if applicable else []
+        )),
+        "accepted_evidence_ids": sorted(item["evidence_id"] for item in (ttl_values if applicable else [])),
+        "rejected_observations": rejected if applicable else [],
         "uncertainty": [] if decision["outcome"] != "inconclusive" else [decision["relationship"]],
     }
     return fingerprint_result(result)
