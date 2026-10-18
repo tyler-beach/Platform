@@ -21,7 +21,7 @@ The report includes:
 - Breakdown by graph/scenario behavior, to expose local failure clusters.
 - SHA-256 fingerprint of the exact JSONL corpus and recorded run configuration.
 
-The mock provider is deterministic and useful for regression tests of the current rules. It is not an independent semantic judge. The Anthropic provider is opt-in and makes live, potentially billable model calls. Do not use aggregate numbers as production-quality estimates: the cases are synthetic and have not been independently adjudicated.
+Pull requests also evaluate the base revision with the same offline mock and write `comparison.json`. The comparison includes metric deltas and scenario-family changes and checks whether dataset fingerprints and analysis configuration match. A changed dataset/configuration is explicitly marked **not like-for-like**. No release threshold is applied until owners approve one against representative, independently adjudicated data.\n\nThe mock provider is deterministic and useful for regression tests of the current rules. It is not an independent semantic judge. The Anthropic provider is opt-in and makes live, potentially billable model calls. Do not use aggregate numbers as production-quality estimates: the cases are synthetic and have not been independently adjudicated.
 
 ## 2. Natural-language ADR / evidence collection audit
 
@@ -49,3 +49,10 @@ The promotion tool exports candidates only; it does not modify `.poc/evaluation/
 ## 4. What is not a production gate yet
 
 The suite does not currently provide an independently adjudicated holdout, representative production sample, statistically justified release thresholds, or calibrated probabilities. The repository’s tests and green CI only prove the checks actually run. Before production integration, appoint independent reviewers, establish a locked holdout, agree thresholds before evaluating it, and record the source/version provenance for every gold label.
+
+
+## 5. Interactive evaluation page
+
+Open `/evaluation/` on the site for the three separate tracks (detector regression, evidence-collection coverage, and quarantined holdout), the baseline-comparison explanation, and the clickable review lifecycle. The page links to the GitHub Actions workflow and review-intake workflow; the workflows remain the source of actual run results. The page does not present hard-coded metrics as live results.
+
+The review lifecycle is sample → GitHub Issue intake → append-only disposition → distinct adjudication → candidate fixture export → regression comparison. A GitHub Issue is not the authoritative ledger. The candidate exporter must never mutate the labeled baseline or the locked holdout.
