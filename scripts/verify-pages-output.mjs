@@ -6,7 +6,7 @@ const index = await fs.readFile(path.join(site, 'index.html'), 'utf8');
 const files = await fs.readdir(path.join(site, 'assets'));
 const scripts = files.filter((file) => file.endsWith('.js'));
 const bundle = (await Promise.all(scripts.map((file) => fs.readFile(path.join(site, 'assets', file), 'utf8')))).join('\n');
-for (const marker of ['ADR Platform', 'Architecture', 'Workflow demo', 'demo-explorer', 'scenario-gallery.json', 'sample-run.json', 'paste-eval-snapshot.json', 'paste-prepare-fixture.json', 'Make architectural drift']) {
+for (const marker of ['ADR Platform', 'Architecture', 'Workflow demo', 'demo-explorer', 'scenario-gallery.json', 'sample-run.json', 'paste-eval-snapshot.json', 'paste-prepare-fixture.json', 'demo-gate.json', 'Make architectural drift']) {
   if (!bundle.includes(marker)) throw new Error(`Application bundle is missing expected marker: ${marker}`);
 }
 for (const required of ['site/404.html', 'site/demo/index.html', 'site/openapi.yaml', 'site/content/assets/diagrams/system-architecture.svg']) {
