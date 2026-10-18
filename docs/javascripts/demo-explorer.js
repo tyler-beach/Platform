@@ -14,7 +14,16 @@
       { id: "poc-analysis.yml", title: "ADR Deviation PoC Analysis", launch: `${base}/actions/workflows/poc-analysis.yml` },
       { id: "poc-evaluation.yml", title: "ADR Deviation Labeled Evaluation", launch: `${base}/actions/workflows/poc-evaluation.yml` },
       { id: "functional-analysis-demo.yml", title: "Functional Analysis Demo", launch: `${base}/actions/workflows/functional-analysis-demo.yml` },
+      { id: "pathfinder-issue-analyze.yml", title: "Pathfinder Issue Package Evaluation", launch: `${base}/actions/workflows/pathfinder-issue-analyze.yml` },
     ];
+  }
+
+  function issueAnalyzeLinks(repository) {
+    const base = `https://github.com/${repository}`;
+    return {
+      issue: `${base}/issues/new?template=pathfinder-analyze.yml`,
+      workflow: `${base}/actions/workflows/pathfinder-issue-analyze.yml`,
+    };
   }
   const API = (repository) => `https://api.github.com/repos/${repository}`;
   const WORKFLOWS = workflowDefinitions(`${OWNER}/${REPOSITORY}`);
@@ -810,12 +819,18 @@
       }
       activeRepository = safeRepository(realHistory && realHistory.repository);
       const activeWorkflows = workflowDefinitions(activeRepository);
+      const pasteLinks = issueAnalyzeLinks(activeRepository);
       byId("demo-open-analysis").href = activeWorkflows[0].launch;
       byId("demo-open-evaluation").href = activeWorkflows[1].launch;
       byId("demo-open-functional").href = activeWorkflows[2].launch;
       byId("demo-guide-analysis").href = activeWorkflows[0].launch;
       byId("demo-guide-evaluation").href = activeWorkflows[1].launch;
       byId("demo-guide-functional").href = activeWorkflows[2].launch;
+      if (byId("demo-open-paste-analyze")) byId("demo-open-paste-analyze").href = pasteLinks.workflow;
+      if (byId("demo-guide-paste-analyze")) byId("demo-guide-paste-analyze").href = pasteLinks.workflow;
+      if (byId("demo-guide-paste-issue")) byId("demo-guide-paste-issue").href = pasteLinks.issue;
+      if (byId("demo-open-paste-issue")) byId("demo-open-paste-issue").href = pasteLinks.issue;
+      if (byId("demo-open-paste-workflow")) byId("demo-open-paste-workflow").href = pasteLinks.workflow;
       const projection = historyProjection(realHistory, activeRepository);
       if (projection) {
         const runs = projection.runs;
@@ -860,12 +875,51 @@
     byId("demo-reload-history").addEventListener("click", loadHistory);
     loadGallery();
     const workflows = workflowDefinitions(`${OWNER}/${REPOSITORY}`);
+    const pasteLinks = issueAnalyzeLinks(`${OWNER}/${REPOSITORY}`);
     byId("demo-open-analysis").href = workflows[0].launch;
     byId("demo-open-evaluation").href = workflows[1].launch;
     byId("demo-open-functional").href = workflows[2].launch;
     byId("demo-guide-analysis").href = workflows[0].launch;
     byId("demo-guide-evaluation").href = workflows[1].launch;
     byId("demo-guide-functional").href = workflows[2].launch;
+    if (byId("demo-open-paste-analyze")) byId("demo-open-paste-analyze").href = pasteLinks.workflow;
+    if (byId("demo-guide-paste-analyze")) byId("demo-guide-paste-analyze").href = pasteLinks.workflow;
+    if (byId("demo-guide-paste-issue")) byId("demo-guide-paste-issue").href = pasteLinks.issue;
+    if (byId("demo-open-paste-issue")) byId("demo-open-paste-issue").href = pasteLinks.issue;
+    if (byId("demo-open-paste-workflow")) byId("demo-open-paste-workflow").href = pasteLinks.workflow;
+
+    function renderPasteEval(data) {
+      if (!byId("demo-paste-eval-status")) return;
+      if (!data || data.schema_version !== "pathfinder-paste-eval-demo-v1") {
+        setText("demo-paste-eval-status", "Paste-evaluation snapshot unavailable. Rebuild Pages demo data.");
+        return;
+      }
+      const counts = data.counts || {};
+      setText(
+        "demo-paste-eval-status",
+        `Fixture snapshot · aggregate ${data.aggregate_status} · ${data.observation_count} extracted observations · catalog ${data.catalog_size}. Live runs use GitHub Issues/Actions.`
+      );
+      const countList = byId("demo-paste-eval-counts");
+      if (countList) {
+        countList.replaceChildren();
+        [
+          `supported_deviation: ${counts.supported_deviation || 0}`,
+          `no_deviation_found: ${counts.no_deviation_found || 0}`,
+          `inconclusive: ${counts.inconclusive || 0}`,
+          `not_applicable: ${counts.not_applicable || 0}`,
+        ].forEach((line) => countList.appendChild(el("li", "", line)));
+      }
+      const predList = byId("demo-paste-eval-predicates");
+      if (predList) {
+        predList.replaceChildren();
+        (data.extracted_observations || []).slice(0, 8).forEach((item) => {
+          predList.appendChild(el("li", "", `${item.predicate} = ${JSON.stringify(item.value)}`));
+        });
+        if ((data.extracted_observations || []).length > 8) {
+          predList.appendChild(el("li", "", `…and ${(data.extracted_observations.length - 8)} more (see Actions artifact on a live run)`));
+        }
+      }
+    }
 
     activeDemoCleanup = () => { stopPlayback(); if (mount.dataset) delete mount.dataset.demoInitialized; };
     fetchSiteJson(root.fetch.bind(root), siteDataUrl("sample-run.json"), root.location.origin)
@@ -875,6 +929,12 @@
         setText("demo-sample-status", error.message + " Run the offline docs demo build to create it.");
         byId("demo-stage-title").textContent = "Walkthrough unavailable";
         byId("demo-stage-description").textContent = "The run history links remain available below.";
+      });
+    fetchSiteJson(root.fetch.bind(root), siteDataUrl("paste-eval-snapshot.json"), root.location.origin)
+      .then((data) => { if (generation !== demoGeneration || doc.getElementById("demo-explorer") !== mount) return; renderPasteEval(data); })
+      .catch((error) => {
+        if (generation !== demoGeneration || doc.getElementById("demo-explorer") !== mount) return;
+        setText("demo-paste-eval-status", `${error.message} Rebuild Pages to regenerate the paste-eval snapshot.`);
       });
     loadHistory();
   }

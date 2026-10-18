@@ -60,7 +60,11 @@ Messy fixtures used in tests:
 - `.poc/issue_analyze/fixtures/real_paste_session.go`
 - `.poc/issue_analyze/fixtures/real_paste_session.py`
 
+## Try it from GitHub Pages
+
+The workflow demo pages (`/demo`, `/evaluation`, `pathfinder-flow/`) show a **redacted fixture snapshot** and deep-link here. Live evaluation still runs only through this GitHub Issue + Actions path—the browser does not execute the extractor.
+
 ## Related
 
 - Catalog evaluation CLI: `docs/REUSABLE_REQUIREMENT_EVALUATION.md`
-- OpenSpec change: `openspec/changes/paste-observation-extraction/`
+- OpenSpec: `openspec/specs/paste-observation-extraction/`, `openspec/changes/pages-paste-eval-bridge/`
