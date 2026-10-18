@@ -189,6 +189,38 @@ def prepare(report_path: Path, batch_path: Path, *, seed: str, per_stratum: int)
     return batch, details
 
 
+def existing_review_unit_ids(issues: list[dict[str, Any]]) -> set[str]:
+    """Extract stable review-unit markers from issue bodies for retry-safe intake."""
+    prefix = "<!-- pathfinder-review-unit: "
+    found: set[str] = set()
+    for issue in issues:
+        body = issue.get("body")
+        if not isinstance(body, str) or prefix not in body:
+            continue
+        marker = body.split(prefix, 1)[1].split("-->", 1)[0].strip()
+        if marker:
+            found.add(marker)
+    return found
+
+
+def list_existing_review_issues(repository: str) -> list[dict[str, Any]]:
+    """Read existing issue markers before creating new intake issues.
+
+    This protects ordinary workflow reruns from duplicates. It is not a
+    transactional lock: concurrent dispatches still require server-side
+    idempotency before this workflow can be treated as production-safe.
+    """
+    result = subprocess.run(
+        ["gh", "issue", "list", "--repo", repository, "--state", "all",
+         "--search", "pathfinder-review-unit", "--json", "body,url", "--limit", "1000"],
+        check=True, capture_output=True, text=True,
+    )
+    value = json.loads(result.stdout or "[]")
+    if not isinstance(value, list):
+        raise ValueError("gh issue list returned an unexpected response")
+    return [item for item in value if isinstance(item, dict)]
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--report", type=Path, required=True)
@@ -217,16 +249,22 @@ def main() -> None:
         return
     if not os.environ.get("GH_TOKEN") or not os.environ.get("GITHUB_REPOSITORY"):
         raise SystemExit("GH_TOKEN and GITHUB_REPOSITORY are required to create GitHub Issues")
+    repository = os.environ["GITHUB_REPOSITORY"]
+    existing = existing_review_unit_ids(list_existing_review_issues(repository))
+    pending = [item for item in payloads if item["unit_id"] not in existing]
+    skipped = [{"unit_id": item["unit_id"], "reason": "already_exists"}
+               for item in payloads if item["unit_id"] in existing]
     created = []
-    for item in payloads:
+    for item in pending:
         result = subprocess.run(
-            ["gh", "issue", "create", "--repo", os.environ["GITHUB_REPOSITORY"],
+            ["gh", "issue", "create", "--repo", repository,
              "--title", item["title"], "--body", item["body"]],
             check=True, capture_output=True, text=True,
         )
         created.append({"unit_id": item["unit_id"], "url": result.stdout.strip(),
                         "selection_reason": item["selection"].get("selection_reason")})
-    print(json.dumps({"created_issue_count": len(created), "issues": created}, indent=2))
+    print(json.dumps({"created_issue_count": len(created), "skipped_existing_count": len(skipped),
+                      "issues": created, "skipped": skipped}, indent=2))
 
 
 if __name__ == "__main__":
