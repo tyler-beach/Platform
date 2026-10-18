@@ -143,7 +143,7 @@ def mock_assess(context: dict[str,Any]) -> dict[str,Any]:
     elif req_candidates and observations:
         req_ev=req_candidates[0]
         obs_ev=observations[0]
-        relationship="contradicts" if outcome=="supported_deviation" and obs_ev in entry_observations else "consistent_with" if outcome=="no_deviation_found" else "uncertain"
+        relationship="contradicts" if outcome=="supported_deviation" and (obs_ev in entry_observations or inline_semantics_proven) else "consistent_with" if outcome=="no_deviation_found" else "uncertain"
         evidence_links=[{
             "requirement_evidence_id":req_ev["evidence_id"],
             "observation_evidence_id":obs_ev["evidence_id"],
@@ -152,7 +152,7 @@ def mock_assess(context: dict[str,Any]) -> dict[str,Any]:
                 f"Requirement at {req_ev.get('path')}:{req_ev.get('start_line')} says: {req_ev.get('excerpt')}. "
                 f"Observation at {obs_ev.get('path')}:{obs_ev.get('start_line')} is: {obs_ev.get('claim')} "
                 f"(excerpt: {obs_ev.get('excerpt')}). The relation is {relationship}. "
-                f"A contradiction is proposed only when the selected entry directly calls the provider; otherwise the relationship remains uncertain."
+                f"A contradiction is proposed only when a direct entry provider call or explicit inline/synchronous helper evidence establishes provider work on the request path; otherwise the relationship remains uncertain."
             )
         }]
     else:
