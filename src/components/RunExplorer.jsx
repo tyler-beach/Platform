@@ -29,6 +29,41 @@ const duration = (start, end) => {
 const titleForStep = (step) => String(step.name || 'Unnamed step').replace(/^\d+\s*[·.)-]\s*/, '');
 const safeJson = (value) => JSON.stringify(value, null, 2);
 
+// Parse GitHub's ZIP response locally; log contents remain in the browser and are never sent elsewhere.
+async function readZipEntries(buffer) {
+  const view = new DataView(buffer);
+  const decoder = new TextDecoder();
+  let end = -1;
+  for (let i = Math.max(0, buffer.byteLength - 65557); i <= buffer.byteLength - 22; i += 1) { if (view.getUint32(i, true) === 0x06054b50) end = i; }
+  if (end < 0) throw new Error('The downloaded file is not a readable ZIP archive.');
+  const count = view.getUint16(end + 10, true);
+  let cursor = view.getUint32(end + 16, true);
+  const entries = [];
+  for (let i = 0; i < count; i += 1) {
+    if (view.getUint32(cursor, true) !== 0x02014b50) break;
+    const method = view.getUint16(cursor + 10, true);
+    const size = view.getUint32(cursor + 20, true);
+    const nameLength = view.getUint16(cursor + 28, true);
+    const extraLength = view.getUint16(cursor + 30, true);
+    const commentLength = view.getUint16(cursor + 32, true);
+    const localOffset = view.getUint32(cursor + 42, true);
+    const name = decoder.decode(new Uint8Array(buffer, cursor + 46, nameLength));
+    const localNameLength = view.getUint16(localOffset + 26, true);
+    const localExtraLength = view.getUint16(localOffset + 28, true);
+    const start = localOffset + 30 + localNameLength + localExtraLength;
+    const bytes = new Uint8Array(buffer, start, size);
+    let content;
+    if (method === 0) content = bytes.slice();
+    else if (method === 8 && typeof DecompressionStream !== 'undefined') {
+      const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+      content = new Uint8Array(await new Response(stream).arrayBuffer());
+    } else throw new Error('This browser cannot decompress this ZIP format. Download the artifact from GitHub instead.');
+    entries.push({ name, bytes: content, text: decoder.decode(content) });
+    cursor += 46 + nameLength + extraLength + commentLength;
+  }
+  return entries.filter((entry) => !entry.name.endsWith('/'));
+}
+
 function Status({ value }) {
   const state = STATES[value] || { label: value || 'Unknown', icon: CircleDashed, tone: 'muted' };
   const Icon = state.icon;
@@ -47,6 +82,12 @@ export default function RunExplorer() {
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [error, setError] = useState('');
   const [detailsError, setDetailsError] = useState('');
+  const [jobLogs, setJobLogs] = useState([]);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [logsError, setLogsError] = useState('');
+  const [artifactContents, setArtifactContents] = useState({});
+  const [artifactLoading, setArtifactLoading] = useState('');
+  const [artifactErrors, setArtifactErrors] = useState({});
   const [lastUpdated, setLastUpdated] = useState('');
 
   const selectedRun = runs.find((run) => String(run.id) === selectedId) || null;
@@ -115,6 +156,33 @@ export default function RunExplorer() {
   }, [selectedId]);
 
   useEffect(() => {
+    if (tab !== 'logs' || !selectedStep?.jobId) return undefined;
+    let active = true;
+    setLogsLoading(true); setLogsError(''); setJobLogs([]);
+    fetch(`${API}/repos/${OWNER_REPO}/actions/jobs/${selectedStep.jobId}/logs`, { headers: { Accept: 'application/vnd.github+json' } })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(response.status === 401 || response.status === 403 ? 'GitHub did not allow this browser to download the log bundle. Open the job in GitHub to inspect its logs.' : `Could not download job logs (HTTP ${response.status}).`);
+        return readZipEntries(await response.arrayBuffer());
+      })
+      .then((entries) => { if (active) setJobLogs(entries); })
+      .catch((caught) => { if (active) setLogsError(caught instanceof Error ? caught.message : 'Unable to read job logs.'); })
+      .finally(() => { if (active) setLogsLoading(false); });
+    return () => { active = false; };
+  }, [tab, selectedStep?.jobId]);
+
+  async function inspectArtifact(artifact) {
+    if (artifactContents[artifact.id] || artifactLoading === String(artifact.id)) return;
+    setArtifactLoading(String(artifact.id));
+    setArtifactErrors((current) => ({ ...current, [artifact.id]: '' }));
+    try {
+      const response = await fetch(`${API}/repos/${OWNER_REPO}/actions/artifacts/${artifact.id}/zip`, { headers: { Accept: 'application/vnd.github+json' } });
+      if (!response.ok) throw new Error(response.status === 401 || response.status === 403 ? 'GitHub did not allow browser access to this artifact. Open the run in GitHub to download it.' : `Artifact download failed (HTTP ${response.status}).`);
+      const entries = await readZipEntries(await response.arrayBuffer());
+      setArtifactContents((current) => ({ ...current, [artifact.id]: entries.map(({ name, text, bytes }) => ({ name, text, size: bytes.byteLength, json: /\\.json$/i.test(name) ? (() => { try { return JSON.parse(text); } catch { return null; } })() : null })) }));
+    } catch (caught) { setArtifactErrors((current) => ({ ...current, [artifact.id]: caught instanceof Error ? caught.message : 'Unable to inspect artifact.' })); }
+    finally { setArtifactLoading(''); }
+  }
+  useEffect(() => {
     if (!selectedStepKey && allSteps[0]) setSelectedStepKey(allSteps[0].key);
   }, [allSteps, selectedStepKey]);
 
@@ -182,15 +250,18 @@ export default function RunExplorer() {
         <section className="run-inspector" aria-label="Selected step details">
           {selectedStep ? <>
             <div className="run-inspector__head"><div><span className="run-explorer__kicker">STEP INSPECTOR</span><h3>{titleForStep(selectedStep)}</h3><p>{selectedStep.jobName}</p></div><Status value={selectedStep.conclusion || selectedStep.status} /></div>
-            <div className="run-inspector__tabs" role="tablist" aria-label="Step detail tabs">{[['summary','Summary'],['outputs','Outputs'],['artifacts','Artifacts'],['logs','Logs']].map(([key,label]) => <button key={key} role="tab" aria-selected={tab === key} className={tab === key ? 'is-active' : ''} onClick={() => setTab(key)}>{label}</button>)}</div>
+            <div className="run-inspector__tabs" role="tablist" aria-label="Step detail tabs">{[['summary','Summary'],['inputs','Inputs'],['outputs','Outputs'],['logs','Logs'],['evidence','Evidence'],['artifacts','Artifacts']].map(([key,label]) => <button key={key} role="tab" aria-selected={tab === key} className={tab === key ? 'is-active' : ''} onClick={() => setTab(key)}>{label}</button>)}</div>
             {tab === 'summary' && <div className="run-inspector__body">
               <div className="run-inspector__state"><span className={`run-step__dot run-step__dot--${toneFor(selectedStep.conclusion || selectedStep.status)}`} /><div><strong>{STATES[selectedStep.conclusion || selectedStep.status]?.label || selectedStep.status || 'Unknown'}</strong><span>Actual GitHub Actions step metadata</span></div></div>
               <dl className="run-detail-list"><div><dt>Step started</dt><dd>{prettyDate(selectedStep.started_at)}</dd></div><div><dt>Step completed</dt><dd>{prettyDate(selectedStep.completed_at)}</dd></div><div><dt>Duration</dt><dd>{duration(selectedStep.started_at, selectedStep.completed_at)}</dd></div><div><dt>Step number</dt><dd>{selectedStep.number ?? '—'}</dd></div><div><dt>Job ID</dt><dd className="run-mono">{selectedStep.jobId}</dd></div><div><dt>Conclusion</dt><dd>{selectedStep.conclusion || 'Not final'}</dd></div></dl>
               <div className="run-inspector__actions"><a href={selectedStep.jobUrl || runUrl} target="_blank" rel="noreferrer"><FileText size={15} /> Open job details <ArrowUpRight size={13} /></a><a href={runUrl} target="_blank" rel="noreferrer"><ExternalLink size={15} /> Run overview</a></div>
             </div>}
-            {tab === 'outputs' && <div className="run-inspector__body"><div className="run-data-callout"><FileJson2 size={17} /><div><strong>What the API exposes</strong><p>GitHub’s step API returns the execution status and timing, not the step’s stdout, stderr, or arbitrary JSON files. Those live in job logs and workflow artifacts.</p></div></div><pre className="run-json"><code>{safeJson(stepOutput)}</code></pre><button className="run-copy-hint" onClick={() => navigator.clipboard?.writeText(safeJson(stepOutput))}>Copy step metadata</button></div>}
+            {tab === 'inputs' && <div className="run-inspector__body"><div className="run-data-callout"><FileJson2 size={17} /><div><strong>Step inputs</strong><p>GitHub’s public job-step API does not expose action input values or shell environment variables. This panel shows only metadata actually returned for this step; it will not infer inputs from a workflow name or log text.</p></div></div><pre className="run-json"><code>{safeJson({ available: false, reason: 'The public GitHub Actions step API does not provide resolved inputs or environment values.', step: { name: selectedStep.name, number: selectedStep.number, job: selectedStep.jobName, job_id: selectedStep.jobId }, source: selectedStep.jobUrl })}</code></pre></div>}
+            {tab === 'evidence' && <div className="run-inspector__body"><div className="run-data-callout"><ShieldAlert size={17} /><div><strong>Execution provenance</strong><p>These fields identify the selected GitHub execution. They establish what GitHub reports about the run, not whether an architectural decision is satisfied.</p></div></div><dl className="run-detail-list"><div><dt>Repository</dt><dd>{OWNER_REPO}</dd></div><div><dt>Workflow</dt><dd>{selectedRun.name}</dd></div><div><dt>Run ID</dt><dd className="run-mono">{selectedRun.id}</dd></div><div><dt>Run attempt</dt><dd>{selectedRun.run_attempt || 1}</dd></div><div><dt>Commit SHA</dt><dd className="run-mono">{selectedRun.head_sha}</dd></div><div><dt>Branch</dt><dd>{selectedRun.head_branch || '—'}</dd></div><div><dt>Trigger</dt><dd>{selectedRun.event || '—'}</dd></div><div><dt>Step job ID</dt><dd className="run-mono">{selectedStep.jobId}</dd></div><div><dt>Step name</dt><dd>{selectedStep.name}</dd></div><div><dt>Step result</dt><dd>{selectedStep.conclusion || selectedStep.status || 'Unknown'}</dd></div></dl><div className="run-inspector__actions"><a href={selectedRun.html_url} target="_blank" rel="noreferrer"><ExternalLink size={15} /> Source run</a><a href={`https://github.com/${OWNER_REPO}/commit/${selectedRun.head_sha}`} target="_blank" rel="noreferrer"><GitBranch size={15} /> Source commit</a></div></div>}
+            {tab === 'outputs' && <div className="run-inspector__body"><div className="run-data-callout"><FileJson2 size={17} /><div><strong>Structured step outputs</strong><p>GitHub does not return arbitrary step output values through the public job API. Inspect the artifacts below for JSON or other output files uploaded by the workflow.</p></div></div><pre className="run-json"><code>{safeJson(stepOutput)}</code></pre><button className="run-copy-hint" onClick={() => navigator.clipboard?.writeText(safeJson(stepOutput))}>Copy step metadata</button><p className="run-muted-note">No output payload is claimed unless it is present in a real artifact or log.</p></div>}
             {tab === 'artifacts' && <div className="run-inspector__body"><div className="run-artifact-intro"><strong>{artifacts.length} artifacts attached to this run</strong><span>Artifacts are run-level bundles; GitHub does not identify an artifact as belonging to a single step unless the workflow names or manifests it.</span></div>{artifacts.length ? artifacts.map((artifact) => <div className="run-artifact" key={artifact.id}><FileJson2 size={18} /><div><strong>{artifact.name}</strong><span>{Math.max(1, Math.round((artifact.size_in_bytes || 0) / 1024))} KB · expires {prettyDate(artifact.expires_at)}</span></div><a href={runUrl} target="_blank" rel="noreferrer" aria-label={`Open artifact ${artifact.name} in GitHub`}><ArrowDownToLine size={15} /></a></div>) : <div className="run-empty run-empty--compact"><FileJson2 size={21} /><strong>No artifacts reported</strong><span>This run may not upload output bundles.</span></div>}<a className="run-primary-link" href={runUrl} target="_blank" rel="noreferrer">Open run artifacts in GitHub <ArrowUpRight size={14} /></a></div>}
-            {tab === 'logs' && <div className="run-inspector__body"><div className="run-data-callout"><FileText size={17} /><div><strong>Job logs</strong><p>Logs are retrieved by GitHub’s authenticated log-download endpoint. For this public static site, they are opened in GitHub rather than proxied through a browser-side token.</p></div></div><a className="run-log-link" href={selectedStep.jobUrl || runUrl} target="_blank" rel="noreferrer"><FileText size={17} /><span><strong>Open {selectedStep.jobName} logs</strong><small>Inspect commands, stdout/stderr, and error context in GitHub Actions.</small></span><ArrowUpRight size={15} /></a><a className="run-log-link" href={runUrl} target="_blank" rel="noreferrer"><ExternalLink size={17} /><span><strong>Open full execution</strong><small>Includes workflow summary, annotations, and artifact downloads.</small></span><ArrowUpRight size={15} /></a></div>}
+            {tab === 'logs' && <div className="run-inspector__body"><div className="run-data-callout"><FileText size={17} /><div><strong>Actual job log files</strong><p>Loaded from the GitHub Actions job log archive when the browser and GitHub permit it. Log contents are raw observations, not compliance verdicts.</p></div></div>{logsLoading && <div className="run-loading run-loading--compact"><LoaderCircle size={16} className="run-spin" /> Downloading and reading job logs…</div>}{logsError && <div className="run-inline-alert"><AlertCircle size={15} /><span>{logsError}</span><a href={selectedStep.jobUrl || runUrl} target="_blank" rel="noreferrer">Open in GitHub <ExternalLink size={13} /></a></div>}{!logsLoading && !logsError && jobLogs.length > 0 && <div className="run-log-files">{jobLogs.map((entry) => <details className="run-log-file" key={entry.name}><summary><FileText size={14} />{entry.name}<span>{entry.text.split(String.fromCharCode(10)).length} lines</span></summary><pre><code>{entry.text || '(no output)'}</code></pre></details>)}</div>}{!logsLoading && !logsError && !jobLogs.length && <div className="run-empty run-empty--compact"><FileText size={21} /><strong>No log entries returned</strong><span>GitHub may not retain logs for this run.</span></div>}<a className="run-log-link" href={selectedStep.jobUrl || runUrl} target="_blank" rel="noreferrer"><FileText size={17} /><span><strong>Open {selectedStep.jobName} in GitHub</strong><small>Fallback if log download is unavailable.</small></span><ArrowUpRight size={15} /></a></div>}
+            {tab === 'artifacts' && <div className="run-inspector__body"><div className="run-artifact-intro"><strong>{artifacts.length} artifacts attached to this run</strong><span>Artifacts belong to the run unless their own manifest identifies a step or source. Open an artifact to inspect real files and parse valid JSON files.</span></div>{artifacts.length ? artifacts.map((artifact) => <div className="run-artifact-wrap" key={artifact.id}><div className="run-artifact"><FileJson2 size={18} /><div><strong>{artifact.name}</strong><span>{Math.max(1, Math.round((artifact.size_in_bytes || 0) / 1024))} KB · expires {prettyDate(artifact.expires_at)}</span><small>Artifact ID {artifact.id} · {artifact.expired ? 'expired' : 'available according to GitHub'}</small></div><button className="run-artifact-inspect" onClick={() => inspectArtifact(artifact)} disabled={artifact.expired || artifactLoading === String(artifact.id)}>{artifactLoading === String(artifact.id) ? <LoaderCircle size={15} className="run-spin" /> : <Search size={15} />}{artifactContents[artifact.id] ? 'Loaded' : 'Inspect files'}</button></div>{artifactErrors[artifact.id] && <div className="run-inline-alert"><AlertCircle size={14} /><span>{artifactErrors[artifact.id]}</span></div>}{artifactContents[artifact.id]?.map((file) => <details className="run-log-file" key={file.name}><summary><FileText size={14} />{file.name}<span>{Math.max(1, Math.round(file.size / 1024))} KB</span></summary>{file.json !== null ? <pre className="run-json"><code>{safeJson(file.json)}</code></pre> : <pre><code>{file.text.slice(0, 300000) || '(empty file)'}</code></pre>}</details>)}</div>) : <div className="run-empty run-empty--compact"><FileJson2 size={21} /><strong>No artifacts reported</strong><span>This run may not upload output bundles.</span></div>}<a className="run-primary-link" href={runUrl} target="_blank" rel="noreferrer">Open run artifacts in GitHub <ArrowUpRight size={14} /></a></div>}
           </> : <div className="run-empty"><CircleDashed size={24} /><strong>Select a workflow step</strong><span>Its execution details will appear here.</span></div>}
         </section>
       </div>}
