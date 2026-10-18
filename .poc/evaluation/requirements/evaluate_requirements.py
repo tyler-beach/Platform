@@ -45,7 +45,7 @@ def fingerprint():
 
 def classify(case):
     f=case["facts"]; t=case["requirement_type"]
-    if known_bool(f,"evidence_complete") is not True: return "ambiguous"
+    if t != "runtime_evidence" and known_bool(f,"evidence_complete") is not True: return "ambiguous"
     if t=="session_ttl":
         if known_bool(f,"active_config") is not True: return "ambiguous"
         ttl=known_number(f,"ttl_seconds"); limit=known_number(f,"max_ttl_seconds")
