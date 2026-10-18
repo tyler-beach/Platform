@@ -58,4 +58,33 @@ class RequirementCorpusTests(unittest.TestCase):
     def test_fingerprint_is_stable(self):
         self.assertEqual(ev.fingerprint(),ev.fingerprint())
         self.assertEqual(len(ev.fingerprint()),64)
+
+    def test_malformed_boolean_values_fail_closed(self):
+        cases = [
+            {"requirement_type":"session_ttl","facts":{"evidence_complete":"true","active_config":True,"ttl_seconds":900,"max_ttl_seconds":600,"exception_valid":False}},
+            {"requirement_type":"pod_disruption_budget","facts":{"evidence_complete":True,"workload_active":"false","pdb_present":True,"pdb_selector_matches":True,"actual_min_available":1,"required_min_available":2}},
+            {"requirement_type":"sensitive_data_logging","facts":{"evidence_complete":True,"sensitive_data_observed":"false","redaction_verified":True}},
+            {"requirement_type":"async_provider","facts":{"evidence_complete":True,"dispatch_resolved":True,"direct_sync_call":"false","async_boundary":False}},
+            {"requirement_type":"approved_exception","facts":{"evidence_complete":True,"exception_used":"false","approved":True,"unexpired":True,"scope_matches":True}},
+            {"requirement_type":"runtime_evidence","facts":{"evidence_complete":True,"applicable":True,"evidence_present":"true","fresh":True,"source_pinned":True,"contradicts_requirement":False}},
+        ]
+        for case in cases:
+            with self.subTest(requirement_type=case["requirement_type"]):
+                self.assertEqual(ev.classify(case), "ambiguous")
+
+    def test_exception_cannot_be_accepted_when_usage_is_unknown(self):
+        case={"requirement_type":"approved_exception","facts":{"evidence_complete":True,"exception_used":None,"approved":True,"unexpired":True,"scope_matches":True}}
+        self.assertEqual(ev.classify(case),"ambiguous")
+
+    def test_invalid_numeric_values_are_not_compared(self):
+        for value in ("900", True, -1):
+            case={"requirement_type":"session_ttl","facts":{"evidence_complete":True,"active_config":True,"ttl_seconds":value,"max_ttl_seconds":600,"exception_valid":False}}
+            self.assertEqual(ev.classify(case),"ambiguous")
+        case={"requirement_type":"pod_disruption_budget","facts":{"evidence_complete":True,"workload_active":True,"pdb_present":True,"pdb_selector_matches":True,"actual_min_available":-1,"required_min_available":1}}
+        self.assertEqual(ev.classify(case),"ambiguous")
+
+    def test_unknown_requirement_type_fails_loudly(self):
+        with self.assertRaises(ValueError):
+            ev.classify({"requirement_type":"made_up_domain","facts":{"evidence_complete":True}})
+
 if __name__=="__main__": unittest.main()

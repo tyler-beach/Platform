@@ -13,6 +13,19 @@ ROOT = Path(__file__).resolve().parents[3]
 CORPUS = ROOT / ".poc" / "evaluation" / "requirements" / "cases.jsonl"
 LABELS = {"deviation", "no_deviation", "ambiguous"}
 
+def known_bool(facts, key):
+    """Return only actual JSON booleans; malformed values remain unknown."""
+    value = facts.get(key)
+    return value if type(value) is bool else None
+
+def known_number(facts, key):
+    """Accept finite JSON numbers, rejecting bools, strings and invalid values."""
+    import math
+    value = facts.get(key)
+    if type(value) not in (int, float) or not math.isfinite(value):
+        return None
+    return value
+
 def load_cases():
     cases=[json.loads(x) for x in CORPUS.read_text(encoding="utf-8").splitlines() if x.strip()]
     ids=[c["case_id"] for c in cases]
@@ -32,47 +45,54 @@ def fingerprint():
 
 def classify(case):
     f=case["facts"]; t=case["requirement_type"]
+    if known_bool(f,"evidence_complete") is not True: return "ambiguous"
     if t=="session_ttl":
-        if not f.get("evidence_complete") or not f.get("active_config"):
-            return "ambiguous"
-        ttl=f.get("ttl_seconds"); limit=f.get("max_ttl_seconds")
-        if ttl is None or limit is None: return "ambiguous"
-        if ttl > limit and f.get("exception_valid") is True: return "no_deviation"
-        if ttl > limit and f.get("exception_valid") is None: return "ambiguous"
-        return "deviation" if ttl > limit else "no_deviation"
+        if known_bool(f,"active_config") is not True: return "ambiguous"
+        ttl=known_number(f,"ttl_seconds"); limit=known_number(f,"max_ttl_seconds")
+        if ttl is None or limit is None or ttl < 0 or limit < 0: return "ambiguous"
+        exception=known_bool(f,"exception_valid")
+        if ttl > limit:
+            if exception is True: return "no_deviation"
+            if exception is None: return "ambiguous"
+            return "deviation"
+        return "no_deviation"
     if t=="pod_disruption_budget":
-        if not f.get("evidence_complete"): return "ambiguous"
-        if f.get("workload_active") is False: return "no_deviation"
-        if f.get("pdb_present") is False: return "deviation"
-        if f.get("pdb_present") is None or f.get("pdb_selector_matches") is None: return "ambiguous"
-        if f.get("pdb_selector_matches") is False: return "deviation"
-        actual=f.get("actual_min_available"); required=f.get("required_min_available")
-        if actual is None or required is None: return "ambiguous"
+        active=known_bool(f,"workload_active")
+        if active is False: return "no_deviation"
+        if active is not True: return "ambiguous"
+        present=known_bool(f,"pdb_present")
+        if present is False: return "deviation"
+        if present is not True: return "ambiguous"
+        selector=known_bool(f,"pdb_selector_matches")
+        if selector is False: return "deviation"
+        if selector is not True: return "ambiguous"
+        actual=known_number(f,"actual_min_available"); required=known_number(f,"required_min_available")
+        if actual is None or required is None or actual < 0 or required < 0: return "ambiguous"
         return "deviation" if actual < required else "no_deviation"
     if t=="sensitive_data_logging":
-        if not f.get("evidence_complete"): return "ambiguous"
-        sensitive=f.get("sensitive_data_observed"); redaction=f.get("redaction_verified")
-        if sensitive is None or redaction is None: return "ambiguous"
+        sensitive=known_bool(f,"sensitive_data_observed"); redaction=known_bool(f,"redaction_verified")
         if sensitive is True: return "deviation"
         if sensitive is False and redaction is True: return "no_deviation"
         return "ambiguous"
     if t=="async_provider":
-        if not f.get("evidence_complete") or not f.get("dispatch_resolved"): return "ambiguous"
-        direct=f.get("direct_sync_call"); boundary=f.get("async_boundary")
+        if known_bool(f,"dispatch_resolved") is not True: return "ambiguous"
+        direct=known_bool(f,"direct_sync_call"); boundary=known_bool(f,"async_boundary")
         if direct is None or boundary is None: return "ambiguous"
         if direct is True and boundary is True: return "ambiguous"
         return "deviation" if direct is True and boundary is False else "no_deviation"
     if t=="approved_exception":
-        if not f.get("evidence_complete"): return "ambiguous"
-        if f.get("exception_used") is False: return "no_deviation"
-        if any(f.get(k) is None for k in ("approved","unexpired","scope_matches")): return "ambiguous"
-        valid=f["approved"] is True and f["unexpired"] is True and f["scope_matches"] is True
-        return "no_deviation" if valid else "deviation"
+        used=known_bool(f,"exception_used")
+        if used is False: return "no_deviation"
+        if used is not True: return "ambiguous"
+        values=[known_bool(f,k) for k in ("approved","unexpired","scope_matches")]
+        if any(value is None for value in values): return "ambiguous"
+        return "no_deviation" if all(value is True for value in values) else "deviation"
     if t=="runtime_evidence":
-        if f.get("applicable") is False: return "no_deviation"
-        if f.get("applicable") is None: return "ambiguous"
-        if not f.get("evidence_present") or not f.get("fresh") or not f.get("source_pinned"): return "ambiguous"
-        contradictory=f.get("contradicts_requirement")
+        applicable=known_bool(f,"applicable")
+        if applicable is False: return "no_deviation"
+        if applicable is not True: return "ambiguous"
+        if any(known_bool(f,k) is not True for k in ("evidence_present","fresh","source_pinned")): return "ambiguous"
+        contradictory=known_bool(f,"contradicts_requirement")
         if contradictory is None: return "ambiguous"
         return "deviation" if contradictory else "no_deviation"
     raise ValueError(f"unknown requirement_type: {t}")
