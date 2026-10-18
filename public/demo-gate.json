@@ -1,6 +1,0 @@
-{
-  "schema_version": "pathfinder-demo-gate-v1",
-  "enabled": false,
-  "hash": "",
-  "note": "Gate disabled because DEMO_GATE_PASSPHRASE was not set for this build."
-}

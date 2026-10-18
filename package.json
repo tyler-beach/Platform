@@ -9,7 +9,7 @@
   },
   "scripts": {
     "dev": "vite --host 127.0.0.1",
-    "build": "node scripts/write-demo-gate-config.mjs && node scripts/copy-content.mjs && node scripts/generate-doc-index.mjs && vite build && node scripts/finalize-pages.mjs",
+    "build": "node scripts/copy-content.mjs && node scripts/generate-doc-index.mjs && vite build && node scripts/finalize-pages.mjs",
     "preview": "vite preview --host 127.0.0.1",
     "test": "node --test test/*.test.cjs docs/javascripts/demo-explorer.test.cjs docs/javascripts/diagram-viewer.test.cjs docs/javascripts/site-experience.test.cjs",
     "predev": "node scripts/generate-doc-index.mjs"

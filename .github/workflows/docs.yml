@@ -88,10 +88,6 @@ jobs:
       - name: Run site and explorer behavior tests
         run: npm test
       - name: Build React Pages application
-        env:
-          # Optional shared passphrase for Pages demo gate (repo secret DEMO_GATE_PASSPHRASE).
-          # When unset, the published site stays ungated.
-          DEMO_GATE_PASSPHRASE: ${{ secrets.DEMO_GATE_PASSPHRASE }}
         run: npm run build
       - name: Generate the synthetic mock walkthrough from the PoC
         env:
