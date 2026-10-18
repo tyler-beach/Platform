@@ -23,6 +23,7 @@ if str(ENGINE_DIR) not in sys.path:
 
 import evaluate_package  # noqa: E402
 import package_collector  # noqa: E402
+import paste_extractor  # noqa: E402
 
 MAX_FIELD_CHARS = 50_000
 MAX_PACKAGE_CHARS = 200_000
@@ -108,21 +109,32 @@ def _bounded(label: str, value: str) -> str:
     return value
 
 
+def _guess_code_path(code: str) -> str:
+    if "package main" in code or re.search(r"\bfunc\s+\w+\s*\(", code):
+        return "issue/sample.go"
+    if re.search(r"^\s*(def|class|import|from)\s+", code, re.M) or "async def" in code:
+        return "issue/sample.py"
+    if code.lstrip().startswith("{"):
+        return "issue/config.json"
+    return "issue/sample-code.txt"
+
+
 def build_package_from_fields(sections: dict[str, str], *, issue_number: int) -> dict[str, Any]:
     tech = _bounded("tech spec", sections.get("tech spec (markdown)", sections.get("tech spec", "")))
     code = _bounded("sample code", sections.get("sample code", sections.get("code", "")))
     obs_raw = sections.get("observations json array", sections.get("observations json", sections.get("observations", "")))
     domains = _parse_domains(sections.get("domains (optional scope filter)", sections.get("domains", "")))
-    if not obs_raw.strip():
-        raise IntakeError(
-            "observations JSON is required unless you provide a full package JSON block"
-        )
-    try:
-        observations = json.loads(obs_raw)
-    except json.JSONDecodeError as exc:
-        raise IntakeError(f"observations JSON is invalid: {exc}") from exc
-    if not isinstance(observations, list) or not observations:
-        raise IntakeError("observations must be a non-empty JSON array")
+    if not tech.strip() and not code.strip() and not obs_raw.strip():
+        raise IntakeError("provide tech spec and/or sample code (or full package JSON / observations)")
+
+    observations: list[Any] = []
+    if obs_raw.strip():
+        try:
+            observations = json.loads(obs_raw)
+        except json.JSONDecodeError as exc:
+            raise IntakeError(f"observations JSON is invalid: {exc}") from exc
+        if not isinstance(observations, list):
+            raise IntakeError("observations must be a JSON array")
 
     package: dict[str, Any] = {
         "schema_version": "pathfinder-evidence-package-v1",
@@ -141,9 +153,10 @@ def build_package_from_fields(sections: dict[str, str], *, issue_number: int) ->
         }
     if code:
         code_sha = _sha(code)
+        code_path = _guess_code_path(code)
         package["code"] = [{
             "artifact_id": "code-0",
-            "path": "issue/sample-code.txt",
+            "path": code_path,
             "revision": f"sha256:{code_sha}",
             "sha256": code_sha,
             "content": code,
@@ -156,7 +169,10 @@ def build_package_from_fields(sections: dict[str, str], *, issue_number: int) ->
         if "artifact_id" not in obs:
             obs["artifact_id"] = "tech_spec" if tech else "code-0"
         if "path" not in obs:
-            obs["path"] = "issue/tech-spec.md" if obs["artifact_id"] == "tech_spec" else "issue/sample-code.txt"
+            if obs["artifact_id"] == "tech_spec":
+                obs["path"] = "issue/tech-spec.md"
+            else:
+                obs["path"] = package.get("code", [{"path": "issue/sample-code.txt"}])[0]["path"]
         if "revision" not in obs or "source_sha256" not in obs:
             if obs["artifact_id"] == "tech_spec" and tech_sha:
                 obs["revision"] = f"sha256:{tech_sha}"
@@ -232,6 +248,8 @@ def package_from_issue(body: str, *, issue_number: int) -> dict[str, Any]:
     if package.get("schema_version") != "pathfinder-evidence-package-v1":
         raise IntakeError("package schema_version must be pathfinder-evidence-package-v1")
     package = _pin_artifact_hashes(package)
+    # When observations are omitted, extract from pasted tech-spec/code (fail-closed).
+    package = paste_extractor.ensure_observations(package)
     # Validate collectability early.
     package_collector.collect_package_observations(package)
     return package
@@ -245,10 +263,18 @@ def render_result_comment(report: dict[str, Any], *, run_url: str, package: dict
         f"- **Aggregate status:** `{report['aggregate_status']}`",
         f"- **Meaning:** {report['aggregate_meaning']}",
         f"- **Catalog size:** {report['catalog_size']}",
-        f"- **Observations supplied:** {report['observation_count']}",
+        f"- **Observations used:** {report['observation_count']}",
         f"- **Package id:** `{package.get('package_id', 'unnamed')}`",
         f"- **Report fingerprint:** `{report['report_sha256']}`",
         f"- **Workflow run:** {run_url}",
+    ]
+    extraction = report.get("extraction") or package.get("extraction")
+    if extraction:
+        lines.append(
+            f"- **Paste extractor:** `{extraction.get('extractor')}` "
+            f"({extraction.get('observation_count', 0)} observations)"
+        )
+    lines.extend([
         "",
         "### Outcome counts",
         "",
@@ -261,7 +287,7 @@ def render_result_comment(report: dict[str, Any], *, run_url: str, package: dict
         "",
         "### Notable requirements",
         "",
-    ]
+    ])
     notable = [
         row for row in report["results"]
         if row["outcome"] in {"supported_deviation", "no_deviation_found"}
@@ -300,7 +326,7 @@ def render_error_comment(message: str, *, run_url: str) -> str:
         "## Pathfinder catalog evaluation failed\n\n"
         f"{message}\n\n"
         f"Workflow run: {run_url}\n\n"
-        "Fix the issue body (attestation, package schema, observations) and edit the issue to re-run.\n"
+        "Fix the issue body (attestation, package schema, or paste content) and edit the issue to re-run.\n"
         "See `docs/ISSUE_ANALYZE_WORKFLOW.md`.\n"
     )
 

@@ -9,59 +9,58 @@ Submit a **pinned evidence package** through a GitHub Issue and receive a catalo
 - The result comment includes hashes, outcomes, and counts — **not** full tech-spec/code bodies.
 - The full report JSON is a workflow artifact (`pathfinder-issue-evaluation-*`).
 
-## How to submit
+## How to submit (paste a real sample)
 
 1. Open **New issue** → **Pathfinder analyze package**.
 2. Check the public/synthetic attestation box.
-3. Preferred: paste a complete `pathfinder-evidence-package-v1` object in **Full package JSON** (optionally inside a ` ```pathfinder-package ` fence).
-4. Or fill **Tech spec**, **Sample code**, **Observations JSON array**, and optional **Domains**.
-5. Submit. The **Pathfinder Issue Package Evaluation** workflow runs on open/edit/label and comments results.
+3. Paste your **Tech spec (markdown)** and/or **Sample code** (Go, Python, or JSON). Domains optional.
+4. Leave **Observations JSON** empty unless you want to override extraction.
+5. Submit. The workflow extracts allowlisted predicates, evaluates the catalog, and comments results.
 
-You can also re-run via **Actions → Pathfinder Issue Package Evaluation → Run workflow** with an issue number.
+You can still paste a complete `pathfinder-evidence-package-v1` in **Full package JSON** if you prefer.
 
-## Package shape
+Re-run via **Actions → Pathfinder Issue Package Evaluation → Run workflow** with an issue number.
 
-Minimum:
+## What extraction can and cannot do
 
-```json
-{
-  "schema_version": "pathfinder-evidence-package-v1",
-  "package_id": "my-service",
-  "scope": { "domains": ["identity", "security"] },
-  "observations": [
-    {
-      "evidence_id": "EV-1",
-      "predicate": "session.ttl_seconds",
-      "subject": "session",
-      "value": 720,
-      "artifact_id": "tech_spec",
-      "revision": "sha256:…",
-      "path": "issue/tech-spec.md",
-      "source_sha256": "…",
-      "locator": { "kind": "tech_spec_claim", "value": "session.ttl_seconds" }
-    }
-  ]
-}
-```
+The paste extractor (`paste_heuristic_v1`) is deterministic (no model calls). It emits observations only for high-confidence matches, for example:
 
-Intake recomputes `sha256` / `revision` from any pasted `tech_spec` / `code` content so digests stay pinned to the body text.
+- Session TTL / idle timeout with explicit units
+- Encryption at rest, TLS policy tokens (`tls-1-2-strict`, `tls-1-3-only`, `legacy-ssl`)
+- Replicas, probes, retries, DLQ claims
+- Rate limit / auth middleware signals in prose or Go/Python
+- Hardcoded secret-like literals → `security.secret_in_source.present=true` only
+- Sensitive log phrases → `privacy.sensitive_log.present=true` only
 
-Observations are **required**. Free-form prose alone is not auto-parsed into predicates; missing evidence stays `inconclusive`.
+It does **not**:
 
-Predicates must be registered and collectable via `structured_package` (see `.poc/requirement_catalog/predicates.json`).
+- Treat “not mentioned” as `false` for most presence checks
+- Cover all 100 catalog predicates from arbitrary prose
+- Invent values when two conflicting numbers appear (both dropped)
+
+Unmatched requirements stay `inconclusive`. Aggregate status is often `mixed` for real pastes.
 
 ## Local dry-run
 
 ```sh
+# Paste-only issue body (no observations JSON)
 python3 .poc/issue_analyze/issue_package.py \
   --issue-number 0 \
-  --body-file .poc/issue_analyze/fixtures/sample_issue_body.md \
+  --body-file .poc/issue_analyze/fixtures/paste_only_issue_body.md \
   --work-dir /tmp/pathfinder-issue \
   --run-url https://example.invalid/run
+
+# Or evaluate a package with tech_spec/code and empty observations
+python3 .poc/requirement_engine/evaluate_package.py /path/to/package.json
 ```
+
+Messy fixtures used in tests:
+
+- `.poc/issue_analyze/fixtures/real_paste_tech_spec.md`
+- `.poc/issue_analyze/fixtures/real_paste_session.go`
+- `.poc/issue_analyze/fixtures/real_paste_session.py`
 
 ## Related
 
 - Catalog evaluation CLI: `docs/REUSABLE_REQUIREMENT_EVALUATION.md`
-- Sample package: `.poc/requirement_catalog/sample_packages/multi-domain-session-service/`
-- OpenSpec change: `openspec/changes/issue-package-evaluation/`
+- OpenSpec change: `openspec/changes/paste-observation-extraction/`

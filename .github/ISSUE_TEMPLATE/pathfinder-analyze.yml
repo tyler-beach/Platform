@@ -12,10 +12,12 @@ body:
         **This repository is public.** Do not paste secrets, credentials, private customer data, or proprietary source. Use synthetic or explicitly public examples only.
 
         You can either:
-        1. Paste a full JSON package in the **Full package JSON** field (preferred), or
-        2. Fill Tech spec / Code / Observations and Domains separately.
+        1. Paste a full JSON package in the **Full package JSON** field, or
+        2. Paste a real **Tech spec** and/or **Sample code** (Go/Python/markdown) and optionally Domains.
 
-        Observations are required for confident results. Free-form prose alone is not auto-parsed into predicates yet; missing evidence stays `inconclusive`.
+        A deterministic paste extractor turns high-confidence claims into typed observations.
+        Hand-written **Observations JSON** is optional and overrides extraction when provided.
+        Unextracted predicates stay `inconclusive` (silence is not treated as compliance).
   - type: checkboxes
     id: attestation
     attributes:
@@ -59,8 +61,8 @@ body:
   - type: textarea
     id: observations
     attributes:
-      label: Observations JSON array
-      description: Required unless included inside Full package JSON. Each observation needs evidence_id, predicate, subject, value, and locator. See docs/ISSUE_ANALYZE_WORKFLOW.md.
+      label: Observations JSON array (optional)
+      description: Optional override. If omitted, Pathfinder extracts allowlisted predicates from Tech spec / Sample code. See docs/ISSUE_ANALYZE_WORKFLOW.md.
       render: json
       placeholder: |
         [

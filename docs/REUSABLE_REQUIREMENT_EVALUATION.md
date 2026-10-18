@@ -37,7 +37,7 @@ Per-requirement outcomes remain `supported_deviation`, `no_deviation_found`, `no
 
 ### GitHub Issue intake
 
-Open a **Pathfinder analyze package** issue (public/synthetic content only). Actions parses the issue into a package, runs catalog evaluation, comments aggregate status + outcome counts, and uploads the full report artifact. See `docs/ISSUE_ANALYZE_WORKFLOW.md`.
+Open a **Pathfinder analyze package** issue (public/synthetic content only). Paste a real tech-spec and/or Go/Python sample; a deterministic paste extractor (`paste_heuristic_v1`) fills allowlisted observations when you omit hand-written observation JSON. Actions evaluates the catalog, comments aggregate status + outcome counts, and uploads the full report artifact. Unextracted predicates stay `inconclusive`. See `docs/ISSUE_ANALYZE_WORKFLOW.md`.
 
 ## Requirement kinds
 
