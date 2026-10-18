@@ -83,6 +83,18 @@ class ScopeRetrievalTests(unittest.TestCase):
         self.assertEqual(refs[0]["path"], "internal/handler/submit.go")
         self.assertEqual(result["comparison"]["overall_result"], "deviation")
 
+    def test_scope_evaluation_is_deterministic_for_identical_inputs(self):
+        import json
+        event = self.by_id["SCOPE-01"]
+        kwargs = dict(top_k=5, in_scope_threshold=0.28, review_threshold=0.14, backend="local")
+        first = run_scope.evaluate_event(event, self.catalog, **kwargs)
+        second = run_scope.evaluate_event(event, self.catalog, **kwargs)
+        self.assertEqual(
+            json.dumps(first, sort_keys=True, separators=(",", ":"), ensure_ascii=False),
+            json.dumps(second, sort_keys=True, separators=(",", ":"), ensure_ascii=False),
+            "identical event, catalog, thresholds, and backend should replay to the same comparison artifact",
+        )
+
     def test_direct_request_path_call_is_a_deviation_with_typed_evidence_link(self):
         event = self.by_id["SCOPE-01"]
         result = run_scope.evaluate_event(event, self.catalog, top_k=5, in_scope_threshold=0.28,
