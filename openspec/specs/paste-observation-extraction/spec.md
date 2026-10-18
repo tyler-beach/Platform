@@ -5,7 +5,7 @@ Deterministic, fail-closed extraction of allowlisted typed catalog observations 
 ## Requirements
 ### Requirement: Extract typed observations from pasted tech-spec or code
 
-When an evidence package includes tech_spec and/or code content and does not supply observations, the system MUST run a deterministic paste extractor that emits zero or more typed observations for allowlisted catalog predicates. Extraction MUST NOT call a model to invent values. Observations MUST use catalog subjects and pin artifact digests/locators.
+When an evidence package includes tech_spec and/or code content and does not supply observations, the system MUST run a deterministic paste extractor that emits zero or more typed observations for allowlisted catalog predicates. Extraction MUST NOT call a model to invent values. Observations MUST use catalog subjects and pin artifact digests/locators. The paste extractor MUST also recognize high-confidence Kubernetes YAML-style claims for allowlisted predicates such as deployment replicas and probe/PDB presence when those keys appear explicitly in the pasted text. The extractor version MUST identify the heuristic revision used.
 
 #### Scenario: Markdown tech spec yields extractable observations
 - **GIVEN** a package with only markdown tech-spec content describing session TTL and encryption at rest, and no observations array
@@ -29,4 +29,10 @@ When an evidence package includes tech_spec and/or code content and does not sup
 - **WHEN** intake builds the package
 - **THEN** extraction runs
 - **AND** evaluation proceeds (empty extraction yields inconclusive coverage, not an intake hard-fail for missing observations)
+
+#### Scenario: Kubernetes YAML snippet yields replica observation
+- **GIVEN** pasted YAML containing `replicas: 2` under a Deployment-like snippet
+- **WHEN** extraction runs
+- **THEN** `kubernetes.deployment.replicas` is emitted with value `2`
+- **AND** the extractor version identifies the current heuristic revision
 
