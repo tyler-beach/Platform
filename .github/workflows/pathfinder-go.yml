@@ -1,0 +1,52 @@
+name: Pathfinder Go
+
+on:
+  pull_request:
+    paths:
+      - "go/pathfinder/**"
+      - ".poc/requirement_catalog/**"
+      - ".poc/issue_analyze/fixtures/**"
+      - ".github/workflows/pathfinder-go.yml"
+      - ".github/workflows/pathfinder-go-analyze.yml"
+      - ".github/workflows/pathfinder-issue-analyze.yml"
+  push:
+    branches: [main]
+    paths:
+      - "go/pathfinder/**"
+      - ".poc/requirement_catalog/**"
+      - ".github/workflows/pathfinder-go.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: go test pathfinder
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: "1.24.x"
+          cache-dependency-path: go/pathfinder/go.mod
+      - name: Test
+        working-directory: go/pathfinder
+        run: go test ./... -count=1
+      - name: Build CLIs
+        working-directory: go/pathfinder
+        run: |
+          go build -o /tmp/pathfinder-issue-analyze ./cmd/pathfinder-issue-analyze
+          go build -o /tmp/pathfinder-evaluate-package ./cmd/pathfinder-evaluate-package
+      - name: Fixture dry-run
+        working-directory: go/pathfinder
+        run: |
+          mkdir -p /tmp/pathfinder-issue
+          /tmp/pathfinder-issue-analyze \
+            --issue-number 0 \
+            --body-file ../../.poc/issue_analyze/fixtures/paste_only_issue_body.md \
+            --work-dir /tmp/pathfinder-issue \
+            --run-url https://example.invalid/run
+          test -f /tmp/pathfinder-issue/comment.md
+          test -f /tmp/pathfinder-issue/report.json
+          ! grep -q "Sessions expire after 12 minutes absolute" /tmp/pathfinder-issue/comment.md

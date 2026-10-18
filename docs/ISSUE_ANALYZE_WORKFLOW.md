@@ -40,18 +40,28 @@ It does **not**:
 
 Unmatched requirements stay `inconclusive`. Aggregate status is often `mixed` for real pastes.
 
+## Runtime
+
+Production evaluate runs on **GitHub Actions** via the Go Pathfinder runtime (`go/pathfinder`), orchestrated as staged reusable workflow jobs (intake → ensure observations → evaluate → publish → job ledger). AWS is not required. Python under `.poc/` remains an offline oracle, not the production entrypoint.
+
+Lean job index lines append to the `pathfinder-jobs` branch (`jobs/jobs.jsonl`). Full reports stay in workflow artifacts. Findings are advisory (`synthetic_unadjudicated`); they do not block merges. Same-repo PR file intake is a follow-on milestone.
+
 ## Local dry-run
 
 ```sh
+cd go/pathfinder
+go build -o /tmp/pathfinder-issue-analyze ./cmd/pathfinder-issue-analyze
+go build -o /tmp/pathfinder-evaluate-package ./cmd/pathfinder-evaluate-package
+
 # Paste-only issue body (no observations JSON)
-python3 .poc/issue_analyze/issue_package.py \
+/tmp/pathfinder-issue-analyze \
   --issue-number 0 \
-  --body-file .poc/issue_analyze/fixtures/paste_only_issue_body.md \
+  --body-file ../../.poc/issue_analyze/fixtures/paste_only_issue_body.md \
   --work-dir /tmp/pathfinder-issue \
   --run-url https://example.invalid/run
 
 # Or evaluate a package with tech_spec/code and empty observations
-python3 .poc/requirement_engine/evaluate_package.py /path/to/package.json
+/tmp/pathfinder-evaluate-package ../../.poc/requirement_catalog/sample_packages/multi-domain-session-service/package.json
 ```
 
 Messy fixtures used in tests:

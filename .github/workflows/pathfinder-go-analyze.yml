@@ -1,0 +1,167 @@
+# Reusable stage-style analyze (Actions stand-in for worker tasks).
+name: Pathfinder Go Analyze (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      issue_number:
+        description: Issue number to evaluate
+        required: true
+        type: string
+      comment:
+        description: Post or update issue comment
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  analyze:
+    name: Intake → ensure → evaluate → publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up Go
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: "1.24.x"
+          cache-dependency-path: go/pathfinder/go.mod
+
+      - name: Build Pathfinder binaries
+        working-directory: go/pathfinder
+        run: |
+          go build -o "$RUNNER_TEMP/pathfinder-issue-analyze" ./cmd/pathfinder-issue-analyze
+          go build -o "$RUNNER_TEMP/pathfinder-evaluate-package" ./cmd/pathfinder-evaluate-package
+
+      - name: Stage — intake / ensure / evaluate / publish
+        id: run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          ISSUE_NUMBER: ${{ inputs.issue_number }}
+          DO_COMMENT: ${{ inputs.comment }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/pathfinder-issue"
+          set +e
+          args=(
+            --issue-number "$ISSUE_NUMBER"
+            --repo "$GITHUB_REPOSITORY"
+            --run-url "$RUN_URL"
+            --work-dir "$RUNNER_TEMP/pathfinder-issue"
+          )
+          if [ "$DO_COMMENT" = "true" ]; then
+            args+=(--comment)
+          fi
+          "$RUNNER_TEMP/pathfinder-issue-analyze" "${args[@]}"
+          status=$?
+          set -e
+          if [ ! -f "$RUNNER_TEMP/pathfinder-issue/comment.md" ]; then
+            echo "comment.md missing after Go analyze" >&2
+            exit 1
+          fi
+          {
+            echo "### Pathfinder stage summary"
+            echo ""
+            echo "- Issue: #$ISSUE_NUMBER"
+            echo "- Work dir artifacts: package.json, report.json, comment.md, job.json"
+            if [ -f "$RUNNER_TEMP/pathfinder-issue/report.json" ]; then
+              REPORT_JSON="$RUNNER_TEMP/pathfinder-issue/report.json" python3 - <<'PY'
+          import json, os
+          r = json.loads(open(os.environ["REPORT_JSON"], encoding="utf-8").read())
+          print(f"- Aggregate: `{r.get('aggregate_status')}`")
+          print(f"- Observations: {r.get('observation_count')}")
+          print(f"- Report fingerprint: `{r.get('report_sha256')}`")
+          PY
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
+      - name: Upload stage artifacts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: pathfinder-issue-evaluation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/pathfinder-issue/report.json
+            ${{ runner.temp }}/pathfinder-issue/comment.md
+            ${{ runner.temp }}/pathfinder-issue/package.json
+            ${{ runner.temp }}/pathfinder-issue/job.json
+          if-no-files-found: warn
+          retention-days: 14
+
+  ledger:
+    name: Append pathfinder-jobs ledger
+    needs: analyze
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: pathfinder-jobs-ledger
+      cancel-in-progress: false
+    permissions:
+      contents: write
+    steps:
+      - name: Download analyze artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: pathfinder-issue-evaluation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/pathfinder-issue
+        continue-on-error: true
+
+      - name: Append job.json to pathfinder-jobs branch
+        id: ledger
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REMOTE: https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git
+        run: |
+          set -euo pipefail
+          JOB_FILE="$RUNNER_TEMP/pathfinder-issue/job.json"
+          if [ ! -f "$JOB_FILE" ]; then
+            echo "job.json missing; skipping ledger append" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          attempts=0
+          max_attempts=5
+          while [ "$attempts" -lt "$max_attempts" ]; do
+            attempts=$((attempts + 1))
+            rm -rf "$RUNNER_TEMP/pathfinder-jobs-write"
+            if git ls-remote --exit-code "$REMOTE" refs/heads/pathfinder-jobs >/dev/null 2>&1; then
+              git clone --quiet --depth 1 --single-branch --branch pathfinder-jobs "$REMOTE" "$RUNNER_TEMP/pathfinder-jobs-write"
+            else
+              mkdir "$RUNNER_TEMP/pathfinder-jobs-write"
+              git -C "$RUNNER_TEMP/pathfinder-jobs-write" init --quiet --initial-branch=pathfinder-jobs
+              git -C "$RUNNER_TEMP/pathfinder-jobs-write" remote add origin "$REMOTE"
+            fi
+            mkdir -p "$RUNNER_TEMP/pathfinder-jobs-write/jobs"
+            cat "$JOB_FILE" >> "$RUNNER_TEMP/pathfinder-jobs-write/jobs/jobs.jsonl"
+            git -C "$RUNNER_TEMP/pathfinder-jobs-write" config user.name "github-actions[bot]"
+            git -C "$RUNNER_TEMP/pathfinder-jobs-write" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git -C "$RUNNER_TEMP/pathfinder-jobs-write" add jobs/jobs.jsonl
+            if git -C "$RUNNER_TEMP/pathfinder-jobs-write" diff --cached --quiet; then
+              echo "Ledger unchanged."
+              exit 0
+            fi
+            git -C "$RUNNER_TEMP/pathfinder-jobs-write" commit --quiet -m "chore(pathfinder-jobs): record ${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+            if git -C "$RUNNER_TEMP/pathfinder-jobs-write" push origin HEAD:pathfinder-jobs; then
+              echo "Ledger append succeeded (attempt $attempts)." >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            echo "Ledger push rejected (attempt $attempts); retrying..."
+            sleep 2
+          done
+          echo "Ledger append failed after $max_attempts attempts (soft-fail; comment/artifacts retained)." >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+
+      - name: Soft-fail note when ledger failed
+        if: steps.ledger.outcome == 'failure'
+        run: |
+          echo "::warning::pathfinder-jobs ledger append failed after retries; issue comment and artifacts were kept."
+          exit 0
