@@ -17,7 +17,7 @@ from typing import Any
 POLICY_VERSION = "session-ttl-policy-v1"
 MAX_TTL_SECONDS = 600
 PARSER_VERSION = "explicit-ttl-fixture-v1"
-OUTCOMES = {"supported_deviation", "no_deviation_found", "inconclusive"}
+OUTCOMES = {"supported_deviation", "no_deviation_found", "not_applicable", "inconclusive"}
 
 
 def canonical(value: Any) -> str:
@@ -124,8 +124,8 @@ def investigate(case: dict[str, Any]) -> dict[str, Any]:
     ]
     rationale: str
     if not applicability:
-        outcome = "no_deviation_found"
-        rationale = "The ADR is not applicable to this source revision; no deviation is asserted."
+        outcome = "not_applicable"
+        rationale = "The ADR is not applicable to this source revision; no compliance conclusion is asserted."
         relation = "not_applicable"
     elif not ttl_values:
         outcome = "inconclusive"
