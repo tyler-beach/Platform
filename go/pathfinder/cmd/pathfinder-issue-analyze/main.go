@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/tyler-beach/Platform/go/pathfinder/internal/adapt/pr"
 	"github.com/tyler-beach/Platform/go/pathfinder/internal/catalog"
 	"github.com/tyler-beach/Platform/go/pathfinder/internal/engine"
 	"github.com/tyler-beach/Platform/go/pathfinder/internal/evaluate"
@@ -97,7 +98,11 @@ func main() {
 	var packageObj map[string]any
 	var report map[string]any
 	if err == nil {
-		packageObj, err = issueintake.PackageFromIssue(body, *issueNumber, catalogDir, subjects, reg)
+		opts := issueintake.Options{Repo: *repo}
+		if *repo != "" {
+			opts.PRClient = pr.NewGHClient()
+		}
+		packageObj, err = issueintake.PackageFromIssue(body, *issueNumber, catalogDir, subjects, reg, opts)
 	}
 	if err == nil {
 		pkgPath := filepath.Join(work, "package.json")
