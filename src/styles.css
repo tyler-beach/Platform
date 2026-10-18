@@ -1199,3 +1199,8 @@ a:hover { color: #b4f5e4; }
 .run-artifact-inspect:disabled { opacity:.65; cursor:wait; }
 .run-artifact small { color:#8199ac; font-size:9px; }
 @media (max-width:620px) { .run-artifact { align-items:flex-start; flex-wrap:wrap; } .run-artifact-inspect { margin-left:28px; } }
+
+.run-summary__links { display:flex; align-items:center; justify-content:flex-end; gap:14px; flex-wrap:wrap; }
+.run-attempt-picker { display:inline-flex; align-items:center; gap:7px; color:#8099ac; font-size:10px; }
+.run-attempt-picker select { border:1px solid #2b4657; border-radius:6px; padding:6px 8px; color:#cce5e5; background:#102433; font-size:10px; }
+@media (max-width:620px) { .run-summary__links { justify-content:flex-start; } }
