@@ -92,6 +92,9 @@ test('Run Explorer inspects logs, artifact payloads, attempts, and provenance wi
   assert.ok(explorer.includes('Compare executions'));
   assert.ok(explorer.includes('run-comparison__table'));
   assert.ok(explorer.includes('Faster in selected run'));
+  assert.ok(explorer.includes('leftMs < rightMs'));
+  assert.ok(explorer.includes('choose another attempt'));
+  assert.ok(explorer.includes('Download full file'));
   assert.ok(explorer.includes('File contents match'));
   assert.ok(css.includes('.run-comparison__table'));
   assert.ok(explorer.includes('Recorded workflow inputs'));

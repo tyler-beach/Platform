@@ -1298,3 +1298,5 @@ button.run-graph-node:hover { border-color:#64cdbd; background:#143043; }
 .run-manifest-raw summary { padding:10px; color:#9ecfc9; font-size:10px; cursor:pointer; background:#0a1a26; }
 .run-input-inspect { width:100%; text-align:left; cursor:pointer; }
 @media(max-width:620px) { .run-inputs-grid { grid-template-columns:minmax(0,1fr); } }
+
+.run-download-file { display:inline-flex; align-items:center; gap:6px; margin:10px 12px 12px; padding:7px 9px; border:1px solid #2e5262; border-radius:6px; color:#a9e4da; background:#0d2533; font-size:10px; cursor:pointer; }
