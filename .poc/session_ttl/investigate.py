@@ -56,7 +56,8 @@ def validate_json_pointer_evidence(item: dict[str, Any], source: dict[str, Any])
                     raise KeyError(token)
     except (json.JSONDecodeError, KeyError, IndexError, TypeError, ValueError) as exc:
         raise ValueError(f"evidence {item['evidence_id']} JSON pointer does not resolve in pinned source") from exc
-    if value != item.get("value"):
+    claimed = item.get("value")
+    if type(value) is not type(claimed) or value != claimed:
         raise ValueError(f"evidence {item['evidence_id']} value does not match pinned source locator")
 
 
@@ -68,6 +69,9 @@ def investigate(case: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("case requires adr and source objects")
     validate_pinned_artifact(adr, "adr")
     validate_pinned_artifact(source, "source")
+    limit = case.get("max_ttl_seconds", 600)
+    if not isinstance(limit, int) or isinstance(limit, bool) or limit < 0:
+        raise ValueError("max_ttl_seconds must be a non-negative integer")
 
     evidence = case.get("evidence", [])
     if not isinstance(evidence, list):
@@ -93,6 +97,8 @@ def investigate(case: dict[str, Any]) -> dict[str, Any]:
     unknown = sorted(set(requested_ids) - set(evidence_by_id))
     if unknown:
         raise ValueError("unknown evidence reference(s): " + ", ".join(unknown))
+    if len(requested_ids) != len(set(requested_ids)):
+        raise ValueError("proposed_evidence_ids must be unique")
 
     # Applicability is deliberately evaluated before examining the TTL observation.
     applicability = adr.get("status") == "accepted" and case.get("scope_match") is True
@@ -120,9 +126,6 @@ def investigate(case: dict[str, Any]) -> dict[str, Any]:
         relation = "conflicting_evidence"
     else:
         ttl = ttl_values[0]["value"]
-        limit = case.get("max_ttl_seconds", 600)
-        if not isinstance(limit, int) or isinstance(limit, bool) or limit < 0:
-            raise ValueError("max_ttl_seconds must be a non-negative integer")
         if ttl > limit:
             outcome = "supported_deviation"
             rationale = f"Observed session TTL is {ttl} seconds, exceeding the applicable maximum of {limit} seconds."
