@@ -356,7 +356,10 @@ export default function RunExplorer() {
       </section>
 
       <section className="run-comparison" aria-labelledby="run-comparison-title">
-        <div className="run-comparison__heading"><div><span className="run-explorer__kicker">REGRESSION WORKSPACE</span><h2 id="run-comparison-title">Compare executions</h2><p>Compare actual GitHub-reported step outcomes, timings, revisions, and artifact inventories across runs or rerun attempts.</p></div><label className="run-compare-toggle"><input type="checkbox" checked={compareEnabled} onChange={(event) => setCompareEnabled(event.target.checked)} /> Enable comparison</label></div>
+        <div className="run-comparison__heading">
+          <div><span className="run-explorer__kicker">REGRESSION WORKSPACE</span><h2 id="run-comparison-title">Compare executions</h2><p>Compare actual GitHub-reported step outcomes, timings, revisions, and artifact inventories across runs or rerun attempts.</p></div>
+          <label className="run-compare-toggle"><input type="checkbox" checked={compareEnabled} onChange={(event) => setCompareEnabled(event.target.checked)} /> Enable comparison</label>
+        </div>
         {compareEnabled && <>
           <div className="run-comparison__selectors">
             <div><span>BASELINE · SELECTED RUN</span><strong>#{selectedRun.run_number} · attempt {selectedAttempt}</strong><small>{selectedRun.head_sha?.slice(0, 12)} · {selectedRun.conclusion || selectedRun.status}</small></div>
@@ -366,24 +369,50 @@ export default function RunExplorer() {
           {compareDetails.error && <div className="run-inline-alert"><AlertCircle size={15} /><span>{compareDetails.error}</span></div>}
           {compareDetails.loading && <div className="run-loading run-loading--compact"><LoaderCircle size={16} className="run-spin" /> Loading comparison execution…</div>}
           {!compareDetails.loading && !compareDetails.error && comparisonRun && <div className="run-comparison__body">
-            <div className="run-comparison__metrics"><div><span>Outcome changes</span><strong>{compareSummary.changed}</strong></div><div><span>Steps added</span><strong>{compareSummary.added}</strong></div><div><span>Steps missing</span><strong>{compareSummary.missing}</strong></div><div><span>Faster / slower</span><strong>{compareSummary.faster} / {compareSummary.slower}</strong></div></div>
+            <div className="run-comparison__metrics">
+              <div><span>Outcome changes</span><strong>{compareSummary.changed}</strong></div>
+              <div><span>Steps added</span><strong>{compareSummary.added}</strong></div>
+              <div><span>Steps missing</span><strong>{compareSummary.missing}</strong></div>
+              <div><span>Faster / slower</span><strong>{compareSummary.faster} / {compareSummary.slower}</strong></div>
+            </div>
             <div className="run-comparison__revision"><div><span>Selected revision</span><code>{selectedRun.head_sha || 'Unavailable'}</code></div><GitBranch size={16} /><div><span>Comparison revision</span><code>{comparisonRun.head_sha || 'Unavailable'}</code></div></div>
             <div className="run-comparison__table-wrap"><table className="run-comparison__table"><thead><tr><th>Job / step</th><th>Selected</th><th>Compared</th><th>Selected duration</th><th>Compared duration</th><th>Difference</th></tr></thead><tbody>{compareSteps.map((row) => <tr key={row.key} className={row.severity === 'changed' ? 'is-changed' : ''}><td><strong>{row.stepName}</strong><small>{row.jobName}</small></td><td><Status value={row.leftStatus === 'missing' ? 'unknown' : row.leftStatus} /></td><td><Status value={row.rightStatus === 'missing' ? 'unknown' : row.rightStatus} /></td><td>{row.leftMs === null ? '—' : Math.round(row.leftMs / 1000) + 's'}</td><td>{row.rightMs === null ? '—' : Math.round(row.rightMs / 1000) + 's'}</td><td><span className={'run-change run-change--' + row.severity}>{row.change}</span></td></tr>)}</tbody></table></div>
-            <div className="run-comparison__artifacts"><div><span className="run-explorer__kicker">OUTPUT INVENTORY</span><strong>Artifact changes</strong><p>Artifacts are compared by name and size. Inspect matching bundles from each run’s Artifacts tab to compare individual JSON/file contents.</p></div><div className="run-artifact-diff-list">{<div className="run-artifact-diff-list">{Array.from(new Set([...artifacts, ...compareDetails.artifacts].map((artifact) => artifact.name.replace(/-\\d{8,}-\\d+$/, '').replace(/-\\d{8,}$/, '')))).map((name) => {
-              const normalizeName = (value) => value.replace(/-\\d{8,}-\\d+$/, '').replace(/-\\d{8,}$/, '');
-              const left = artifacts.find((x) => normalizeName(x.name) === name), right = compareDetails.artifacts.find((x) => normalizeName(x.name) === name);
-              const leftFiles = left ? artifactContents[left.id] : null, rightFiles = right ? artifactContents[right.id] : null;
-              let change = !left ? 'Only comparison run' : !right ? 'Only selected run' : left.size_in_bytes === right.size_in_bytes ? 'Same size' : (left.size_in_bytes > right.size_in_bytes ? 'Selected run larger' : 'Comparison run larger');
-              let fileChange = '';
-              if (leftFiles && rightFiles) {
-                const a = new Map(leftFiles.map((file) => [file.name, file])), b = new Map(rightFiles.map((file) => [file.name, file]));
-                const added = [...b.keys()].filter((key) => !a.has(key)).length;
-                const removed = [...a.keys()].filter((key) => !b.has(key)).length;
-                const changed = [...a.keys()].filter((key) => b.has(key) && ((a.get(key).sha256 && b.get(key).sha256) ? a.get(key).sha256 !== b.get(key).sha256 : a.get(key).text !== b.get(key).text)).length;
-                fileChange = added + removed + changed === 0 ? 'File contents match' : changed + ' changed · ' + added + ' added · ' + removed + ' removed';
-              } else if (left && right) fileChange = 'Inspect both bundles for file-level diff';
-              return <div key={name}><strong>{left?.name || right?.name || name}</strong><small>Selected: {left ? Math.ceil(left.size_in_bytes / 1024) + ' KB' : '—'} · Compared: {right ? Math.ceil(right.size_in_bytes / 1024) + ' KB' : '—'}</small><span>{change}{fileChange ? ' · ' + fileChange : ''}</span><div className="run-artifact-compare-actions">{left && <button className="run-artifact-inspect" onClick={() => inspectArtifact(left)} disabled={left.expired || artifactLoading === String(left.id)}>{artifactContents[left.id] ? 'Selected inspected' : 'Inspect selected'}</button>}{right && <button className="run-artifact-inspect" onClick={() => inspectArtifact(right)} disabled={right.expired || artifactLoading === String(right.id)}>{artifactContents[right.id] ? 'Compared inspected' : 'Inspect compared'}</button>}</div></div>;
-            })}</div>      <section className="run-signal-graph" aria-label="Execution signal flow">
+            <div className="run-comparison__artifacts">
+              <div><span className="run-explorer__kicker">OUTPUT INVENTORY</span><strong>Artifact and file changes</strong><p>Bundle names are normalized for run-specific suffixes. Inspect both bundles to compare contained files by path and SHA-256; byte size alone is not content equality.</p></div>
+              <div className="run-artifact-diff-list">
+                {Array.from(new Set([...artifacts, ...compareDetails.artifacts].map((artifact) => artifact.name.replace(/-[0-9]{8,}-[0-9]+$/, '').replace(/-[0-9]{8,}$/, '')))).map((name) => {
+                  const normalizeName = (value) => value.replace(/-[0-9]{8,}-[0-9]+$/, '').replace(/-[0-9]{8,}$/, '');
+                  const left = artifacts.find((x) => normalizeName(x.name) === name);
+                  const right = compareDetails.artifacts.find((x) => normalizeName(x.name) === name);
+                  const leftFiles = left ? artifactContents[left.id] : null;
+                  const rightFiles = right ? artifactContents[right.id] : null;
+                  let change = !left ? 'Only comparison run' : !right ? 'Only selected run' : left.size_in_bytes === right.size_in_bytes ? 'Same size' : left.size_in_bytes > right.size_in_bytes ? 'Selected run larger' : 'Comparison run larger';
+                  let fileChange = '';
+                  if (leftFiles && rightFiles) {
+                    const a = new Map(leftFiles.map((file) => [file.name, file]));
+                    const b = new Map(rightFiles.map((file) => [file.name, file]));
+                    const added = [...b.keys()].filter((key) => !a.has(key)).length;
+                    const removed = [...a.keys()].filter((key) => !b.has(key)).length;
+                    const changed = [...a.keys()].filter((key) => b.has(key) && ((a.get(key).sha256 && b.get(key).sha256) ? a.get(key).sha256 !== b.get(key).sha256 : a.get(key).text !== b.get(key).text)).length;
+                    fileChange = added + removed + changed === 0 ? 'File contents match' : changed + ' changed · ' + added + ' added · ' + removed + ' removed';
+                  } else if (left && right) fileChange = 'Inspect both bundles for file-level diff';
+                  return <div key={name}>
+                    <strong>{left?.name || right?.name || name}</strong>
+                    <small>Selected: {left ? Math.ceil(left.size_in_bytes / 1024) + ' KB' : '—'} · Compared: {right ? Math.ceil(right.size_in_bytes / 1024) + ' KB' : '—'}</small>
+                    <span>{change}{fileChange ? ' · ' + fileChange : ''}</span>
+                    <div className="run-artifact-compare-actions">
+                      {left && <button className="run-artifact-inspect" onClick={() => inspectArtifact(left)} disabled={left.expired || artifactLoading === String(left.id)}>{artifactContents[left.id] ? 'Selected inspected' : 'Inspect selected'}</button>}
+                      {right && <button className="run-artifact-inspect" onClick={() => inspectArtifact(right)} disabled={right.expired || artifactLoading === String(right.id)}>{artifactContents[right.id] ? 'Compared inspected' : 'Inspect compared'}</button>}
+                    </div>
+                  </div>;
+                })}
+              </div>
+            </div>
+          </div>}
+        </>}
+      </section>
+
+      <section className="run-signal-graph" aria-label="Execution signal flow">
         <div className="run-signal-graph__heading"><div><span className="run-explorer__kicker">SIGNAL FLOW</span><h2>Run → jobs → artifacts</h2></div><span>{jobs.length} jobs · {allSteps.length} steps · {artifacts.length} artifacts</span></div>
         <div className="run-graph-track">
           <div className="run-graph-node run-graph-node--source"><span className="run-graph-node__type">SOURCE RUN</span><strong>#{selectedRun.run_number}</strong><small>{selectedRun.name}</small><Status value={selectedRun.conclusion || selectedRun.status} /></div>
