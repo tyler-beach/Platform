@@ -228,7 +228,8 @@ def validate_result(result: Any) -> None:
         raise ValueError("unsupported result schema version")
     if result["policy_version"] != POLICY_VERSION:
         raise ValueError("unsupported policy version")
-    if result["outcome"] not in OUTCOMES:
+    outcome = result["outcome"]
+    if not isinstance(outcome, str) or outcome not in OUTCOMES:
         raise ValueError("invalid result outcome")
     if not isinstance(result["relationship"], str) or not isinstance(result["rationale"], str):
         raise ValueError("result relationship and rationale must be strings")
