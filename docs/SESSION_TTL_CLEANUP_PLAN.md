@@ -7,7 +7,8 @@ Make the offline session-TTL vertical slice auditable and hard to misinterpret w
 
 ### P0 — Input and decision correctness
 - Validate the top-level case type, artifact shape, status/scope fields, evidence records, locator fields, and CLI JSON shape.
-- Preserve evidence IDs for observations considered by the decision, including rejected observations; attach explicit rejection reason codes instead of silently dropping invalid values.
+- Distinguish considered evidence IDs from accepted evidence IDs and rejected observations; attach explicit rejection reason codes instead of silently dropping invalid values.
+- If any decision-relevant TTL observation is rejected, force an inconclusive result even when another observation is valid, so partial invalid evidence cannot produce an overconfident compliance/deviation claim.
 - Keep invalid, missing, conflicting, and not-applicable outcomes distinct. Never infer compliance from absent or invalid evidence.
 - Keep policy threshold provenance explicit: policy v1 is fixed at 600 seconds; ADR text is pinned but is not dynamically interpreted by this evaluator.
 
