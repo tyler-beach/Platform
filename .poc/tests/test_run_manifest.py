@@ -3,36 +3,48 @@ from __future__ import annotations
 import hashlib
 import json
 import sys
+import tempfile
+import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from run_manifest import build_manifest
 
 
-def test_run_manifest_records_allowlisted_inputs_and_hashes_output_files(tmp_path, monkeypatch):
-    output_dir = tmp_path / "run"
-    output_dir.mkdir()
-    evidence_bytes = b'{"finding":"example"}'
-    (output_dir / "evidence.json").write_bytes(evidence_bytes)
-    manifest_path = output_dir / "pathfinder-run-manifest.json"
+class RunManifestTests(unittest.TestCase):
+    def test_allowlisted_inputs_and_hashes_all_outputs_under_scan_root(self):
+        with tempfile.TemporaryDirectory() as directory:
+            scan_root = Path(directory) / "run-data"
+            nested = scan_root / "12345-1"
+            nested.mkdir(parents=True)
+            evidence_bytes = b'{"finding":"example"}'
+            evidence_path = scan_root / "evidence-package.json"
+            evidence_path.write_bytes(evidence_bytes)
+            manifest_path = nested / "pathfinder-run-manifest.json"
+            env = {
+                "GITHUB_REPOSITORY": "example/adr-platform",
+                "GITHUB_RUN_ID": "12345678901",
+                "GITHUB_RUN_ATTEMPT": "2",
+                "INPUT_COMPARISON": "spec-vs-implementation",
+                "INPUT_MODEL_PROVIDER": "mock",
+                "ANTHROPIC_API_KEY": "must-not-appear-in-manifest",
+            }
+            with patch.dict("os.environ", env, clear=False):
+                manifest = build_manifest(manifest_path, scan_root)
 
-    monkeypatch.setenv("GITHUB_REPOSITORY", "example/adr-platform")
-    monkeypatch.setenv("GITHUB_RUN_ID", "12345678901")
-    monkeypatch.setenv("GITHUB_RUN_ATTEMPT", "2")
-    monkeypatch.setenv("INPUT_COMPARISON", "spec-vs-implementation")
-    monkeypatch.setenv("INPUT_MODEL_PROVIDER", "mock")
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "must-not-appear-in-manifest")
+            self.assertEqual(manifest["schema"], "pathfinder.execution-manifest/v1")
+            self.assertEqual(manifest["run"]["run_attempt"], 2)
+            self.assertEqual(manifest["inputs"]["comparison"], "spec-vs-implementation")
+            self.assertEqual(manifest["inputs"]["model_provider"], "mock")
+            self.assertEqual(manifest["output_count"], 1)
+            self.assertEqual(manifest["outputs"][0]["path"], "evidence-package.json")
+            self.assertEqual(manifest["outputs"][0]["sha256"], hashlib.sha256(evidence_bytes).hexdigest())
+            serialized = json.dumps(manifest)
+            self.assertNotIn("ANTHROPIC_API_KEY", serialized)
+            self.assertNotIn("must-not-appear-in-manifest", serialized)
+            self.assertIn("not a compliance verdict", manifest["evidence_boundary"])
 
-    manifest = build_manifest(manifest_path)
 
-    assert manifest["schema"] == "pathfinder.execution-manifest/v1"
-    assert manifest["run"]["run_attempt"] == 2
-    assert manifest["inputs"]["comparison"] == "spec-vs-implementation"
-    assert manifest["inputs"]["model_provider"] == "mock"
-    assert manifest["output_count"] == 1
-    assert manifest["outputs"][0]["path"] == "evidence.json"
-    assert manifest["outputs"][0]["sha256"] == hashlib.sha256(evidence_bytes).hexdigest()
-    serialized = json.dumps(manifest)
-    assert "ANTHROPIC_API_KEY" not in serialized
-    assert "must-not-appear-in-manifest" not in serialized
-    assert "not a compliance verdict" in manifest["evidence_boundary"]
+if __name__ == "__main__":
+    unittest.main()

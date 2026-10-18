@@ -32,12 +32,13 @@ INPUT_FIELDS = {
 }
 
 
-def build_manifest(output_path: Path) -> dict:
+def build_manifest(output_path: Path, scan_root: Path | None = None) -> dict:
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    root = output_path.parent
+    root = (scan_root or output_path.parent).resolve()
+    manifest_resolved = output_path.resolve()
     outputs = []
     for path in sorted(root.rglob("*")):
-        if not path.is_file() or path.resolve() == output_path.resolve():
+        if not path.is_file() or path.resolve() == manifest_resolved:
             continue
         relative = path.relative_to(root).as_posix()
         data = path.read_bytes()
@@ -77,8 +78,9 @@ def build_manifest(output_path: Path) -> dict:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--scan-root", type=Path, default=None, help="Root containing generated run outputs to hash")
     args = parser.parse_args()
-    manifest = build_manifest(args.output)
+    manifest = build_manifest(args.output, args.scan_root)
     args.output.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(f"Wrote {args.output} with {manifest['output_count']} hashed output references.")
 

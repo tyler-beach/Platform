@@ -267,7 +267,7 @@ jobs:
           INPUT_MAX_INPUT_TOKENS: ${{ inputs.max_input_tokens }}
           INPUT_MAX_OUTPUT_TOKENS: ${{ inputs.max_output_tokens }}
         run: |
-          python .poc/run_manifest.py --output "run-data/${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/pathfinder-run-manifest.json"
+          python -m unittest discover -s .poc/tests -p "test_run_manifest.py"\n          python .poc/run_manifest.py --scan-root run-data --output "run-data/${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}/pathfinder-run-manifest.json"
       - name: Publish report and CSV audit snapshot
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
