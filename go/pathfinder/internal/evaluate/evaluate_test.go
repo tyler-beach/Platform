@@ -53,4 +53,61 @@ func TestEvaluateSamplePackageStable(t *testing.T) {
 	if status == "" {
 		t.Fatal("missing aggregate_status")
 	}
+	cat, _ := a["catalog"].(map[string]any)
+	if cat["mode"] != "synthetic" || cat["manifest_sha256"] == "" {
+		t.Fatalf("catalog identity=%v", cat)
+	}
+}
+
+func TestEvaluateRealCatalogDomainApplicability(t *testing.T) {
+	root := repoRoot(t)
+	catalogDir := filepath.Join(root, "data", "adr_catalog")
+	pkg := map[string]any{
+		"schema_version": "pathfinder-evidence-package-v1",
+		"package_id":     "scope-identity-only",
+		"scope":          map[string]any{"domains": []any{"identity"}},
+		"observations":   []any{},
+	}
+	report, err := evaluate.EvaluatePackageWithMode(pkg, catalogDir, "accepted", "real")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report["catalog_size"].(int) != 3 {
+		t.Fatalf("catalog_size=%v", report["catalog_size"])
+	}
+	if report["in_scope_count"].(int) != 1 {
+		t.Fatalf("in_scope_count=%v want 1", report["in_scope_count"])
+	}
+	if report["aggregate_status"] == "all_aligned" {
+		t.Fatal("no applicable confident outcomes should not look all_aligned")
+	}
+	cat, _ := report["catalog"].(map[string]any)
+	if cat["mode"] != "real" || cat["catalog_id"] != "platform-real-adr-v0" {
+		t.Fatalf("catalog=%v", cat)
+	}
+	counts, _ := report["counts"].(map[string]int)
+	if counts["not_applicable"] < 2 {
+		t.Fatalf("expected reliability rows not_applicable, counts=%v", counts)
+	}
+}
+
+func TestEvaluateNoApplicableRequirements(t *testing.T) {
+	root := repoRoot(t)
+	catalogDir := filepath.Join(root, "data", "adr_catalog")
+	pkg := map[string]any{
+		"schema_version": "pathfinder-evidence-package-v1",
+		"package_id":     "scope-frontend-only",
+		"scope":          map[string]any{"domains": []any{"frontend"}},
+		"observations":   []any{},
+	}
+	report, err := evaluate.EvaluatePackageWithMode(pkg, catalogDir, "accepted", "real")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report["aggregate_status"] != "not_applicable_only" {
+		t.Fatalf("status=%v", report["aggregate_status"])
+	}
+	if report["in_scope_count"].(int) != 0 {
+		t.Fatalf("in_scope_count=%v", report["in_scope_count"])
+	}
 }

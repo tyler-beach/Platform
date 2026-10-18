@@ -5,6 +5,7 @@ on:
     paths:
       - "go/pathfinder/**"
       - ".poc/requirement_catalog/**"
+      - "data/adr_catalog/**"
       - ".poc/issue_analyze/fixtures/**"
       - ".github/workflows/pathfinder-go.yml"
       - ".github/workflows/pathfinder-go-analyze.yml"
@@ -14,6 +15,7 @@ on:
     paths:
       - "go/pathfinder/**"
       - ".poc/requirement_catalog/**"
+      - "data/adr_catalog/**"
       - ".github/workflows/pathfinder-go.yml"
 
 permissions:
@@ -50,3 +52,20 @@ jobs:
           test -f /tmp/pathfinder-issue/comment.md
           test -f /tmp/pathfinder-issue/report.json
           ! grep -q "Sessions expire after 12 minutes absolute" /tmp/pathfinder-issue/comment.md
+          grep -q "Catalog:" /tmp/pathfinder-issue/comment.md
+      - name: Real catalog dry-run
+        working-directory: go/pathfinder
+        run: |
+          /tmp/pathfinder-evaluate-package \
+            --catalog-mode=real \
+            --out /tmp/pathfinder-real-report.json \
+            ../../data/adr_catalog/sample_packages/session-and-pdb/package.json
+          python3 - <<'PY'
+          import json
+          r = json.load(open("/tmp/pathfinder-real-report.json"))
+          assert r["catalog"]["mode"] == "real"
+          assert r["catalog"]["catalog_id"] == "platform-real-adr-v0"
+          assert r["catalog_size"] == 3
+          assert r["in_scope_count"] == 3
+          print("real catalog ok", r["aggregate_status"], r["in_scope_count"])
+          PY

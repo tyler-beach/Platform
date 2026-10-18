@@ -1,0 +1,38 @@
+{
+  "predicates": {
+    "kubernetes.pod_disruption_budget.min_available": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "numeric_min"
+      ],
+      "description": "PDBs for tier-1 services MUST keep at least two pods available.",
+      "domains": [
+        "reliability"
+      ],
+      "value_type": "number"
+    },
+    "kubernetes.pod_disruption_budget.present": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required",
+        "resource_present"
+      ],
+      "description": "Disruption-sensitive workloads MUST have a matching PodDisruptionBudget.",
+      "domains": [
+        "reliability"
+      ],
+      "value_type": "boolean"
+    },
+    "session.ttl_seconds": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "numeric_max"
+      ],
+      "description": "Authenticated session lifetime MUST NOT exceed 600 seconds.",
+      "domains": [
+        "identity"
+      ],
+      "value_type": "number"
+    }
+  }
+}

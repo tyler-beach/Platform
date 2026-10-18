@@ -26,6 +26,7 @@ func main() {
 	comment := flag.Bool("comment", false, "post or update issue comment via gh")
 	bodyFile := flag.String("body-file", "", "local issue body instead of gh api")
 	catalogDirFlag := flag.String("catalog-dir", "", "requirement catalog directory")
+	catalogModeFlag := flag.String("catalog-mode", "", "catalog mode: synthetic|real (or PATHFINDER_CATALOG)")
 	flag.Parse()
 
 	if *issueNumber < 0 {
@@ -51,9 +52,19 @@ func main() {
 	}
 
 	repoRoot := findRepoRoot()
+	mode, modeErr := catalog.ResolveMode(*catalogModeFlag)
+	if modeErr != nil {
+		fmt.Fprintln(os.Stderr, modeErr)
+		os.Exit(2)
+	}
 	catalogDir := *catalogDirFlag
 	if catalogDir == "" {
-		catalogDir = catalog.DefaultDir(repoRoot)
+		var resolveErr error
+		catalogDir, resolveErr = catalog.ResolveDir(repoRoot, mode)
+		if resolveErr != nil {
+			fmt.Fprintln(os.Stderr, resolveErr)
+			os.Exit(2)
+		}
 	}
 
 	exitCode := 0
@@ -111,7 +122,7 @@ func main() {
 		}
 	}
 	if err == nil {
-		report, err = evaluate.EvaluatePackage(packageObj, catalogDir, "accepted")
+		report, err = evaluate.EvaluatePackageWithMode(packageObj, catalogDir, "accepted", mode)
 	}
 	if err == nil {
 		if werr := writeJSON(filepath.Join(work, "report.json"), report); werr != nil {

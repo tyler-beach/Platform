@@ -61,7 +61,7 @@ const tracks = {
       { label: 'Open analyze workflow', href: 'https://github.com/tyler-beach/Platform/actions/workflows/pathfinder-issue-analyze.yml' },
       { label: 'Read issue-analyze docs', href: 'https://github.com/tyler-beach/Platform/blob/main/docs/ISSUE_ANALYZE_WORKFLOW.md' },
     ],
-    status: 'Public/synthetic only · forks denied · unextracted predicates stay inconclusive',
+    status: 'Default catalog: synthetic ADR-101–200 · real pack opt-in (data/adr_catalog) · forks denied · unextracted stay inconclusive',
   },
 };
 

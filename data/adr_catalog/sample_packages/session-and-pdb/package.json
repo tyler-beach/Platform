@@ -1,0 +1,15 @@
+{
+  "schema_version": "pathfinder-evidence-package-v1",
+  "package_id": "real-catalog-session-pdb-sample",
+  "scope": {
+    "domains": ["identity", "reliability"]
+  },
+  "tech_spec": {
+    "artifact_id": "tech-spec",
+    "path": "tech-spec.md",
+    "revision": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "text": "Sessions expire after 45 minutes absolute. Production payments Deployment has a PodDisruptionBudget with minAvailable: 2."
+  },
+  "observations": []
+}

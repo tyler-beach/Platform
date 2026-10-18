@@ -15,23 +15,33 @@ import (
 func main() {
 	outPath := flag.String("out", "", "write report JSON to path")
 	catalogDirFlag := flag.String("catalog-dir", "", "requirement catalog directory")
+	catalogModeFlag := flag.String("catalog-mode", "", "catalog mode: synthetic|real (or PATHFINDER_CATALOG)")
 	flag.Parse()
 	if flag.NArg() != 1 {
-		fmt.Fprintln(os.Stderr, "usage: pathfinder-evaluate-package [--out path] [--catalog-dir dir] <package.json>")
+		fmt.Fprintln(os.Stderr, "usage: pathfinder-evaluate-package [--out path] [--catalog-dir dir] [--catalog-mode synthetic|real] <package.json>")
 		os.Exit(2)
 	}
 	pkgPath := flag.Arg(0)
+	mode, err := catalog.ResolveMode(*catalogModeFlag)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
 	catalogDir := *catalogDirFlag
 	if catalogDir == "" {
-		catalogDir = catalog.DefaultDir(findRepoRoot())
+		var resolveErr error
+		catalogDir, resolveErr = catalog.ResolveDir(findRepoRoot(), mode)
+		if resolveErr != nil {
+			fmt.Fprintln(os.Stderr, resolveErr)
+			os.Exit(2)
+		}
 	}
 	pkg, err := pkgcollect.LoadPackage(pkgPath)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
-	// Optional --domains via remaining? keep simple; domains stay in package.
-	report, err := evaluate.EvaluatePackage(pkg, catalogDir, "accepted")
+	report, err := evaluate.EvaluatePackageWithMode(pkg, catalogDir, "accepted", mode)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)

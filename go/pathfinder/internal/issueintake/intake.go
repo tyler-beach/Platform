@@ -400,6 +400,15 @@ func RenderResultComment(report, packageObj map[string]any, runURL string) (stri
 		fmt.Sprintf("- **Report fingerprint:** `%v`", report["report_sha256"]),
 		fmt.Sprintf("- **Workflow run:** %s", runURL),
 	}
+	if v, ok := report["in_scope_count"]; ok {
+		lines = append(lines, fmt.Sprintf("- **In-scope requirements:** %v", v))
+	}
+	if cat, ok := report["catalog"].(map[string]any); ok {
+		lines = append(lines,
+			fmt.Sprintf("- **Catalog:** `%v` (`%v`) v`%v`", cat["catalog_id"], cat["mode"], cat["version"]),
+			fmt.Sprintf("- **Catalog manifest:** `%v`", cat["manifest_sha256"]),
+		)
+	}
 	extraction, _ := report["extraction"].(map[string]any)
 	if extraction == nil {
 		extraction, _ = packageObj["extraction"].(map[string]any)
@@ -472,7 +481,7 @@ func RenderResultComment(report, packageObj map[string]any, runURL string) (stri
 		"",
 		"- Full tech-spec/code bodies are **not** copied into this comment.",
 		"- Download the workflow artifact `pathfinder-issue-evaluation` for the full report JSON.",
-		"- Catalog labels remain `synthetic_unadjudicated`. Missing observations stay `inconclusive`.",
+		"- Catalog label_status values are advisory. Missing observations stay `inconclusive`.",
 		"- This comment does not waive ADRs, mutate production, or create training labels.",
 		"",
 	)
