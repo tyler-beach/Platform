@@ -86,7 +86,7 @@ test('Run Explorer inspects logs, artifact payloads, attempts, and provenance wi
   assert.ok(explorer.includes("['inputs','Inputs']"));
   assert.ok(explorer.includes('does not expose action input values'));
   assert.ok(explorer.includes('readZipEntries'));
-  assert.ok(explorer.includes('source commit'));
+  assert.ok(explorer.includes('Source commit'));
   assert.ok(css.includes('.run-log-file'));
   assert.ok(css.includes('.run-attempt-picker'));
 });
