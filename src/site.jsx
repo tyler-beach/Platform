@@ -42,6 +42,7 @@ function Header() {
     </button>
     <nav className={`global-nav ${open ? 'is-open' : ''}`} aria-label="Main navigation">
       <NavLink to="/architecture" className={({ isActive }) => `global-nav__link ${isActive ? 'is-active' : ''}`}><BookOpen size={16} /> Architecture</NavLink>
+      <NavLink to="/demo" className={({ isActive }) => `global-nav__link ${isActive ? 'is-active' : ''}`}><Workflow size={16} /> Walkthrough</NavLink>
       <a href={pageAsset('pathfinder-flow/')} className="global-nav__link global-nav__link--explore"><Workflow size={16} /> Explore workflow <span className="nav-live-mark" aria-hidden="true" /></a>
       <NavLink to="/evaluation" className={({ isActive }) => `global-nav__link ${isActive ? 'is-active' : ''}`}><ShieldCheck size={16} /> Evaluation</NavLink>
     </nav>
@@ -82,6 +83,20 @@ function Home() {
           <Link className="experience-card experience-card--demo" to="/demo">
             <div className="experience-icon"><Workflow size={21} /></div><span className="experience-index">02 / PATHFINDER WALKTHROUGH</span><h3>Follow the paved path</h3><p>See a decision checked against implementation evidence, explore what is known and missing, and make the review call yourself.</p><span className="experience-card__link">Start an investigation <ArrowRight size={16} /></span>
             <div className="experience-art experience-art--demo" aria-hidden="true"><span /><span /><span /><b /><b /></div>
+          </Link>
+        </div>
+      </section>
+
+      <section className="experience-section experience-section--more" aria-labelledby="more-experience-title">
+        <div className="section-heading"><div><span className="section-kicker">MORE TO EXPLORE</span><h2 id="more-experience-title">Go deeper into the workflow.</h2></div><p>These are separate views for different questions—not replacements for the main walkthrough.</p></div>
+        <div className="experience-grid experience-grid--additional">
+          <a className="experience-card experience-card--flow" href={pageAsset('pathfinder-flow/')}>
+            <div className="experience-icon"><Workflow size={21} /></div><span className="experience-index">03 / SIGNAL-FLOW EXPLORER</span><h3>Trace the evidence paths</h3><p>Step through the animated system map, inspect nodes, and follow how evidence reaches a reviewable outcome.</p><span className="experience-card__link">Open workflow map <ArrowRight size={16} /></span>
+            <div className="experience-art experience-art--demo" aria-hidden="true"><span /><span /><span /><b /><b /></div>
+          </a>
+          <Link className="experience-card experience-card--evaluation" to="/evaluation">
+            <div className="experience-icon"><ShieldCheck size={21} /></div><span className="experience-index">04 / EVALUATION & REPLAY</span><h3>Inspect quality and replay</h3><p>Explore evaluation views for test coverage, evidence quality, and repeatable example runs.</p><span className="experience-card__link">Open evaluation <ArrowRight size={16} /></span>
+            <div className="experience-art experience-art--docs" aria-hidden="true"><span /><span /><span /><i /><i /></div>
           </Link>
         </div>
       </section>

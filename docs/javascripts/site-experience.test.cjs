@@ -7,6 +7,7 @@ const root = path.resolve(__dirname, '../..');
 const app = fs.readFileSync(path.join(root, 'src/site.jsx'), 'utf8');
 const demo = fs.readFileSync(path.join(root, 'src/components/DemoExplorer.jsx'), 'utf8');
 const css = fs.readFileSync(path.join(root, 'src/styles.css'), 'utf8');
+const flow = fs.readFileSync(path.join(root, 'public/pathfinder-flow/index.html'), 'utf8');
 const build = fs.readFileSync(path.join(root, 'vite.config.js'), 'utf8');
 const packageJson = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 
@@ -44,4 +45,21 @@ test('Demo integration loads the existing audited explorer after mount and tears
   assert.match(demo, /ADRDemoLifecycle\?\.destroy\(\)/);
   assert.match(demo, /demo-open-analysis/);
   assert.match(demo, /demo-open-functional/);
+});
+
+test('all workflow experiences remain discoverable from the home page', () => {
+  assert.match(app, /to="\/demo"/);
+  assert.match(app, /to="\/evaluation"/);
+  assert.match(app, /pathfinder-flow\//);
+  assert.match(app, /MORE TO EXPLORE/);
+  assert.match(app, /SIGNAL-FLOW EXPLORER/);
+  assert.match(app, /EVALUATION & REPLAY/);
+});
+
+test('animated workflow uses one motion system and aligned evidence bus/stages', () => {
+  assert.match(flow, /EVIDENCE BUS/);
+  assert.match(flow, /M427 143 V522/);
+  assert.match(flow, /<div class="stage"><i>06<\/i> Disposition<\/div>/);
+  assert.doesNotMatch(flow, /offset-path:path\(/);
+  assert.match(flow, /<animateMotion/);
 });
