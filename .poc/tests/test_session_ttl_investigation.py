@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -168,8 +170,9 @@ class SessionTTLInvestigationTests(unittest.TestCase):
         case = fixture(-1)
         result = investigate.investigate(case)
         self.assertEqual(result["outcome"], "inconclusive")
-        self.assertEqual(result["relationship"], "insufficient_evidence")
-        self.assertEqual(result["evidence_ids"], [])
+        self.assertEqual(result["relationship"], "invalid_observation")
+        self.assertEqual(result["evidence_ids"], ["EV-TTL-1"])
+        self.assertEqual(result["rejected_observations"], [{"evidence_id": "EV-TTL-1", "reason_code": "negative_value"}])
 
     def test_float_ttl_observation_is_inconclusive_not_compliant(self):
         case = fixture(720)
@@ -179,13 +182,24 @@ class SessionTTLInvestigationTests(unittest.TestCase):
         case["evidence"][0]["value"] = 12.5
         result = investigate.investigate(case)
         self.assertEqual(result["outcome"], "inconclusive")
-        self.assertEqual(result["relationship"], "insufficient_evidence")
-        self.assertEqual(result["evidence_ids"], [])
+        self.assertEqual(result["relationship"], "invalid_observation")
+        self.assertEqual(result["evidence_ids"], ["EV-TTL-1"])
+        self.assertEqual(result["rejected_observations"], [{"evidence_id": "EV-TTL-1", "reason_code": "unexpected_numeric_type"}])
 
     def test_mutated_pinned_artifact_hash_is_rejected(self):
         case = fixture(720)
         case["source"]["content"] += " "
         with self.assertRaisesRegex(ValueError, "content hash"):
+            investigate.investigate(case)
+
+    def test_non_object_case_is_rejected_with_contract_error(self):
+        with self.assertRaisesRegex(ValueError, "case must be a JSON object"):
+            investigate.investigate([])
+
+    def test_malformed_evidence_locator_is_rejected_without_attribute_error(self):
+        case = fixture(720)
+        case["evidence"][0]["locator"] = {"kind": []}
+        with self.assertRaisesRegex(ValueError, "requires a typed locator"):
             investigate.investigate(case)
 
     def test_replay_is_deterministic_for_identical_pinned_inputs(self):
@@ -199,6 +213,87 @@ class SessionTTLInvestigationTests(unittest.TestCase):
         first = investigate.investigate(fixture(720))
         second = investigate.investigate(fixture(721))
         self.assertNotEqual(first["result_sha256"], second["result_sha256"])
+
+
+    def test_result_contract_rejects_unknown_outcome(self):
+        result = investigate.investigate(fixture(720))
+        result["outcome"] = "probably_compliant"
+        with self.assertRaisesRegex(ValueError, "invalid result outcome"):
+            investigate.validate_result(result)
+
+    def test_result_contract_rejects_non_applicable_compliance_claim(self):
+        result = investigate.investigate(fixture(720))
+        result["applicability"]["applicable"] = False
+        with self.assertRaisesRegex(ValueError, "non-applicable result"):
+            investigate.validate_result(result)
+
+    def test_cli_success_and_repeat_verification(self):
+        fixture_path = ROOT / ".poc" / "session_ttl" / "fixtures" / "over-limit.json"
+        result = subprocess.run(
+            [sys.executable, str(ROOT / ".poc" / "session_ttl" / "investigate.py"),
+             str(fixture_path), "--verify-repeat"],
+            capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        parsed = json.loads(result.stdout)
+        self.assertEqual(parsed["outcome"], "supported_deviation")
+        self.assertEqual(parsed["result_sha256"], investigate.investigate(investigate.load_case(fixture_path))["result_sha256"])
+
+    def test_cli_malformed_json_returns_actionable_error_without_traceback(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            case_path = Path(tmp) / "bad.json"
+            case_path.write_text('{"adr": ', encoding="utf-8")
+            result = subprocess.run(
+                [sys.executable, str(ROOT / ".poc" / "session_ttl" / "investigate.py"), str(case_path)],
+                capture_output=True, text=True, check=False,
+            )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("error:", result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
+
+    def test_cli_invalid_case_shape_returns_actionable_error_without_traceback(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            case_path = Path(tmp) / "array.json"
+            case_path.write_text("[]", encoding="utf-8")
+            result = subprocess.run(
+                [sys.executable, str(ROOT / ".poc" / "session_ttl" / "investigate.py"), str(case_path)],
+                capture_output=True, text=True, check=False,
+            )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("case must be a JSON object", result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
+
+    def test_duplicate_json_keys_are_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            case_path = Path(tmp) / "duplicate.json"
+            case_path.write_text('{"case_id":"a","case_id":"b"}', encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "duplicate JSON object key"):
+                investigate.load_case(case_path)
+
+
+    def test_invalid_observation_prevents_confident_decision_with_valid_value(self):
+        case = fixture(720)
+        source_content = json.dumps({"observations": [
+            {"predicate": "session.ttl_seconds", "value": 720},
+            {"predicate": "session.ttl_seconds", "value": -1},
+        ]}, separators=(",", ":"))
+        case["source"] = artifact("service-config", "git:def456", "config/session.json", source_content)
+        case["evidence"].append({
+            "evidence_id": "EV-TTL-2",
+            "artifact_id": case["source"]["artifact_id"],
+            "revision": case["source"]["revision"],
+            "locator": {"kind": "json_pointer", "value": "/observations/1/value"},
+            "predicate": "session.ttl_seconds",
+            "value": -1,
+        })
+        result = investigate.investigate(case)
+        self.assertEqual(result["outcome"], "inconclusive")
+        self.assertEqual(result["relationship"], "invalid_observation")
+        self.assertEqual(result["considered_evidence_ids"], ["EV-TTL-1", "EV-TTL-2"])
+        self.assertEqual(result["accepted_evidence_ids"], ["EV-TTL-1"])
+        self.assertEqual(result["rejected_observations"], [
+            {"evidence_id": "EV-TTL-2", "reason_code": "negative_value"}
+        ])
 
 
 if __name__ == "__main__":
