@@ -84,7 +84,7 @@ test('Run Explorer inspects logs, artifact payloads, attempts, and provenance wi
   assert.ok(explorer.includes('/attempts/${selectedAttempt}/jobs'));
   assert.ok(explorer.includes("['evidence','Evidence']"));
   assert.ok(explorer.includes("['inputs','Inputs']"));
-  assert.ok(explorer.includes('does not expose action input values'));
+  assert.ok(explorer.includes('does not expose resolved shell variables or action inputs'));
   assert.ok(explorer.includes('readZipEntries'));
   assert.ok(explorer.includes('Source commit'));
   assert.ok(css.includes('.run-log-file'));
