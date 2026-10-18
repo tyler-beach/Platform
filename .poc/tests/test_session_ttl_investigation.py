@@ -103,6 +103,12 @@ class SessionTTLInvestigationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "stale artifact revision"):
             investigate.investigate(case)
 
+    def test_evidence_value_must_match_pinned_json_pointer(self):
+        case = fixture(720)
+        case["evidence"][0]["value"] = 721
+        with self.assertRaisesRegex(ValueError, "does not match pinned source locator"):
+            investigate.investigate(case)
+
     def test_mutated_pinned_artifact_hash_is_rejected(self):
         case = fixture(720)
         case["source"]["content"] += " "
