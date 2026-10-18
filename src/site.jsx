@@ -7,7 +7,7 @@ import rehypeSanitize from 'rehype-sanitize';
 import rehypeSlug from 'rehype-slug';
 import DOMPurify from 'dompurify';
 import {
-  ArrowDownRight, ArrowLeft, ArrowRight, ArrowUpRight, BookOpen, Boxes, Braces,
+  Activity, ArrowDownRight, ArrowLeft, ArrowRight, ArrowUpRight, BookOpen, Boxes, Braces,
   Check, ChevronDown, ChevronRight, CircleDot, Command, FileCode2, GitBranch,
   Github, Layers3, Menu, Search, ShieldCheck, Sparkles, Workflow, X,
 } from 'lucide-react';
@@ -18,6 +18,7 @@ import {
 } from './content.js';
 import DemoExplorer from './components/DemoExplorer.jsx';
 import EvaluationDashboard from './components/EvaluationDashboard.jsx';
+import RunExplorer from './components/RunExplorer.jsx';
 
 const BRAND = 'Pathfinder';
 const repository = document.querySelector('meta[name="adr-repository"]')?.content || 'tyler-beach/Platform';
@@ -42,6 +43,8 @@ function Header() {
     </button>
     <nav className={`global-nav ${open ? 'is-open' : ''}`} aria-label="Main navigation">
       <NavLink to="/architecture" className={({ isActive }) => `global-nav__link ${isActive ? 'is-active' : ''}`}><BookOpen size={16} /> Architecture</NavLink>
+      <NavLink to="/demo" className={({ isActive }) => `global-nav__link ${isActive ? 'is-active' : ''}`}><Workflow size={16} /> Walkthrough</NavLink>
+      <NavLink to="/explore" className={({ isActive }) => `global-nav__link ${isActive ? 'is-active' : ''}`}><Activity size={16} /> Run Explorer</NavLink>
       <a href={pageAsset('pathfinder-flow/')} className="global-nav__link global-nav__link--explore"><Workflow size={16} /> Explore workflow <span className="nav-live-mark" aria-hidden="true" /></a>
       <NavLink to="/evaluation" className={({ isActive }) => `global-nav__link ${isActive ? 'is-active' : ''}`}><ShieldCheck size={16} /> Evaluation</NavLink>
     </nav>
@@ -82,6 +85,24 @@ function Home() {
           <Link className="experience-card experience-card--demo" to="/demo">
             <div className="experience-icon"><Workflow size={21} /></div><span className="experience-index">02 / PATHFINDER WALKTHROUGH</span><h3>Follow the paved path</h3><p>See a decision checked against implementation evidence, explore what is known and missing, and make the review call yourself.</p><span className="experience-card__link">Start an investigation <ArrowRight size={16} /></span>
             <div className="experience-art experience-art--demo" aria-hidden="true"><span /><span /><span /><b /><b /></div>
+          </Link>
+        </div>
+      </section>
+
+      <section className="experience-section experience-section--more" aria-labelledby="more-experience-title">
+        <div className="section-heading"><div><span className="section-kicker">MORE TO EXPLORE</span><h2 id="more-experience-title">Go deeper into the workflow.</h2></div><p>These are separate views for different questions—not replacements for the main walkthrough.</p></div>
+        <div className="experience-grid experience-grid--additional">
+          <a className="experience-card experience-card--flow" href={pageAsset('pathfinder-flow/')}>
+            <div className="experience-icon"><Workflow size={21} /></div><span className="experience-index">03 / SIGNAL-FLOW EXPLORER</span><h3>Trace the evidence paths</h3><p>Step through the animated system map, inspect nodes, and follow how evidence reaches a reviewable outcome.</p><span className="experience-card__link">Open workflow map <ArrowRight size={16} /></span>
+            <div className="experience-art experience-art--demo" aria-hidden="true"><span /><span /><span /><b /><b /></div>
+          </a>
+          <Link className="experience-card experience-card--run-explorer" to="/explore">
+            <div className="experience-icon"><Activity size={21} /></div><span className="experience-index">05 / RUN EXPLORER</span><h3>Inspect a real execution</h3><p>Select a GitHub Actions run, trace each job and step, and inspect actual status, timing, logs, and attached artifacts.</p><span className="experience-card__link">Explore run history <ArrowRight size={16} /></span>
+            <div className="experience-art experience-art--demo" aria-hidden="true"><span /><span /><span /><b /><b /></div>
+          </Link>
+          <Link className="experience-card experience-card--evaluation" to="/evaluation">
+            <div className="experience-icon"><ShieldCheck size={21} /></div><span className="experience-index">04 / EVALUATION & REPLAY</span><h3>Inspect quality and replay</h3><p>Explore evaluation views for test coverage, evidence quality, and repeatable example runs.</p><span className="experience-card__link">Open evaluation <ArrowRight size={16} /></span>
+            <div className="experience-art experience-art--docs" aria-hidden="true"><span /><span /><span /><i /><i /></div>
           </Link>
         </div>
       </section>
@@ -264,6 +285,10 @@ function categoryForPath(path) {
   return 'ENGINEERING REFERENCE';
 }
 
+function RunExplorerRoute() {
+  return <Shell wide><RunExplorer /></Shell>;
+}
+
 export default function App() {
-  return <Routes><Route path="/" element={<Home />} /><Route path="/architecture/*" element={<Shell wide><ArchitectureRouter /></Shell>} /><Route path="/demo/*" element={<DemoRoute />} /><Route path="/evaluation/*" element={<EvaluationRoute />} /><Route path="/not-found" element={<NotFound />} /><Route path="*" element={<LegacyRoute />} /></Routes>;
+  return <Routes><Route path="/" element={<Home />} /><Route path="/architecture/*" element={<Shell wide><ArchitectureRouter /></Shell>} /><Route path="/demo/*" element={<DemoRoute />} /><Route path="/explore/*" element={<RunExplorerRoute />} /><Route path="/evaluation/*" element={<EvaluationRoute />} /><Route path="/not-found" element={<NotFound />} /><Route path="*" element={<LegacyRoute />} /></Routes>;
 }

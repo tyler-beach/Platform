@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / ".poc"))
 
 from evaluation import evaluate
+import model
 
 
 class LabeledEvaluationTests(unittest.TestCase):
@@ -67,6 +68,46 @@ class LabeledEvaluationTests(unittest.TestCase):
         self.assertEqual(sweep[80]["fn"], 1)
         self.assertEqual(metrics["ambiguous_case_escalation_rate"], 1.0)
         self.assertIn("not probabilities", metrics["interpretation"])
+
+    def test_mock_does_not_confuse_local_validator_with_remote_provider(self):
+        case = next(c for c in evaluate.load_cases() if c["case_id"] == "N-03")
+        context, _ = evaluate.build_case_context(case)
+        self.assertEqual(model.mock_assess(context)["outcome"], "no_deviation_found")
+
+    def test_mock_recognizes_explicit_queue_boundary_before_worker_provider(self):
+        for case_id in ("N-01", "N-05"):
+            with self.subTest(case_id=case_id):
+                case = next(c for c in evaluate.load_cases() if c["case_id"] == case_id)
+                context, _ = evaluate.build_case_context(case)
+                self.assertEqual(model.mock_assess(context)["outcome"], "no_deviation_found")
+
+    def test_mock_escalates_conditional_or_approximate_provider_edges(self):
+        for case_id in ("A-02", "A-05", "A-06"):
+            with self.subTest(case_id=case_id):
+                case = next(c for c in evaluate.load_cases() if c["case_id"] == case_id)
+                context, _ = evaluate.build_case_context(case)
+                self.assertEqual(model.mock_assess(context)["outcome"], "potential_deviation")
+
+    def test_mock_recognizes_explicit_inline_helper_evidence(self):
+        for case_id in ("D-03", "D-05"):
+            with self.subTest(case_id=case_id):
+                case = next(c for c in evaluate.load_cases() if c["case_id"] == case_id)
+                context, _ = evaluate.build_case_context(case)
+                self.assertEqual(model.mock_assess(context)["outcome"], "supported_deviation")
+
+    def test_mock_does_not_treat_prohibition_as_permission_for_sync(self):
+        case = next(c for c in evaluate.load_cases() if c["case_id"] == "A-08")
+        context, _ = evaluate.build_case_context(case)
+        self.assertEqual(model.mock_assess(context)["outcome"], "potential_deviation")
+
+    def test_inline_helper_deviation_has_contradictory_evidence_link(self):
+        for case_id in ("D-03", "D-05"):
+            with self.subTest(case_id=case_id):
+                case = next(c for c in evaluate.load_cases() if c["case_id"] == case_id)
+                context, _ = evaluate.build_case_context(case)
+                assessment = model.mock_assess(context)
+                self.assertEqual(assessment["outcome"], "supported_deviation")
+                self.assertEqual(assessment["evidence_links"][0]["relationship"], "contradicts")
 
 
 if __name__ == "__main__":
