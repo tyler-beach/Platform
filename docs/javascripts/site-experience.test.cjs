@@ -64,13 +64,14 @@ test('animated workflow uses one motion system and aligned evidence bus/stages',
   assert.match(flow, /<animateMotion/);
 });
 
-\ntest('Run Explorer is a separate route backed by live Actions metadata', () => {
-  assert.match(app, /path="\\/explore\\/\*"/);
-  assert.match(app, /Run Explorer/);
+
+test('Run Explorer is a separate route backed by live Actions metadata', () => {
+  assert.ok(app.includes('path="/explore/*"'));
+  assert.ok(app.includes('Run Explorer'));
   const explorer = fs.readFileSync(path.join(root, 'src/components/RunExplorer.jsx'), 'utf8');
-  assert.match(explorer, /actions\\/runs\\?per_page=50/);
-  assert.match(explorer, /actions\\/runs\\/\$\\{selectedRun\.id\}\\/jobs/);
-  assert.match(explorer, /STEP INSPECTOR/);
-  assert.match(explorer, /Evidence boundary/);
-  assert.match(css, /\.run-workspace/);
+  assert.ok(explorer.includes('/actions/runs?per_page=50'));
+  assert.ok(explorer.includes('/actions/runs/${selectedRun.id}/jobs'));
+  assert.ok(explorer.includes('STEP INSPECTOR'));
+  assert.ok(explorer.includes('Evidence boundary'));
+  assert.ok(css.includes('.run-workspace'));
 });
