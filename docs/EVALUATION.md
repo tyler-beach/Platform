@@ -31,7 +31,7 @@ The executable baseline lives in `.poc/evaluation/cases.jsonl` and runs with:
 
     python .poc/evaluation/evaluate.py --provider mock --output-dir /tmp/adr-evaluation
 
-The suite has 14 synthetic scenarios split across three expected dispositions: clear deviations, clear non-deviations, and ambiguous cases that should remain open to review. It deliberately tests boundaries that naive call-name heuristics can get wrong: helper methods that block on providers, a queue followed by a worker call, local validators named `Assess`, explicitly permitted synchronous calls, unresolved dynamic dispatch, conditional fallbacks, and approximate CHA edges.
+The suite has 20 synthetic scenarios split across three expected dispositions: clear deviations, clear non-deviations, and ambiguous cases that should remain open to review. It deliberately tests boundaries that naive call-name heuristics can get wrong: helper methods that block on providers, a queue followed by a worker call, local validators named `Assess`, explicitly permitted synchronous calls, unresolved dynamic dispatch, conditional fallbacks, and approximate CHA edges.
 
 The runner executes the current assessment adapter, applies the versioned evidence score and outcome guardrails, and writes both `evaluation.md` and `evaluation.json`. It reports three-way accuracy and confusion matrix, binary precision/recall/F1 on clear cases, escalation on ambiguous cases, and a score-threshold sweep that gates which model-proposed findings are sent forward as actionable. The sweep does not use score alone to predict whether a violation exists.
 
