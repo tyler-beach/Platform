@@ -6,9 +6,9 @@ sys.path.insert(0,str(ROOT/".poc"/"evaluation"/"requirements"))
 import evaluate_requirements as ev
 
 class RequirementCorpusTests(unittest.TestCase):
-    def test_six_requirement_types_have_twenty_cases_each(self):
+    def test_eight_requirement_types_have_twenty_cases_each(self):
         cases=ev.load_cases()
-        self.assertEqual(len(cases),120)
+        self.assertEqual(len(cases),160)
         from collections import Counter
         counts=Counter(c["requirement_type"] for c in cases)
         self.assertEqual(set(counts.values()),{20})
@@ -55,6 +55,20 @@ class RequirementCorpusTests(unittest.TestCase):
         self.assertEqual(ev.classify(case),"no_deviation")
         case["facts"]["exception_valid"]=False
         self.assertEqual(ev.classify(case),"deviation")
+    def test_encryption_and_least_privilege_domains(self):
+        cases={c["case_id"]:c for c in ev.load_cases()}
+        self.assertEqual(ev.classify(cases["ENCRYPTION-AT-REST-01"]),"deviation")
+        self.assertEqual(ev.classify(cases["ENCRYPTION-AT-REST-07"]),"no_deviation")
+        self.assertEqual(ev.classify(cases["ENCRYPTION-AT-REST-19"]),"ambiguous")
+        self.assertEqual(ev.classify(cases["LEAST-PRIVILEGE-AUTHORIZATION-01"]),"deviation")
+        self.assertEqual(ev.classify(cases["LEAST-PRIVILEGE-AUTHORIZATION-07"]),"no_deviation")
+        self.assertEqual(ev.classify(cases["LEAST-PRIVILEGE-AUTHORIZATION-20"]),"ambiguous")
+
+    def test_staging_evidence_cannot_prove_production_state(self):
+        for cid in ("ENCRYPTION-AT-REST-20","LEAST-PRIVILEGE-AUTHORIZATION-20"):
+            case=next(c for c in ev.load_cases() if c["case_id"]==cid)
+            self.assertEqual(ev.classify(case),"ambiguous")
+
     def test_fingerprint_is_stable(self):
         self.assertEqual(ev.fingerprint(),ev.fingerprint())
         self.assertEqual(len(ev.fingerprint()),64)

@@ -45,6 +45,7 @@ def fingerprint():
 
 def classify(case):
     f=case["facts"]; t=case["requirement_type"]
+    if f.get("environment") not in (None, "production"): return "ambiguous"
     if t != "runtime_evidence" and known_bool(f,"evidence_complete") is not True: return "ambiguous"
     if t=="session_ttl":
         if known_bool(f,"active_config") is not True: return "ambiguous"
@@ -95,6 +96,20 @@ def classify(case):
         contradictory=known_bool(f,"contradicts_requirement")
         if contradictory is None: return "ambiguous"
         return "deviation" if contradictory else "no_deviation"
+    if t=="encryption_at_rest":
+        active=known_bool(f,"active_resource")
+        if active is False: return "no_deviation"
+        if active is not True: return "ambiguous"
+        enabled=known_bool(f,"encryption_enabled")
+        if enabled is None: return "ambiguous"
+        return "no_deviation" if enabled else "deviation"
+    if t=="least_privilege_authorization":
+        active=known_bool(f,"active_policy")
+        if active is False: return "no_deviation"
+        if active is not True: return "ambiguous"
+        least=known_bool(f,"least_privilege_verified")
+        if least is None: return "ambiguous"
+        return "no_deviation" if least else "deviation"
     raise ValueError(f"unknown requirement_type: {t}")
 
 def metrics(rows):

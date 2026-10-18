@@ -2,7 +2,7 @@
 
 ## Scope
 
-This suite adds **120 synthetic scenario cases**: 20 each for session TTL, pod disruption budgets, sensitive data in logs, asynchronous provider processing, approved exceptions, and runtime-evidence sufficiency. Each type has 16 development cases and 4 locked holdout cases. The locked split is not used to select rules during a tuning pass.
+This suite adds **160 synthetic scenario cases**: 20 each for session TTL, pod disruption budgets, sensitive data in logs, asynchronous provider processing, approved exceptions, runtime-evidence sufficiency, encryption at rest, and least-privilege authorization. Each type has 16 development cases and 4 locked holdout cases. The locked split is not used to select rules during a tuning pass.
 
 ## Run
 
@@ -18,6 +18,9 @@ The report is written to `.poc/evaluation/requirements/latest-report.json`, incl
 Labels are **provisional synthetic scenario-specification labels**. The facts are deliberately structured so the initial evaluator can be checked against explicit scenarios and evidence states. They are not independent human adjudications, real production observations, or estimates of production accuracy. Every case is marked `independent_adjudication_status: pending`; no independent-review result is invented. Use the included labels as regression oracles for the current deterministic rules, not as proof the rules generalize.
 
 A blank review worksheet is provided at `.poc/evaluation/requirements/adjudication-template.csv` with one row per case. Before describing this as an independently adjudicated benchmark, have a reviewer who did not author the rules examine the requirement, evidence, rationale, applicability, and expected disposition; record reviewer identity/role, adjudicated label, evidence rationale, and disagreement resolution. Do not copy the provisional label into the adjudicated-label field without independent review. Keep locked cases inaccessible during rule tuning and refresh them after changes are accepted.
+
+- Encryption at rest compares the effective active resource setting; missing or non-production observations remain ambiguous. This simplified fixture does not establish key strength or key-policy correctness.
+- Least-privilege authorization relies on a pinned assessment of effective permissions; missing active-policy evidence remains ambiguous. The fixture does not parse IAM or Kubernetes policy semantics itself.
 
 ## Conservative disposition rules
 
