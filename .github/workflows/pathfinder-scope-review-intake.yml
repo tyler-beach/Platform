@@ -1,0 +1,91 @@
+name: Pathfinder Scope Review Intake
+
+on:
+  workflow_dispatch:
+    inputs:
+      create_issues:
+        description: "Create GitHub Issues for the selected review sample"
+        required: true
+        type: boolean
+        default: false
+      seed:
+        description: "Stable sampling seed (reuse to reproduce the same selection)"
+        required: true
+        type: string
+        default: pilot-2026-01
+      per_stratum:
+        description: "Probability sample count per outcome × evidence-band stratum"
+        required: true
+        type: number
+        default: 1
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: pathfinder-scope-review-intake-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  scope-and-sample:
+    name: Analyze synthetic scenarios and select review units
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+      - name: Validate sample size
+        env:
+          PER_STRATUM: ${{ inputs.per_stratum }}
+        run: |
+          python - <<'PY'
+          import os
+          value = int(os.environ["PER_STRATUM"])
+          if not 1 <= value <= 100:
+              raise SystemExit("per_stratum must be between 1 and 100")
+          PY
+      - name: Run offline ADR scope comparison
+        run: python .poc/scope/run_scope.py --output-dir "$RUNNER_TEMP/pathfinder-scope"
+      - name: Select review units and render issue payloads
+        env:
+          REVIEW_SEED: ${{ inputs.seed }}
+          PER_STRATUM: ${{ inputs.per_stratum }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          python .poc/review_sampling/github_issue_intake.py \
+            --report "$RUNNER_TEMP/pathfinder-scope/scope-report.json" \
+            --batch "$RUNNER_TEMP/pathfinder-scope/review-batch.json" \
+            --seed "$REVIEW_SEED" --per-stratum "$PER_STRATUM" \
+            --run-url "$RUN_URL" --render-only \
+            --payload-output "$RUNNER_TEMP/pathfinder-scope/review-issue-payloads.json"
+      - name: Create selected review issues (opt-in)
+        if: ${{ inputs.create_issues == true }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          REVIEW_SEED: ${{ inputs.seed }}
+          PER_STRATUM: ${{ inputs.per_stratum }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          python .poc/review_sampling/github_issue_intake.py \
+            --report "$RUNNER_TEMP/pathfinder-scope/scope-report.json" \
+            --batch "$RUNNER_TEMP/pathfinder-scope/review-batch.json" \
+            --seed "$REVIEW_SEED" --per-stratum "$PER_STRATUM" \
+            --run-url "$RUN_URL"
+      - name: Publish scope report and review manifest
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: pathfinder-scope-review-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/pathfinder-scope/scope-report.json
+            ${{ runner.temp }}/pathfinder-scope/scope-report.md
+            ${{ runner.temp }}/pathfinder-scope/review-batch.json
+            ${{ runner.temp }}/pathfinder-scope/review-issue-payloads.json
+          if-no-files-found: warn
+          retention-days: 14
