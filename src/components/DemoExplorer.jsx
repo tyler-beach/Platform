@@ -91,6 +91,7 @@ export default function DemoExplorer() {
           <form id="demo-paste-prepare" className="demo-paste-prepare" onSubmit={(event) => event.preventDefault()}>
             <label className="demo-paste-prepare__check"><input id="demo-paste-attest" type="checkbox" /> I attest this paste is synthetic or explicitly public (no secrets / confidential source).</label>
             <label className="demo-paste-prepare__field"><span>Domains (optional)</span><input id="demo-paste-domains" type="text" placeholder="identity, security, reliability" autoComplete="off" /></label>
+            <label className="demo-paste-prepare__field"><span>Same-repo pull request (optional)</span><input id="demo-paste-pr" type="text" placeholder="https://github.com/OWNER/REPO/pull/123" autoComplete="off" /></label>
             <label className="demo-paste-prepare__field"><span>Tech spec (markdown)</span><textarea id="demo-paste-tech" rows={5} placeholder="Sessions expire after 12 minutes…" spellCheck="false" /></label>
             <label className="demo-paste-prepare__field"><span>Sample code (Go / Python / YAML)</span><textarea id="demo-paste-code" rows={5} placeholder="package main…" spellCheck="false" /></label>
             <p id="demo-paste-prepare-status" className="demo-muted" role="status" />

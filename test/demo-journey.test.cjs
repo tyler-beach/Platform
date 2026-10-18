@@ -25,7 +25,7 @@ test("guided ADR journey explains the investigation in five plain-language steps
   for (const id of [
     "demo-open-analysis", "demo-open-evaluation", "demo-open-functional",
     "demo-open-paste-analyze", "demo-open-paste-issue", "demo-paste-eval",
-    "demo-paste-prepare", "demo-paste-copy-body", "demo-paste-open-github", "demo-paste-load-fixture",
+    "demo-paste-prepare", "demo-paste-pr", "demo-paste-copy-body", "demo-paste-open-github", "demo-paste-load-fixture",
   ]) {
     assert.ok(component.includes(`id="${id}"`), "missing technical workflow link: " + id);
   }

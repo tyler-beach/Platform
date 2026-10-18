@@ -23,15 +23,22 @@ test("offers Pathfinder issue package evaluation workflow for paste catalog runs
 test("builds and validates Pathfinder analyze issue bodies for GitHub submission", () => {
   const error = core.validatePastePrepare({ techSpec: "", code: "", attested: false });
   assert.match(error, /attestation/i);
+  const missing = core.validatePastePrepare({ techSpec: "", code: "", pullRequest: "", attested: true });
+  assert.match(missing, /tech spec|sample code|pull request/i);
+  const prOnly = core.validatePastePrepare({ techSpec: "", code: "", pullRequest: "#57", attested: true });
+  assert.equal(prOnly, "");
   const body = core.buildPasteIssueBody({
     techSpec: "Sessions expire after 12 minutes.",
     code: "package main",
     domains: "identity",
+    pullRequest: "https://github.com/tyler-beach/Platform/pull/57",
     attested: true,
   });
   assert.match(body, /\[X\]/);
   assert.match(body, /### Tech spec \(markdown\)/);
+  assert.match(body, /### Same-repo pull request \(optional\)/);
   assert.match(body, /Sessions expire after 12 minutes/);
+  assert.match(body, /pull\/57/);
   const shortPlan = core.githubPasteIssuePlan("tyler-beach/Platform", {
     title: "[Pathfinder analyze] demo",
     body: "short",
