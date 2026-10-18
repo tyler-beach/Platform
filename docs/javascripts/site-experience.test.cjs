@@ -94,4 +94,19 @@ test('Run Explorer inspects logs, artifact payloads, attempts, and provenance wi
   assert.ok(explorer.includes('Faster in selected run'));
   assert.ok(explorer.includes('File contents match'));
   assert.ok(css.includes('.run-comparison__table'));
+  assert.ok(explorer.includes('Recorded workflow inputs'));
+  assert.ok(explorer.includes('Pinned source artifacts'));
+  assert.ok(explorer.includes('sha256'));
+});
+
+
+test('PoC workflow emits a versioned execution manifest with allowlisted inputs and hashed outputs', () => {
+  const workflow = fs.readFileSync(path.join(root, '.github/workflows/poc-analysis.yml'), 'utf8');
+  const manifest = fs.readFileSync(path.join(root, '.poc/run_manifest.py'), 'utf8');
+  assert.ok(workflow.includes('Write Pathfinder execution manifest'));
+  assert.ok(workflow.includes('.poc/run_manifest.py'));
+  assert.ok(manifest.includes('pathfinder.execution-manifest/v1'));
+  assert.ok(manifest.includes('INPUT_MODEL_PROVIDER'));
+  assert.ok(manifest.includes('sha256'));
+  assert.ok(manifest.includes('Secret values'));
 });

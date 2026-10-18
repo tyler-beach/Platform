@@ -1279,3 +1279,22 @@ button.run-graph-node:hover { border-color:#64cdbd; background:#143043; }
 .run-file-digest { display:block; padding:8px 12px; color:#78aeb1; background:#091a25; font:9px/1.5 var(--mono); overflow-wrap:anywhere; }
 .run-artifact-compare-actions { display:flex; flex-wrap:wrap; gap:6px; margin-top:3px; }
 .run-artifact-compare-actions .run-artifact-inspect { padding:6px 7px; font-size:9px; }
+
+.run-inputs-source { display:grid; gap:5px; margin-top:14px; padding:12px; border:1px solid #284354; border-radius:8px; background:#091a25; }
+.run-inputs-source > span { color:#7c98ab; font:700 9px var(--mono); letter-spacing:.08em; text-transform:uppercase; }
+.run-inputs-source strong { color:#dbe9f1; font-size:10px; overflow-wrap:anywhere; }
+.run-inputs-source small { color:#7e9bae; font:9px var(--mono); }
+.run-inputs-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-top:12px; }
+.run-inputs-grid > div { display:grid; align-content:start; gap:6px; padding:11px; border:1px solid #21394a; border-radius:7px; background:#091924; min-width:0; }
+.run-inputs-grid > div > span { color:#7894a8; font:700 9px var(--mono); text-transform:uppercase; }
+.run-inputs-grid > div > strong { color:#d4e4ed; font:10px/1.55 var(--mono); overflow-wrap:anywhere; white-space:pre-wrap; }
+.run-inputs-subheading { margin:16px 0 8px; color:#dce9f2; font:700 11px var(--display); }
+.run-input-artifacts { display:grid; gap:8px; }
+.run-input-artifacts > div { display:grid; gap:5px; padding:10px; border:1px solid #213a4a; border-radius:7px; background:#091924; }
+.run-input-artifacts strong { color:#d7e8f0; font-size:10px; }
+.run-input-artifacts small { color:#89a2b4; font:9px/1.5 var(--mono); overflow-wrap:anywhere; }
+.run-input-artifacts code { color:#79cbbc; font:9px/1.5 var(--mono); overflow-wrap:anywhere; }
+.run-manifest-raw { margin-top:12px; border:1px solid #243d4e; border-radius:8px; overflow:hidden; }
+.run-manifest-raw summary { padding:10px; color:#9ecfc9; font-size:10px; cursor:pointer; background:#0a1a26; }
+.run-input-inspect { width:100%; text-align:left; cursor:pointer; }
+@media(max-width:620px) { .run-inputs-grid { grid-template-columns:minmax(0,1fr); } }
