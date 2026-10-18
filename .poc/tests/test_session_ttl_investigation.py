@@ -224,7 +224,7 @@ class SessionTTLInvestigationTests(unittest.TestCase):
     def test_result_contract_rejects_non_applicable_compliance_claim(self):
         result = investigate.investigate(fixture(720))
         result["applicability"]["applicable"] = False
-        with self.assertRaisesRegex(ValueError, "non-applicable result"):
+        with self.assertRaisesRegex(ValueError, "applicability fields are inconsistent"):
             investigate.validate_result(result)
 
     def test_cli_success_and_repeat_verification(self):
@@ -295,6 +295,78 @@ class SessionTTLInvestigationTests(unittest.TestCase):
             {"evidence_id": "EV-TTL-2", "reason_code": "negative_value"}
         ])
 
+
+    def test_result_contract_rejects_unhashable_outcome(self):
+        result = investigate.investigate(fixture(720))
+        result["outcome"] = []
+        with self.assertRaisesRegex(ValueError, "invalid result outcome"):
+            investigate.validate_result(result)
+
+    def test_json_pointer_rfc6901_escaped_tokens_and_empty_key(self):
+        document = {"a/b": {"~key": [10, 20]}, "": "empty-key"}
+        self.assertEqual(investigate.resolve_json_pointer(document, "/a~1b/~0key/1"), 20)
+        self.assertEqual(investigate.resolve_json_pointer(document, "/"), "empty-key")
+        self.assertIs(investigate.resolve_json_pointer(document, ""), document)
+
+    def test_json_pointer_rejects_noncanonical_array_indices(self):
+        document = {"values": [10, 20]}
+        for pointer in ("/values/00", "/values/-", "/values/-1", "/values/2"):
+            with self.subTest(pointer=pointer), self.assertRaises(ValueError):
+                investigate.resolve_json_pointer(document, pointer)
+
+    def test_json_pointer_rejects_scalar_traversal(self):
+        with self.assertRaisesRegex(ValueError, "scalar"):
+            investigate.resolve_json_pointer({"value": 1}, "/value/child")
+
+    def test_evidence_artifact_id_wrong_type_is_contract_error(self):
+        case = fixture(720)
+        case["evidence"][0]["artifact_id"] = []
+        with self.assertRaisesRegex(ValueError, "artifact_id must be a string"):
+            investigate.investigate(case)
+
+    def test_artifact_identity_collision_is_rejected(self):
+        case = fixture(720)
+        case["source"]["artifact_id"] = case["adr"]["artifact_id"]
+        with self.assertRaisesRegex(ValueError, "artifact IDs must be distinct"):
+            investigate.investigate(case)
+
+    def test_malformed_source_json_is_rejected_without_ttl_evidence(self):
+        case = fixture(None)
+        case["source"]["content"] = "{not-json"
+        case["source"]["sha256"] = hashlib.sha256(case["source"]["content"].encode()).hexdigest()
+        with self.assertRaisesRegex(ValueError, "source content must be valid JSON"):
+            investigate.investigate(case)
+
+    def test_result_contract_rejects_policy_tampering(self):
+        result = investigate.investigate(fixture(720))
+        result["policy"]["limit_seconds"] = 1
+        with self.assertRaisesRegex(ValueError, "pinned policy"):
+            investigate.validate_result(result)
+
+    def test_result_contract_rejects_fabricated_accepted_evidence(self):
+        result = investigate.investigate(fixture(720))
+        result["accepted_evidence_ids"] = ["EV-FABRICATED"]
+        with self.assertRaisesRegex(ValueError, "subsets of considered"):
+            investigate.validate_result(result)
+
+    def test_result_contract_rejects_relationship_outcome_mismatch(self):
+        result = investigate.investigate(fixture(720))
+        result["relationship"] = "consistent_with"
+        with self.assertRaisesRegex(ValueError, "inconsistent with outcome"):
+            investigate.validate_result(result)
+
+    def test_result_contract_rejects_confident_outcome_with_rejected_observation(self):
+        result = investigate.investigate(fixture(-1))
+        result["outcome"] = "no_deviation_found"
+        result["relationship"] = "consistent_with"
+        result["uncertainty"] = []
+        with self.assertRaisesRegex(ValueError, "rejected observations require"):
+            investigate.validate_result(result)
+
+    def test_boundary_values_are_deterministic(self):
+        for ttl, expected in ((0, "no_deviation_found"), (599, "no_deviation_found"), (600, "no_deviation_found"), (601, "supported_deviation")):
+            with self.subTest(ttl=ttl):
+                self.assertEqual(investigate.investigate(fixture(ttl))["outcome"], expected)
 
 if __name__ == "__main__":
     unittest.main()

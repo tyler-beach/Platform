@@ -103,6 +103,8 @@ def validate_evidence(case: dict[str, Any], adr: dict[str, Any], source: dict[st
         if evidence_id in by_id:
             raise ValueError("evidence IDs must be unique")
         artifact_id = item.get("artifact_id")
+        if not isinstance(artifact_id, str):
+            raise ValueError(f"evidence {evidence_id} artifact_id must be a string")
         if artifact_id not in {adr["artifact_id"], source["artifact_id"]}:
             raise ValueError(f"evidence {evidence_id} points outside the pinned artifacts")
         expected_revision = adr["revision"] if artifact_id == adr["artifact_id"] else source["revision"]
@@ -141,9 +143,8 @@ def validate_case(case: Any) -> tuple[dict[str, Any], dict[str, Any], list[dict[
         raise ValueError("case must be a JSON object")
     adr = validate_pinned_artifact(case.get("adr"), "adr")
     source = validate_pinned_artifact(case.get("source"), "source")
-    for artifact_name, artifact in (("adr", adr), ("source", source)):
-        if artifact["artifact_id"] == "":
-            raise ValueError(f"{artifact_name}.artifact_id must not be empty")
+    if adr["artifact_id"] == source["artifact_id"]:
+        raise ValueError("ADR and source artifact IDs must be distinct")
     if not isinstance(adr.get("status"), str) or not adr["status"].strip():
         raise ValueError("adr.status must be a non-empty string")
     if type(case.get("scope_match")) is not bool:
@@ -154,6 +155,10 @@ def validate_case(case: Any) -> tuple[dict[str, Any], dict[str, Any], list[dict[
     supplied_limit = case.get("max_ttl_seconds", MAX_TTL_SECONDS)
     if type(supplied_limit) is not int or supplied_limit != MAX_TTL_SECONDS:
         raise ValueError(f"max_ttl_seconds must equal the {MAX_TTL_SECONDS}-second limit in {POLICY_VERSION}")
+    try:
+        json.loads(source["content"], object_pairs_hook=_reject_duplicate_json_keys)
+    except (json.JSONDecodeError, ValueError) as exc:
+        raise ValueError("source content must be valid JSON") from exc
     evidence, requested = validate_evidence(case, adr, source)
     return {"case_id": case_id, "scope_match": case["scope_match"]}, {"adr": adr, "source": source}, evidence, requested
 
@@ -213,14 +218,10 @@ def evaluate(applicable: bool, ttl_values: list[dict[str, Any]]) -> dict[str, st
 
 
 def validate_result(result: Any) -> None:
-    """Validate the result contract before computing its fingerprint."""
+    """Validate result shape and cross-field invariants before fingerprinting."""
     if not isinstance(result, dict):
         raise ValueError("result must be an object")
-    required = {
-        "schema_version", "policy_version", "policy", "normalization_contract_version",
-        "case_id", "inputs", "applicability", "outcome", "relationship", "rationale",
-        "evidence_ids", "considered_evidence_ids", "accepted_evidence_ids", "rejected_observations", "uncertainty",
-    }
+    required = {"schema_version", "policy_version", "policy", "normalization_contract_version", "case_id", "inputs", "applicability", "outcome", "relationship", "rationale", "evidence_ids", "considered_evidence_ids", "accepted_evidence_ids", "rejected_observations", "uncertainty"}
     missing = sorted(required - set(result))
     if missing:
         raise ValueError("result missing required field(s): " + ", ".join(missing))
@@ -228,27 +229,91 @@ def validate_result(result: Any) -> None:
         raise ValueError("unsupported result schema version")
     if result["policy_version"] != POLICY_VERSION:
         raise ValueError("unsupported policy version")
-    if result["outcome"] not in OUTCOMES:
+    outcome = result["outcome"]
+    if not isinstance(outcome, str) or outcome not in OUTCOMES:
         raise ValueError("invalid result outcome")
-    if not isinstance(result["relationship"], str) or not isinstance(result["rationale"], str):
-        raise ValueError("result relationship and rationale must be strings")
-    if not isinstance(result["inputs"], list) or not isinstance(result["evidence_ids"], list):
-        raise ValueError("result inputs and evidence_ids must be lists")
-    if not isinstance(result["considered_evidence_ids"], list) or not isinstance(result["accepted_evidence_ids"], list):
-        raise ValueError("result considered_evidence_ids and accepted_evidence_ids must be lists")
-    if any(not isinstance(item, str) for item in result["evidence_ids"]):
-        raise ValueError("result evidence_ids must contain strings")
-    if len(result["evidence_ids"]) != len(set(result["evidence_ids"])):
-        raise ValueError("result evidence_ids must be unique")
-    if not isinstance(result["rejected_observations"], list) or not isinstance(result["uncertainty"], list):
-        raise ValueError("result rejected_observations and uncertainty must be lists")
-    if not isinstance(result["applicability"], dict) or type(result["applicability"].get("applicable")) is not bool:
+    expected_policy = {"predicate": TTL_PREDICATE, "operator": "maximum", "limit_seconds": MAX_TTL_SECONDS}
+    if result["policy"] != expected_policy:
+        raise ValueError("result policy does not match pinned policy parameters")
+    for field in ("normalization_contract_version", "case_id", "relationship", "rationale"):
+        if not isinstance(result[field], str) or not result[field].strip():
+            raise ValueError(f"result {field} must be a non-empty string")
+    inputs = result["inputs"]
+    if not isinstance(inputs, list) or len(inputs) != 2:
+        raise ValueError("result inputs must contain ADR and source artifacts")
+    artifact_ids = []
+    for index, item in enumerate(inputs):
+        if not isinstance(item, dict):
+            raise ValueError(f"result inputs[{index}] must be an object")
+        for field in ("artifact_id", "revision", "path", "sha256"):
+            if not isinstance(item.get(field), str) or not item[field].strip():
+                raise ValueError(f"result inputs[{index}] requires non-empty {field}")
+        if not re.fullmatch(r"[0-9a-f]{64}", item["sha256"]):
+            raise ValueError(f"result inputs[{index}] has invalid sha256")
+        artifact_ids.append(item["artifact_id"])
+    if len(set(artifact_ids)) != 2:
+        raise ValueError("result input artifact IDs must be distinct")
+    applicability = result["applicability"]
+    if not isinstance(applicability, dict) or type(applicability.get("applicable")) is not bool:
         raise ValueError("result applicability must contain a boolean applicable field")
-    if result["outcome"] == "no_deviation_found" and not result["applicability"]["applicable"]:
-        raise ValueError("non-applicable result cannot claim no deviation found")
-    if result["outcome"] == "supported_deviation" and not result["applicability"]["applicable"]:
-        raise ValueError("non-applicable result cannot claim a deviation")
-
+    if not isinstance(applicability.get("adr_status"), str) or type(applicability.get("scope_match")) is not bool:
+        raise ValueError("result applicability status and scope fields are invalid")
+    expected_applicable = applicability["adr_status"] == "accepted" and applicability["scope_match"]
+    if applicability["applicable"] != expected_applicable:
+        raise ValueError("result applicability fields are inconsistent")
+    for field in ("evidence_ids", "considered_evidence_ids", "accepted_evidence_ids"):
+        values = result[field]
+        if not isinstance(values, list) or any(not isinstance(value, str) or not value for value in values):
+            raise ValueError(f"result {field} must be a list of non-empty strings")
+        if len(values) != len(set(values)):
+            raise ValueError(f"result {field} must be unique")
+    evidence_ids = set(result["evidence_ids"])
+    considered = set(result["considered_evidence_ids"])
+    accepted = set(result["accepted_evidence_ids"])
+    if evidence_ids != considered:
+        raise ValueError("evidence_ids must equal considered_evidence_ids")
+    rejected = result["rejected_observations"]
+    if not isinstance(rejected, list):
+        raise ValueError("result rejected_observations must be a list")
+    rejected_ids = []
+    allowed_reasons = {"negative_value", "unexpected_numeric_type"}
+    for index, item in enumerate(rejected):
+        if not isinstance(item, dict) or not isinstance(item.get("evidence_id"), str) or not item["evidence_id"]:
+            raise ValueError(f"result rejected_observations[{index}] requires an evidence_id")
+        reason = item.get("reason_code")
+        if not isinstance(reason, str) or reason not in allowed_reasons:
+            raise ValueError(f"result rejected_observations[{index}] has an unknown reason_code")
+        rejected_ids.append(item["evidence_id"])
+    if len(rejected_ids) != len(set(rejected_ids)):
+        raise ValueError("rejected observation IDs must be unique")
+    if not accepted.issubset(considered) or not set(rejected_ids).issubset(considered):
+        raise ValueError("accepted and rejected evidence must be subsets of considered evidence")
+    if accepted.intersection(rejected_ids):
+        raise ValueError("evidence cannot be both accepted and rejected")
+    uncertainty = result["uncertainty"]
+    if not isinstance(uncertainty, list) or any(not isinstance(value, str) or not value for value in uncertainty):
+        raise ValueError("result uncertainty must be a list of non-empty strings")
+    if rejected and (outcome != "inconclusive" or result["relationship"] != "invalid_observation"):
+        raise ValueError("rejected observations require inconclusive/invalid_observation result")
+    if not applicability["applicable"]:
+        if outcome != "not_applicable" or result["relationship"] != "not_applicable":
+            raise ValueError("non-applicable result must use not_applicable outcome and relationship")
+        if evidence_ids or accepted or rejected:
+            raise ValueError("non-applicable result cannot claim decision evidence")
+    elif outcome == "not_applicable":
+        raise ValueError("applicable result cannot claim not_applicable")
+    expected_relationship = {"supported_deviation": "contradicts", "no_deviation_found": "consistent_with", "not_applicable": "not_applicable", "inconclusive": {"insufficient_evidence", "conflicting_evidence", "invalid_observation"}}[outcome]
+    if isinstance(expected_relationship, set):
+        if result["relationship"] not in expected_relationship:
+            raise ValueError("result relationship is inconsistent with outcome")
+    elif result["relationship"] != expected_relationship:
+        raise ValueError("result relationship is inconsistent with outcome")
+    if outcome in {"supported_deviation", "no_deviation_found"} and not accepted:
+        raise ValueError("confident result requires accepted evidence")
+    if outcome == "inconclusive" and not uncertainty:
+        raise ValueError("inconclusive result requires uncertainty")
+    if outcome != "inconclusive" and uncertainty:
+        raise ValueError("conclusive result cannot carry uncertainty")
 
 def fingerprint_result(result: dict[str, Any]) -> dict[str, Any]:
     validate_result(result)
