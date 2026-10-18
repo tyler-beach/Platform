@@ -29,7 +29,7 @@ These are candidate types, not a promise that every natural-language ADR can be 
 
 An observation should carry at least: `evidence_id`, typed `predicate`, `subject`, typed `value`, `artifact_id`, immutable `revision`, repository-relative `path`, source SHA-256, and a typed locator (AST span, JSON Pointer, YAML resource, API object, test, or trace). Values must be checked against their declared types; Python booleans must not be accepted as integers.
 
-The generic engine prototype at `.poc/requirement_engine/engine.py` accepts normalized evidence and demonstrates two distinct requirement kinds. It does **not** parse Kubernetes YAML or arbitrary ADR prose. A real Kubernetes collector must establish whether a PDB exists and whether it applies to the intended workload; a missing collector result is not proof of a missing PDB.
+The generic engine prototype at `.poc/requirement_engine/engine.py` accepts normalized evidence and demonstrates two distinct requirement kinds. The offline collector at `.poc/requirement_engine/pdb_collector.py` parses a supplied YAML inventory, locates a named workload, evaluates PDB selectors against pod-template labels and namespace, and emits a provenance-bound positive or negative observation. Any malformed YAML, duplicate mapping key, unsupported selector expression, missing workload, or empty manifest inventory fails closed rather than asserting absence. A negative result applies only to the complete supplied inventory; it does not establish live cluster state or cover files excluded from that inventory. Neither component parses arbitrary ADR prose.
 
 ## Outcome semantics
 
