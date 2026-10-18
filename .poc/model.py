@@ -58,11 +58,11 @@ def mock_assess(context: dict[str,Any]) -> dict[str,Any]:
         for e in entry_edges
     )
     uncertain_dispatch=any(
-        e.get("dispatch_kind") in {"conditional","dynamic","cha","interface","virtual"}
+        e.get("dispatch_kind") in {"conditional","dynamic","cha"}
         or e.get("resolution_status")=="resolved_approximate"
         for e in entry_provider_edges
     )
-    requires_async=any(x in req for x in ("asynchronous","asynchronously","queue","queued","enqueue","outbox","background worker","must not block","non-blocking"))
+    requires_async=any(x in req for x in ("asynchronous","asynchronously","queue","queued","enqueue","outbox","background worker","must not block","must not synchronously","must not wait","not synchronously","non-blocking"))
     explicit_sync=any(x in req for x in ("synchronous","synchronously","inline","before returning","blocking"))
     limitations=[]
     generic_config_only=False
@@ -82,6 +82,14 @@ def mock_assess(context: dict[str,Any]) -> dict[str,Any]:
                        0 if e.get("evidence_type")=="resolved_call_edge" else 1))
     ids.extend(e["evidence_id"] for e in scored_edges if e.get("evidence_id"))
     ids.extend(e["evidence_id"] for e in evidence_items if e.get("evidence_type")=="diff_line" and e.get("evidence_id"))
+    diff_text=str(context.get("diff_excerpt","")).lower()
+    inline_semantics_proven=any(phrase in diff_text for phrase in (
+        "synchronously before returning",
+        "returns the provider result inline",
+        "waits on the provider",
+        "no asynchronous boundary",
+        "does not enqueue",
+    ))
     if requires_async and has_entry_provider_call and uncertain_dispatch:
         outcome="potential_deviation";summary="A provider-shaped call appears at the entry, but conditional or approximate dispatch prevents a definitive deviation decision."
         rationale="The call target is provider-shaped, but its execution condition or runtime target is not established by the supplied graph. Preserve the finding for review rather than treating a possible edge as a confirmed violation."
@@ -95,6 +103,10 @@ def mock_assess(context: dict[str,Any]) -> dict[str,Any]:
         outcome="no_deviation_found";summary="The entry path schedules work through a queue or outbox, while the provider call is below that boundary."
         rationale="The resolved entry edge enqueues, publishes, schedules, or dispatches work, and the provider call appears downstream rather than on the request entry edge. This supports the stated asynchronous pattern; it does not prove runtime delivery or worker behavior."
         confidence=0.78 if not limitations else 0.62
+    elif requires_async and has_provider_path and inline_semantics_proven:
+        outcome="supported_deviation";summary="The provider is reached through a helper, and the supplied change evidence explicitly says the call is inline or synchronous."
+        rationale="The graph shows a transitive provider path, and the change excerpt explicitly describes synchronous completion or the absence of an asynchronous boundary. Treat this as a supported review finding, subject to checking the cited source and change evidence."
+        confidence=0.72 if not limitations else 0.58
     elif requires_async and has_provider_path:
         outcome="potential_deviation";summary="A provider assessment is reachable below the entry point, but the graph does not establish the asynchronous boundary."
         rationale="The provider call occurs through another function. The graph alone does not prove that the entry waits for that call or bypasses the required asynchronous boundary."

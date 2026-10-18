@@ -88,6 +88,18 @@ class LabeledEvaluationTests(unittest.TestCase):
                 context, _ = evaluate.build_case_context(case)
                 self.assertEqual(model.mock_assess(context)["outcome"], "potential_deviation")
 
+    def test_mock_recognizes_explicit_inline_helper_evidence(self):
+        for case_id in ("D-03", "D-05"):
+            with self.subTest(case_id=case_id):
+                case = next(c for c in evaluate.load_cases() if c["case_id"] == case_id)
+                context, _ = evaluate.build_case_context(case)
+                self.assertEqual(model.mock_assess(context)["outcome"], "supported_deviation")
+
+    def test_mock_does_not_treat_prohibition_as_permission_for_sync(self):
+        case = next(c for c in evaluate.load_cases() if c["case_id"] == "A-08")
+        context, _ = evaluate.build_case_context(case)
+        self.assertEqual(model.mock_assess(context)["outcome"], "potential_deviation")
+
 
 if __name__ == "__main__":
     unittest.main()
