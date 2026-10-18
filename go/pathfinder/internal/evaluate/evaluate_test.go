@@ -32,11 +32,11 @@ func TestEvaluateSamplePackageStable(t *testing.T) {
 	if err := json.Unmarshal(raw, &pkg); err != nil {
 		t.Fatal(err)
 	}
-	a, err := evaluate.EvaluatePackage(pkg, catalogDir, "accepted")
+	a, err := evaluate.EvaluatePackageWithMode(pkg, catalogDir, "accepted", "synthetic")
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, err := evaluate.EvaluatePackage(pkg, catalogDir, "accepted")
+	b, err := evaluate.EvaluatePackageWithMode(pkg, catalogDir, "accepted", "synthetic")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,22 +72,48 @@ func TestEvaluateRealCatalogDomainApplicability(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if report["catalog_size"].(int) != 3 {
+	if report["catalog_size"].(int) != 22 {
 		t.Fatalf("catalog_size=%v", report["catalog_size"])
 	}
-	if report["in_scope_count"].(int) != 1 {
-		t.Fatalf("in_scope_count=%v want 1", report["in_scope_count"])
+	if report["in_scope_count"].(int) != 5 {
+		t.Fatalf("in_scope_count=%v want 5 identity rows", report["in_scope_count"])
 	}
 	if report["aggregate_status"] == "all_aligned" {
 		t.Fatal("no applicable confident outcomes should not look all_aligned")
 	}
 	cat, _ := report["catalog"].(map[string]any)
-	if cat["mode"] != "real" || cat["catalog_id"] != "platform-real-adr-v0" {
+	if cat["mode"] != "real" || cat["catalog_id"] != "platform-real-adr-v1" {
 		t.Fatalf("catalog=%v", cat)
 	}
 	counts, _ := report["counts"].(map[string]int)
-	if counts["not_applicable"] < 2 {
-		t.Fatalf("expected reliability rows not_applicable, counts=%v", counts)
+	if counts["not_applicable"] < 10 {
+		t.Fatalf("expected non-identity rows not_applicable, counts=%v", counts)
+	}
+}
+
+func TestEvaluateRealSamplePackageConfidentOutcomes(t *testing.T) {
+	root := repoRoot(t)
+	catalogDir := filepath.Join(root, "data", "adr_catalog")
+	pkgPath := filepath.Join(catalogDir, "sample_packages", "session-and-pdb", "package.json")
+	raw, err := os.ReadFile(pkgPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var pkg map[string]any
+	if err := json.Unmarshal(raw, &pkg); err != nil {
+		t.Fatal(err)
+	}
+	report, err := evaluate.EvaluatePackage(pkg, catalogDir, "accepted")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report["observation_count"].(int) < 5 {
+		t.Fatalf("observation_count=%v", report["observation_count"])
+	}
+	counts, _ := report["counts"].(map[string]int)
+	confident := counts["supported_deviation"] + counts["no_deviation_found"]
+	if confident < 1 {
+		t.Fatalf("expected confident outcomes, counts=%v", counts)
 	}
 }
 

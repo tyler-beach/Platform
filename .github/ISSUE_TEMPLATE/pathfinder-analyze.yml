@@ -7,7 +7,9 @@ body:
   - type: markdown
     attributes:
       value: |
-        Submit a **pinned evidence package** for offline evaluation against the synthetic ADR catalog (`ADR-101`–`ADR-200`).
+        Submit a **pinned evidence package** for evaluation against the **prototype real ADR pack** (20 platform-style ADRs under `data/adr_catalog`).
+
+        **First run:** see `docs/PATHFINDER_FIRST_RUN.md`.
 
         **This repository is public.** Do not paste secrets, credentials, private customer data, or proprietary source. Use synthetic or explicitly public examples only.
 
@@ -28,11 +30,22 @@ body:
       options:
         - label: I attest this submission contains only synthetic or explicitly public content and no secrets or confidential source.
           required: true
+  - type: dropdown
+    id: catalog_pack
+    attributes:
+      label: Catalog pack
+      description: Real prototype pack is the product default. Synthetic ADR-101–200 is demo-only.
+      options:
+        - Real prototype pack (default)
+        - Synthetic demo catalog (ADR-101–200)
+      default: 0
+    validations:
+      required: true
   - type: textarea
     id: domains
     attributes:
       label: Domains (optional scope filter)
-      description: Comma-separated catalog domains. Leave blank to evaluate all domains. Examples — identity, security, reliability, api, cloud, privacy, messaging, cicd, observability.
+      description: Comma-separated. Leave blank to evaluate all active pack domains (api, cicd, identity, messaging, observability, reliability, security). Narrowing domains marks other requirements not_applicable — not aligned.
       placeholder: identity, security, reliability
     validations:
       required: false
@@ -89,4 +102,4 @@ body:
   - type: markdown
     attributes:
       value: |
-        After you submit, the **Pathfinder Issue Package Evaluation** workflow comments aggregate status and outcome counts, and uploads the full report as a workflow artifact.
+        After you submit, the **Pathfinder Issue Package Evaluation** workflow comments aggregate status and outcome counts, uploads the full report as a workflow artifact (~14 day retention), and appends a lean record on the `pathfinder-jobs` branch.

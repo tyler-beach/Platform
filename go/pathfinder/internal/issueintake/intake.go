@@ -400,14 +400,14 @@ func RenderResultComment(report, packageObj map[string]any, runURL string) (stri
 		fmt.Sprintf("- **Report fingerprint:** `%v`", report["report_sha256"]),
 		fmt.Sprintf("- **Workflow run:** %s", runURL),
 	}
-	if v, ok := report["in_scope_count"]; ok {
-		lines = append(lines, fmt.Sprintf("- **In-scope requirements:** %v", v))
-	}
 	if cat, ok := report["catalog"].(map[string]any); ok {
 		lines = append(lines,
 			fmt.Sprintf("- **Catalog:** `%v` (`%v`) v`%v`", cat["catalog_id"], cat["mode"], cat["version"]),
 			fmt.Sprintf("- **Catalog manifest:** `%v`", cat["manifest_sha256"]),
 		)
+	}
+	if v, ok := report["in_scope_count"]; ok {
+		lines = append(lines, fmt.Sprintf("- **In-scope requirements:** %v / %v", v, report["catalog_size"]))
 	}
 	extraction, _ := report["extraction"].(map[string]any)
 	if extraction == nil {
@@ -418,6 +418,12 @@ func RenderResultComment(report, packageObj map[string]any, runURL string) (stri
 			"- **Paste extractor:** `%v` (%v observations)",
 			extraction["extractor"], extraction["observation_count"],
 		))
+	}
+	scope, _ := packageObj["scope"].(map[string]any)
+	if scope == nil || len(asSlice(scope["domains"])) == 0 {
+		lines = append(lines, "- **Domain filter:** none (all active catalog domains evaluated)")
+	} else {
+		lines = append(lines, fmt.Sprintf("- **Domain filter:** %v", scope["domains"]))
 	}
 	if adapter, ok := packageObj["adapter"].(map[string]any); ok {
 		lines = append(lines, fmt.Sprintf("- **Input adapter:** `%v`", adapter["kind"]))
@@ -481,8 +487,14 @@ func RenderResultComment(report, packageObj map[string]any, runURL string) (stri
 		"",
 		"- Full tech-spec/code bodies are **not** copied into this comment.",
 		"- Download the workflow artifact `pathfinder-issue-evaluation` for the full report JSON.",
-		"- Catalog label_status values are advisory. Missing observations stay `inconclusive`.",
-		"- This comment does not waive ADRs, mutate production, or create training labels.",
+		"### How to read this",
+		"",
+		"- Unextracted predicates stay `inconclusive` — silence is not compliance.",
+		"- `not_applicable` means out of scope (domain/lifecycle), not aligned.",
+		"- Catalog labels are advisory (`prototype_corpus_unadjudicated` / synthetic). Findings do not block merges.",
+		"- Full report JSON is in the workflow artifact (`pathfinder-issue-evaluation-*`, retained ~14 days).",
+		"- Lean job index: `pathfinder-jobs` branch → `jobs/jobs.jsonl`. Re-run via Actions workflow_dispatch.",
+		"- First-run guide: `docs/PATHFINDER_FIRST_RUN.md`.",
 		"",
 	)
 	comment := strings.Join(lines, "\n")
@@ -529,6 +541,25 @@ func parseDomains(raw string) []string {
 		}
 	}
 	return out
+}
+
+// CatalogModeFromIssueBody reads an optional Catalog pack section (real|synthetic).
+// Empty means caller should use the process default (real).
+func CatalogModeFromIssueBody(body string) string {
+	sections := ParseFormSections(body)
+	raw := strings.ToLower(strings.TrimSpace(firstSection(sections, "catalog pack", "catalog mode", "catalog")))
+	if raw == "" {
+		return ""
+	}
+	// GitHub dropdown / radio lines often look like: "Real prototype pack (default)"
+	switch {
+	case strings.Contains(raw, "synthetic"):
+		return "synthetic"
+	case strings.Contains(raw, "real"):
+		return "real"
+	default:
+		return ""
+	}
 }
 
 func cloneMap(in map[string]any) map[string]any {

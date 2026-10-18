@@ -64,8 +64,10 @@ jobs:
           import json
           r = json.load(open("/tmp/pathfinder-real-report.json"))
           assert r["catalog"]["mode"] == "real"
-          assert r["catalog"]["catalog_id"] == "platform-real-adr-v0"
-          assert r["catalog_size"] == 3
-          assert r["in_scope_count"] == 3
-          print("real catalog ok", r["aggregate_status"], r["in_scope_count"])
+          assert r["catalog"]["catalog_id"] == "platform-real-adr-v1"
+          assert r["catalog_size"] == 22
+          assert r["observation_count"] >= 5
+          confident = sum(r["counts"].get(k, 0) for k in ("supported_deviation", "no_deviation_found"))
+          assert confident >= 1
+          print("real catalog ok", r["aggregate_status"], r["in_scope_count"], "confident", confident)
           PY

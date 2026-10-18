@@ -36,6 +36,8 @@ test("builds and validates Pathfinder analyze issue bodies for GitHub submission
   });
   assert.match(body, /\[X\]/);
   assert.match(body, /### Tech spec \(markdown\)/);
+  assert.match(body, /### Catalog pack/);
+  assert.match(body, /Real prototype pack/);
   assert.match(body, /### Same-repo pull request \(optional\)/);
   assert.match(body, /Sessions expire after 12 minutes/);
   assert.match(body, /pull\/57/);

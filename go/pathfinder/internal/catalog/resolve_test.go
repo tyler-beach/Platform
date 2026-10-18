@@ -37,7 +37,11 @@ func TestResolveDirModes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if id.CatalogID != "platform-real-adr-v0" || id.ManifestSHA256 == "" {
+	if id.CatalogID != "platform-real-adr-v1" || id.ManifestSHA256 == "" {
 		t.Fatalf("identity=%+v", id)
+	}
+	mode, err := catalog.ResolveMode("")
+	if err != nil || mode != catalog.ModeReal {
+		t.Fatalf("default mode=%q err=%v", mode, err)
 	}
 }

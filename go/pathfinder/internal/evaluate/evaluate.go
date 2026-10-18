@@ -9,6 +9,7 @@ import (
 	"github.com/tyler-beach/Platform/go/pathfinder/internal/collect/pkgcollect"
 	"github.com/tyler-beach/Platform/go/pathfinder/internal/engine"
 	"github.com/tyler-beach/Platform/go/pathfinder/internal/extract/paste"
+	"github.com/tyler-beach/Platform/go/pathfinder/internal/modelobs"
 	"github.com/tyler-beach/Platform/go/pathfinder/internal/predicates"
 )
 
@@ -105,6 +106,17 @@ func EvaluatePackageWithMode(packageObj map[string]any, catalogDir string, adrSt
 	ensured, err := paste.EnsureObservations(packageObj, subjects)
 	if err != nil {
 		return nil, err
+	}
+	if rawObs, ok := ensured["observations"].([]any); ok {
+		aug, augErr := modelobs.Augment(rawObs)
+		if augErr != nil {
+			return nil, augErr
+		}
+		ensured["observations"] = aug
+		if extraction, ok := ensured["extraction"].(map[string]any); ok {
+			extraction["model_extract"] = modelobs.Enabled()
+			extraction["observation_count"] = len(aug)
+		}
 	}
 	observations, err := pkgcollect.CollectObservations(ensured, reg)
 	if err != nil {

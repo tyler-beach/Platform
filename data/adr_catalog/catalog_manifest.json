@@ -1,12 +1,41 @@
 {
-  "catalog_id": "platform-real-adr-v0",
+  "adr_count": 20,
+  "catalog_id": "platform-real-adr-v1",
   "catalog_mode": "real",
-  "manifest_sha256": "40e358e3cec50b277a395ecaaef65bf8951c665c43b92de7c9f605548f8dfb2c",
-  "requirement_count": 3,
+  "domains": [
+    "api",
+    "cicd",
+    "identity",
+    "messaging",
+    "observability",
+    "reliability",
+    "security"
+  ],
+  "label_status": "prototype_corpus_unadjudicated",
+  "manifest_sha256": "2b678e6f31ac654c5c1f39e79e577a12eaf2328fd6e8cd2d6b3597af5f95343c",
+  "requirement_count": 22,
   "schema_version": "pathfinder-catalog-manifest-v1",
   "source_adrs": [
+    "adrs/POD-DISRUPTION-BUDGETS.md",
     "adrs/SESSION-TTL.md",
-    "adrs/POD-DISRUPTION-BUDGETS.md"
+    "adrs/SESSION-IDLE-TIMEOUT.md",
+    "adrs/ADMIN-MFA.md",
+    "adrs/PASSWORD-MIN-LENGTH.md",
+    "adrs/REFRESH-TOKEN-ROTATION.md",
+    "adrs/ENCRYPTION-AT-REST.md",
+    "adrs/TLS-POLICY.md",
+    "adrs/HSTS.md",
+    "adrs/API-RATE-LIMIT.md",
+    "adrs/API-AUTH-MIDDLEWARE.md",
+    "adrs/OPENAPI-PUBLISHED.md",
+    "adrs/MIN-REPLICAS.md",
+    "adrs/HEALTH-PROBES.md",
+    "adrs/MESSAGING-DLQ.md",
+    "adrs/STRUCTURED-LOGGING.md",
+    "adrs/PII-LOG-SCRUBBING.md",
+    "adrs/SECRET-SCANNING.md",
+    "adrs/BRANCH-PROTECTION-REVIEWS.md",
+    "adrs/NETWORK-POLICY.md"
   ],
-  "version": "0.1.0"
+  "version": "1.0.0"
 }
