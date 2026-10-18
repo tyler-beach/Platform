@@ -1,7 +1,7 @@
 # analyze-input-adapters Specification
 
 ## Purpose
-TBD - created by archiving change github-input-adapters. Update Purpose after archive.
+Resolve same-repo pull request changed files into a pinned Pathfinder evidence package on GitHub Actions intake.
 ## Requirements
 ### Requirement: Resolve a same-repo pull request into a pinned package
 

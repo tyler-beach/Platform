@@ -1,7 +1,7 @@
 # go-pathfinder-runtime Specification
 
 ## Purpose
-TBD - created by archiving change github-actions-go-pathfinder. Update Purpose after archive.
+Go-owned deterministic Pathfinder evaluation spine and issue-analyze CLI used as the production entrypoint on GitHub Actions.
 ## Requirements
 ### Requirement: Go owns deterministic catalog evaluation
 

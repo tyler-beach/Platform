@@ -1,7 +1,7 @@
 # pathfinder-job-ledger Specification
 
 ## Purpose
-TBD - created by archiving change github-actions-go-pathfinder. Update Purpose after archive.
+Append-only lean job index on the `pathfinder-jobs` branch for Pathfinder analyze runs, without storing full source or full report bodies.
 ## Requirements
 ### Requirement: Append lean job records to pathfinder-jobs
 

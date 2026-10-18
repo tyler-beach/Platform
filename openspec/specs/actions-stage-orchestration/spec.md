@@ -1,7 +1,7 @@
 # actions-stage-orchestration Specification
 
 ## Purpose
-TBD - created by archiving change github-actions-go-pathfinder. Update Purpose after archive.
+GitHub Actions staged orchestration for Pathfinder analyze (intake → ensure-observations → evaluate → publish), using artifacts between stages as a stand-in for later cloud workers.
 ## Requirements
 ### Requirement: Staged GitHub Actions orchestration for analyze
 
