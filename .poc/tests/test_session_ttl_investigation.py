@@ -1,0 +1,115 @@
+from __future__ import annotations
+
+import hashlib
+import sys
+import unittest
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / ".poc" / "session_ttl"))
+import investigate
+
+
+def artifact(artifact_id: str, revision: str, path: str, content: str) -> dict:
+    return {
+        "artifact_id": artifact_id,
+        "revision": revision,
+        "path": path,
+        "content": content,
+        "sha256": hashlib.sha256(content.encode("utf-8")).hexdigest(),
+    }
+
+
+def fixture(ttl: int | None = 720, **overrides) -> dict:
+    adr = artifact("ADR-SESSION-001", "git:abc123", "adrs/session-ttl.md", "Session TTL must not exceed 600 seconds.")
+    adr["status"] = overrides.pop("adr_status", "accepted")
+    source = artifact("service-config", "git:def456", "config/session.json", '{"session_ttl_seconds": 720}')
+    evidence = []
+    if ttl is not None:
+        evidence.append({
+            "evidence_id": "EV-TTL-1",
+            "artifact_id": source["artifact_id"],
+            "revision": source["revision"],
+            "locator": {"kind": "json_pointer", "value": "/session_ttl_seconds"},
+            "predicate": "session.ttl_seconds",
+            "value": ttl,
+        })
+    case = {
+        "case_id": "ttl-fixture",
+        "adr": adr,
+        "source": source,
+        "scope_match": True,
+        "max_ttl_seconds": 600,
+        "evidence": evidence,
+    }
+    case.update(overrides)
+    return case
+
+
+class SessionTTLInvestigationTests(unittest.TestCase):
+    def test_ttl_above_limit_is_supported_deviation(self):
+        result = investigate.investigate(fixture(720))
+        self.assertEqual(result["outcome"], "supported_deviation")
+        self.assertEqual(result["relationship"], "contradicts")
+        self.assertIn("EV-TTL-1", result["evidence_ids"])
+
+    def test_ttl_at_limit_is_compliant(self):
+        self.assertEqual(investigate.investigate(fixture(600))["outcome"], "no_deviation_found")
+
+    def test_out_of_scope_or_superseded_decision_is_not_applied(self):
+        case = fixture(720, scope_match=False)
+        result = investigate.investigate(case)
+        self.assertFalse(result["applicability"]["applicable"])
+        self.assertEqual(result["outcome"], "no_deviation_found")
+        self.assertEqual(result["relationship"], "not_applicable")
+
+    def test_missing_ttl_is_inconclusive(self):
+        result = investigate.investigate(fixture(None))
+        self.assertEqual(result["outcome"], "inconclusive")
+        self.assertEqual(result["relationship"], "insufficient_evidence")
+
+    def test_conflicting_ttl_values_are_inconclusive(self):
+        case = fixture(720)
+        case["evidence"].append({
+            "evidence_id": "EV-TTL-2",
+            "artifact_id": case["source"]["artifact_id"],
+            "revision": case["source"]["revision"],
+            "locator": {"kind": "line", "start": 8, "end": 8},
+            "predicate": "session.ttl_seconds",
+            "value": 300,
+        })
+        result = investigate.investigate(case)
+        self.assertEqual(result["outcome"], "inconclusive")
+        self.assertEqual(result["relationship"], "conflicting_evidence")
+
+    def test_unknown_model_proposed_evidence_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "unknown evidence"):
+            investigate.investigate(fixture(720, proposed_evidence_ids=["EV-NOT-IN-PACKAGE"]))
+
+    def test_stale_source_revision_is_rejected(self):
+        case = fixture(720)
+        case["evidence"][0]["revision"] = "git:old-revision"
+        with self.assertRaisesRegex(ValueError, "stale artifact revision"):
+            investigate.investigate(case)
+
+    def test_mutated_pinned_artifact_hash_is_rejected(self):
+        case = fixture(720)
+        case["source"]["content"] += " "
+        with self.assertRaisesRegex(ValueError, "content hash"):
+            investigate.investigate(case)
+
+    def test_replay_is_deterministic_for_identical_pinned_inputs(self):
+        case = fixture(720)
+        first = investigate.investigate(case)
+        second = investigate.investigate(case)
+        self.assertEqual(first, second)
+        self.assertEqual(first["result_sha256"], second["result_sha256"])
+
+    def test_result_hash_changes_when_pinned_input_changes(self):
+        first = investigate.investigate(fixture(720))
+        second = investigate.investigate(fixture(721))
+        self.assertNotEqual(first["result_sha256"], second["result_sha256"])
+
+
+if __name__ == "__main__":
+    unittest.main()
