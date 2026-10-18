@@ -73,7 +73,7 @@ class GitHubIssueIntakeTests(unittest.TestCase):
             second, _ = prepare(report_path, batch_path, seed="fixed-seed", per_stratum=1)
             self.assertEqual(first["selected_review_units"], second["selected_review_units"])
             self.assertEqual(original, batch_path.read_text(encoding="utf-8"))
-            self.assertEqual(first["frame"]["sha256"], second["frame"]["sha256"])
+            self.assertEqual(first["frame"]["fingerprint_sha256"], second["frame"]["fingerprint_sha256"])
 
     def test_unknown_outcome_becomes_inconclusive(self):
         report = self.report()
