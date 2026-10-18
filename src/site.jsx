@@ -42,7 +42,7 @@ function Header() {
     </button>
     <nav className={`global-nav ${open ? 'is-open' : ''}`} aria-label="Main navigation">
       <NavLink to="/architecture" className={({ isActive }) => `global-nav__link ${isActive ? 'is-active' : ''}`}><BookOpen size={16} /> Architecture</NavLink>
-      <NavLink to="/demo" className={({ isActive }) => `global-nav__link ${isActive ? 'is-active' : ''}`}><Workflow size={16} /> Workflow demo <span className="nav-live-mark" aria-hidden="true" /></NavLink>
+      <a href={pageAsset('pathfinder-flow/')} className="global-nav__link global-nav__link--explore"><Workflow size={16} /> Explore workflow <span className="nav-live-mark" aria-hidden="true" /></a>
       <NavLink to="/evaluation" className={({ isActive }) => `global-nav__link ${isActive ? 'is-active' : ''}`}><ShieldCheck size={16} /> Evaluation</NavLink>
     </nav>
     <div className="header-actions"><a className="github-link" href={repo} target="_blank" rel="noreferrer"><Github size={16} /><span>Repository</span><ArrowUpRight size={13} /></a></div>
@@ -63,10 +63,10 @@ function Home() {
       <section className="hero-grid">
         <div className="hero-copy">
           <div className="eyebrow"><span className="eyebrow-dot" /> PATHFINDER · ARCHITECTURE ASSURANCE</div>
-          <h1>Keep decisions on the <em>paved path.</em></h1>
-          <p className="hero-lede">Pathfinder connects architecture decisions to specs and code changes, then shows where implementation may have left the paved path—with evidence you can inspect and a person in control of the call.</p>
-          <div className="hero-actions"><Link className="button button--light" to="/demo"><Workflow size={16} /> Follow a paved path <ArrowRight size={16} /></Link><Link className="button button--outline" to="/architecture">Explore the architecture</Link></div>
-          <div className="hero-proof"><span><Check size={14} /> Version-bound evidence</span><span><Check size={14} /> Human-governed findings</span><span><Check size={14} /> Auditable workflows</span></div>
+          <h1>Do the changes follow the rules?</h1>
+          <p className="hero-lede">Pathfinder checks code against the rules your team agreed on. It shows the evidence, points out gaps, and lets a person make the final call.</p>
+          <div className="hero-actions"><a className="button button--light" href={pageAsset('pathfinder-flow/')}><Workflow size={16} /> Explore the workflow <ArrowRight size={16} /></a><Link className="button button--outline" to="/architecture">How it works</Link></div>
+          <div className="hero-proof"><span><Check size={14} /> See the source</span><span><Check size={14} /> Find missing proof</span><span><Check size={14} /> Review each result</span></div>
         </div>
         <PipelineCanvas />
         <div className="hero-glow" aria-hidden="true" />
@@ -87,7 +87,7 @@ function Home() {
       </section>
 
       <section className="principles-strip"><div><ShieldCheck size={19} /><strong>Evidence before inference</strong><span>Claims trace to a pinned source version.</span></div><div><Braces size={19} /><strong>Language-neutral by design</strong><span>Assess behavior and intent across stacks.</span></div><div><CircleDot size={19} /><strong>Uncertainty stays visible</strong><span>Missing evidence is never compliance.</span></div></section>
-      <div className="home-disclaimer"><Sparkles size={17} /><p><strong>Current scope:</strong> this repository contains a design baseline and runnable GitHub Actions PoC. The production API, AWS workers, database, and Step Functions workflow remain proposed.</p><Link to="/architecture/ROADMAP">Read the roadmap <ArrowRight size={14} /></Link></div>
+      <div className="home-disclaimer"><Sparkles size={17} /><p><strong>This is a demo.</strong> It uses example data, not a live scan of your code.</p><Link to="/architecture/ROADMAP">Read the roadmap <ArrowRight size={14} /></Link></div>
     </div>
   </Shell>;
 }
