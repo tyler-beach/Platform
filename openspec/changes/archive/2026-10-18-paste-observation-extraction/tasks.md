@@ -8,4 +8,4 @@
 
 - [x] 2.1 Unit tests with messy real-looking fixtures
 - [x] 2.2 Docs + issue template (observations optional)
-- [ ] 2.3 PR / CI / merge
+- [x] 2.3 PR / CI / merge
