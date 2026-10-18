@@ -219,7 +219,7 @@ def validate_result(result: Any) -> None:
     required = {
         "schema_version", "policy_version", "policy", "normalization_contract_version",
         "case_id", "inputs", "applicability", "outcome", "relationship", "rationale",
-        "evidence_ids", "rejected_observations", "uncertainty",
+        "evidence_ids", "considered_evidence_ids", "accepted_evidence_ids", "rejected_observations", "uncertainty",
     }
     missing = sorted(required - set(result))
     if missing:
@@ -234,6 +234,8 @@ def validate_result(result: Any) -> None:
         raise ValueError("result relationship and rationale must be strings")
     if not isinstance(result["inputs"], list) or not isinstance(result["evidence_ids"], list):
         raise ValueError("result inputs and evidence_ids must be lists")
+    if not isinstance(result["considered_evidence_ids"], list) or not isinstance(result["accepted_evidence_ids"], list):
+        raise ValueError("result considered_evidence_ids and accepted_evidence_ids must be lists")
     if any(not isinstance(item, str) for item in result["evidence_ids"]):
         raise ValueError("result evidence_ids must contain strings")
     if len(result["evidence_ids"]) != len(set(result["evidence_ids"])):
@@ -262,6 +264,12 @@ def investigate(case: dict[str, Any]) -> dict[str, Any]:
     applicable = adr["status"] == "accepted" and normalized["scope_match"]
     ttl_values, rejected = resolve_ttl_observations(evidence, requested_ids, source)
     decision = evaluate(applicable, ttl_values)
+    if applicable and rejected:
+        decision = {
+            "outcome": "inconclusive",
+            "relationship": "invalid_observation",
+            "rationale": "At least one decision-relevant TTL observation was rejected; the available valid values are not sufficient to assert compliance or deviation.",
+        }
     result = {
         "schema_version": RESULT_SCHEMA_VERSION,
         "policy_version": POLICY_VERSION,
@@ -278,7 +286,7 @@ def investigate(case: dict[str, Any]) -> dict[str, Any]:
             [entry for entry in evidence if entry.get("predicate") == TTL_PREDICATE and entry.get("artifact_id") == source["artifact_id"] and entry.get("evidence_id") in requested_ids]
             if applicable else []
         )),
-        "rejected_observations": rejected if applicable else [],
+        "considered_evidence_ids": sorted(item["evidence_id"] for item in (\n            [entry for entry in evidence if entry.get("predicate") == TTL_PREDICATE and entry.get("artifact_id") == source["artifact_id"] and entry.get("evidence_id") in requested_ids]\n            if applicable else []\n        )),\n        "accepted_evidence_ids": sorted(item["evidence_id"] for item in (ttl_values if applicable else [])),\n        "rejected_observations": rejected if applicable else [],
         "uncertainty": [] if decision["outcome"] != "inconclusive" else [decision["relationship"]],
     }
     return fingerprint_result(result)
