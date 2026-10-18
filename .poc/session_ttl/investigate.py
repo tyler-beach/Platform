@@ -85,6 +85,7 @@ def investigate(case: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(item.get("locator"), dict) or not item["locator"].get("kind"):
             raise ValueError(f"evidence {item['evidence_id']} requires a typed locator")
         validate_json_pointer_evidence(item, source)
+        evidence_by_id[item["evidence_id"]] = item
 
     requested_ids = case.get("proposed_evidence_ids", [item["evidence_id"] for item in evidence])
     if not isinstance(requested_ids, list) or any(not isinstance(x, str) for x in requested_ids):
