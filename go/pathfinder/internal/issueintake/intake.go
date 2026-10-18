@@ -1,0 +1,500 @@
+package issueintake
+
+import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"regexp"
+	"strings"
+
+	"github.com/tyler-beach/Platform/go/pathfinder/internal/collect/pkgcollect"
+	"github.com/tyler-beach/Platform/go/pathfinder/internal/extract/paste"
+	"github.com/tyler-beach/Platform/go/pathfinder/internal/predicates"
+)
+
+const (
+	MaxFieldChars   = 50_000
+	MaxPackageChars = 200_000
+	CommentMarker   = "<!-- pathfinder-analyze-report -->"
+)
+
+var (
+	packageFenceRE = regexp.MustCompile(`(?is)` + "```(?:pathfinder-package|json)\\s*\\n(.*?)\\n```")
+	sectionHeadRE  = regexp.MustCompile(`(?m)^###\s+(.+?)\s*$`)
+)
+
+type Error struct{ Msg string }
+
+func (e *Error) Error() string { return e.Msg }
+
+func sha(content string) string {
+	sum := sha256.Sum256([]byte(content))
+	return hex.EncodeToString(sum[:])
+}
+
+func normalizeTitle(title string) string {
+	return strings.Join(strings.Fields(strings.ToLower(strings.TrimSpace(title))), " ")
+}
+
+// ParseFormSections extracts ### sections from an issue body.
+func ParseFormSections(body string) map[string]string {
+	sections := map[string]string{}
+	indexes := sectionHeadRE.FindAllStringSubmatchIndex(body, -1)
+	for i, loc := range indexes {
+		title := body[loc[2]:loc[3]]
+		start := loc[1]
+		end := len(body)
+		if i+1 < len(indexes) {
+			end = indexes[i+1][0]
+		}
+		sections[normalizeTitle(title)] = strings.TrimSpace(body[start:end])
+	}
+	return sections
+}
+
+func AttestationAccepted(body string, sections map[string]string) bool {
+	var b strings.Builder
+	b.WriteString(body)
+	b.WriteByte('\n')
+	for _, v := range sections {
+		b.WriteString(v)
+		b.WriteByte('\n')
+	}
+	text := b.String()
+	patterns := []*regexp.Regexp{
+		regexp.MustCompile(`(?i)\[x\].*synthetic or explicitly public`),
+		regexp.MustCompile(`(?i)\[X\].*synthetic or explicitly public`),
+		regexp.MustCompile(`(?is)attestation.*\n.*\[x\]`),
+	}
+	for _, p := range patterns {
+		if p.MatchString(text) {
+			return true
+		}
+	}
+	return false
+}
+
+func extractPackageJSON(body string, sections map[string]string) (map[string]any, error) {
+	for _, key := range []string{"full package json (preferred)", "full package json", "package json"} {
+		if raw, ok := sections[key]; ok && strings.TrimSpace(raw) != "" {
+			return parsePackageRaw(raw)
+		}
+	}
+	if m := packageFenceRE.FindStringSubmatch(body); m != nil {
+		return parsePackageRaw(m[1])
+	}
+	return nil, nil
+}
+
+func parsePackageRaw(raw string) (map[string]any, error) {
+	raw = strings.TrimSpace(raw)
+	if m := packageFenceRE.FindStringSubmatch(raw); m != nil {
+		raw = strings.TrimSpace(m[1])
+	}
+	if len(raw) > MaxPackageChars {
+		return nil, &Error{Msg: fmt.Sprintf("package JSON exceeds %d characters", MaxPackageChars)}
+	}
+	var value map[string]any
+	if err := json.Unmarshal([]byte(raw), &value); err != nil {
+		return nil, &Error{Msg: fmt.Sprintf("full package JSON is invalid: %v", err)}
+	}
+	return value, nil
+}
+
+func bounded(label, value string) (string, error) {
+	if len(value) > MaxFieldChars {
+		return "", &Error{Msg: fmt.Sprintf("%s exceeds %d characters", label, MaxFieldChars)}
+	}
+	return value, nil
+}
+
+func guessCodePath(code string) string {
+	if strings.Contains(code, "package main") || regexp.MustCompile(`\bfunc\s+\w+\s*\(`).MatchString(code) {
+		return "issue/sample.go"
+	}
+	if regexp.MustCompile(`(?m)^\s*(def|class|import|from)\s+`).MatchString(code) || strings.Contains(code, "async def") {
+		return "issue/sample.py"
+	}
+	if regexp.MustCompile(`(?m)^(apiVersion|kind):\s*\S+`).MatchString(code) {
+		return "issue/manifest.yaml"
+	}
+	if strings.HasPrefix(strings.TrimLeft(code, " \t"), "{") {
+		return "issue/config.json"
+	}
+	return "issue/sample-code.txt"
+}
+
+func buildPackageFromFields(sections map[string]string, issueNumber int) (map[string]any, error) {
+	tech, err := bounded("tech spec", firstSection(sections, "tech spec (markdown)", "tech spec"))
+	if err != nil {
+		return nil, err
+	}
+	code, err := bounded("sample code", firstSection(sections, "sample code", "code"))
+	if err != nil {
+		return nil, err
+	}
+	obsRaw := firstSection(sections, "observations json array", "observations json", "observations")
+	domains := parseDomains(firstSection(sections, "domains (optional scope filter)", "domains"))
+	if strings.TrimSpace(tech) == "" && strings.TrimSpace(code) == "" && strings.TrimSpace(obsRaw) == "" {
+		return nil, &Error{Msg: "provide tech spec and/or sample code (or full package JSON / observations)"}
+	}
+	var observations []any
+	if strings.TrimSpace(obsRaw) != "" {
+		if err := json.Unmarshal([]byte(obsRaw), &observations); err != nil {
+			return nil, &Error{Msg: fmt.Sprintf("observations JSON is invalid: %v", err)}
+		}
+	}
+	pkg := map[string]any{
+		"schema_version": "pathfinder-evidence-package-v1",
+		"package_id":     fmt.Sprintf("github-issue-%d", issueNumber),
+		"scope":          map[string]any{},
+		"observations":   []any{},
+	}
+	if len(domains) > 0 {
+		domAny := make([]any, len(domains))
+		for i, d := range domains {
+			domAny[i] = d
+		}
+		pkg["scope"] = map[string]any{"domains": domAny}
+	}
+	var techSHA string
+	if tech != "" {
+		techSHA = sha(tech)
+		pkg["tech_spec"] = map[string]any{
+			"artifact_id": "tech_spec",
+			"path":        "issue/tech-spec.md",
+			"revision":    "sha256:" + techSHA,
+			"sha256":      techSHA,
+			"content":     tech,
+		}
+	}
+	if code != "" {
+		codeSHA := sha(code)
+		pkg["code"] = []any{map[string]any{
+			"artifact_id": "code-0",
+			"path":        guessCodePath(code),
+			"revision":    "sha256:" + codeSHA,
+			"sha256":      codeSHA,
+			"content":     code,
+		}}
+	}
+	obsOut := []any{}
+	for index, item := range observations {
+		obs, ok := item.(map[string]any)
+		if !ok {
+			return nil, &Error{Msg: fmt.Sprintf("observations[%d] must be an object", index)}
+		}
+		obs = cloneMap(obs)
+		if _, ok := obs["artifact_id"]; !ok {
+			if tech != "" {
+				obs["artifact_id"] = "tech_spec"
+			} else {
+				obs["artifact_id"] = "code-0"
+			}
+		}
+		if _, ok := obs["path"]; !ok {
+			if obs["artifact_id"] == "tech_spec" {
+				obs["path"] = "issue/tech-spec.md"
+			} else if codeList, ok := pkg["code"].([]any); ok && len(codeList) > 0 {
+				obs["path"] = codeList[0].(map[string]any)["path"]
+			} else {
+				obs["path"] = "issue/sample-code.txt"
+			}
+		}
+		if _, hasRev := obs["revision"]; !hasRev {
+			if _, hasSHA := obs["source_sha256"]; !hasSHA {
+				if obs["artifact_id"] == "tech_spec" && techSHA != "" {
+					obs["revision"] = "sha256:" + techSHA
+					obs["source_sha256"] = techSHA
+				} else if codeList, ok := pkg["code"].([]any); ok && len(codeList) > 0 {
+					c0 := codeList[0].(map[string]any)
+					obs["revision"] = c0["revision"]
+					obs["source_sha256"] = c0["sha256"]
+				} else {
+					return nil, &Error{Msg: fmt.Sprintf("observations[%d] needs source_sha256/revision when no tech_spec/code content is supplied", index)}
+				}
+			}
+		}
+		if _, ok := obs["locator"]; !ok {
+			pred := obs["predicate"]
+			if pred == nil {
+				pred = fmt.Sprintf("obs-%d", index)
+			}
+			obs["locator"] = map[string]any{"kind": "issue_claim", "value": pred}
+		}
+		obsOut = append(obsOut, obs)
+	}
+	pkg["observations"] = obsOut
+	return pkg, nil
+}
+
+func pinArtifactHashes(packageObj map[string]any) map[string]any {
+	out := cloneMap(packageObj)
+	digests := map[string]string{}
+	if tech, ok := out["tech_spec"].(map[string]any); ok {
+		if content, ok := tech["content"].(string); ok && strings.TrimSpace(content) != "" {
+			tech = cloneMap(tech)
+			digest := sha(content)
+			tech["sha256"] = digest
+			tech["revision"] = "sha256:" + digest
+			if _, ok := tech["artifact_id"]; !ok {
+				tech["artifact_id"] = "tech_spec"
+			}
+			if _, ok := tech["path"]; !ok {
+				tech["path"] = "issue/tech-spec.md"
+			}
+			out["tech_spec"] = tech
+			digests[tech["artifact_id"].(string)] = digest
+		}
+	}
+	var codeBlocks []any
+	for index, raw := range asSlice(out["code"]) {
+		block, ok := raw.(map[string]any)
+		if !ok {
+			codeBlocks = append(codeBlocks, raw)
+			continue
+		}
+		content, ok := block["content"].(string)
+		if !ok {
+			codeBlocks = append(codeBlocks, block)
+			continue
+		}
+		item := cloneMap(block)
+		digest := sha(content)
+		item["sha256"] = digest
+		item["revision"] = "sha256:" + digest
+		if _, ok := item["artifact_id"]; !ok {
+			item["artifact_id"] = fmt.Sprintf("code-%d", index)
+		}
+		if _, ok := item["path"]; !ok {
+			item["path"] = fmt.Sprintf("issue/sample-code-%d.txt", index)
+		}
+		codeBlocks = append(codeBlocks, item)
+		digests[item["artifact_id"].(string)] = digest
+	}
+	if len(codeBlocks) > 0 {
+		out["code"] = codeBlocks
+	}
+	var observations []any
+	for _, raw := range asSlice(out["observations"]) {
+		item, ok := raw.(map[string]any)
+		if !ok {
+			observations = append(observations, raw)
+			continue
+		}
+		obs := cloneMap(item)
+		if id, ok := obs["artifact_id"].(string); ok {
+			if digest, ok := digests[id]; ok {
+				obs["source_sha256"] = digest
+				obs["revision"] = "sha256:" + digest
+			}
+		}
+		observations = append(observations, obs)
+	}
+	if _, ok := out["observations"]; ok {
+		out["observations"] = observations
+	}
+	return out
+}
+
+// PackageFromIssue builds a pinned package; catalogDir used for paste subjects + collector validation.
+func PackageFromIssue(body string, issueNumber int, catalogDir string, subjects map[string]string, reg *predicates.Registry) (map[string]any, error) {
+	sections := ParseFormSections(body)
+	if !AttestationAccepted(body, sections) {
+		return nil, &Error{Msg: "public/synthetic attestation checkbox is required"}
+	}
+	pkg, err := extractPackageJSON(body, sections)
+	if err != nil {
+		return nil, err
+	}
+	if pkg == nil {
+		pkg, err = buildPackageFromFields(sections, issueNumber)
+		if err != nil {
+			return nil, err
+		}
+	}
+	pkg = cloneMap(pkg)
+	if _, ok := pkg["package_id"]; !ok {
+		pkg["package_id"] = fmt.Sprintf("github-issue-%d", issueNumber)
+	}
+	if pkg["schema_version"] != "pathfinder-evidence-package-v1" {
+		return nil, &Error{Msg: "package schema_version must be pathfinder-evidence-package-v1"}
+	}
+	pkg = pinArtifactHashes(pkg)
+	pkg, err = paste.EnsureObservations(pkg, subjects)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := pkgcollect.CollectObservations(pkg, reg); err != nil {
+		return nil, err
+	}
+	_ = catalogDir
+	return pkg, nil
+}
+
+// RenderResultComment builds markdown without embedding source bodies.
+func RenderResultComment(report, packageObj map[string]any, runURL string) (string, error) {
+	counts := countMap(report["counts"])
+	lines := []string{
+		CommentMarker,
+		"## Pathfinder catalog evaluation",
+		"",
+		fmt.Sprintf("- **Aggregate status:** `%v`", report["aggregate_status"]),
+		fmt.Sprintf("- **Meaning:** %v", report["aggregate_meaning"]),
+		fmt.Sprintf("- **Catalog size:** %v", report["catalog_size"]),
+		fmt.Sprintf("- **Observations used:** %v", report["observation_count"]),
+		fmt.Sprintf("- **Package id:** `%v`", packageObj["package_id"]),
+		fmt.Sprintf("- **Report fingerprint:** `%v`", report["report_sha256"]),
+		fmt.Sprintf("- **Workflow run:** %s", runURL),
+	}
+	extraction, _ := report["extraction"].(map[string]any)
+	if extraction == nil {
+		extraction, _ = packageObj["extraction"].(map[string]any)
+	}
+	if extraction != nil {
+		lines = append(lines, fmt.Sprintf(
+			"- **Paste extractor:** `%v` (%v observations)",
+			extraction["extractor"], extraction["observation_count"],
+		))
+	}
+	lines = append(lines,
+		"",
+		"### Outcome counts",
+		"",
+		"| Outcome | Count |",
+		"|---|---:|",
+		fmt.Sprintf("| supported_deviation | %d |", counts["supported_deviation"]),
+		fmt.Sprintf("| no_deviation_found | %d |", counts["no_deviation_found"]),
+		fmt.Sprintf("| inconclusive | %d |", counts["inconclusive"]),
+		fmt.Sprintf("| not_applicable | %d |", counts["not_applicable"]),
+		"",
+		"### Notable requirements",
+		"",
+	)
+	results, _ := report["results"].([]map[string]any)
+	if results == nil {
+		if raw, ok := report["results"].([]any); ok {
+			for _, r := range raw {
+				if m, ok := r.(map[string]any); ok {
+					results = append(results, m)
+				}
+			}
+		}
+	}
+	var notable []map[string]any
+	for _, row := range results {
+		o := row["outcome"]
+		if o == "supported_deviation" || o == "no_deviation_found" {
+			notable = append(notable, row)
+			if len(notable) >= 20 {
+				break
+			}
+		}
+	}
+	if len(notable) == 0 {
+		lines = append(lines, "_No confident aligned/deviation results; most in-scope requirements were inconclusive or out of scope._")
+	} else {
+		lines = append(lines, "| ADR | Domain | Outcome | Predicate |", "|---|---|---|---|")
+		for _, row := range notable {
+			lines = append(lines, fmt.Sprintf("| `%v` | %v | `%v` | `%v` |", row["adr_id"], row["domain"], row["outcome"], row["predicate"]))
+		}
+	}
+	lines = append(lines,
+		"",
+		"### Evidence boundary",
+		"",
+		"- Full tech-spec/code bodies are **not** copied into this comment.",
+		"- Download the workflow artifact `pathfinder-issue-evaluation` for the full report JSON.",
+		"- Catalog labels remain `synthetic_unadjudicated`. Missing observations stay `inconclusive`.",
+		"- This comment does not waive ADRs, mutate production, or create training labels.",
+		"",
+	)
+	comment := strings.Join(lines, "\n")
+	if tech, ok := packageObj["tech_spec"].(map[string]any); ok {
+		if c, ok := tech["content"].(string); ok && len(c) > 40 && strings.Contains(comment, c) {
+			return "", &Error{Msg: "refusing to post a comment that embeds source content"}
+		}
+	}
+	for _, raw := range asSlice(packageObj["code"]) {
+		if block, ok := raw.(map[string]any); ok {
+			if c, ok := block["content"].(string); ok && len(c) > 40 && strings.Contains(comment, c) {
+				return "", &Error{Msg: "refusing to post a comment that embeds source content"}
+			}
+		}
+	}
+	return comment, nil
+}
+
+func RenderErrorComment(message, runURL string) string {
+	return CommentMarker + "\n" +
+		"## Pathfinder catalog evaluation failed\n\n" +
+		message + "\n\n" +
+		"Workflow run: " + runURL + "\n\n" +
+		"Fix the issue body (attestation, package schema, or paste content) and edit the issue to re-run.\n" +
+		"See `docs/ISSUE_ANALYZE_WORKFLOW.md`.\n"
+}
+
+func firstSection(sections map[string]string, keys ...string) string {
+	for _, k := range keys {
+		if v, ok := sections[k]; ok {
+			return v
+		}
+	}
+	return ""
+}
+
+func parseDomains(raw string) []string {
+	raw = strings.ReplaceAll(raw, "\n", ",")
+	var out []string
+	for _, part := range strings.Split(raw, ",") {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			out = append(out, part)
+		}
+	}
+	return out
+}
+
+func cloneMap(in map[string]any) map[string]any {
+	out := make(map[string]any, len(in))
+	for k, v := range in {
+		out[k] = v
+	}
+	return out
+}
+
+func asSlice(v any) []any {
+	if v == nil {
+		return nil
+	}
+	if s, ok := v.([]any); ok {
+		return s
+	}
+	return nil
+}
+
+func countMap(v any) map[string]int {
+	out := map[string]int{
+		"supported_deviation": 0,
+		"no_deviation_found":  0,
+		"inconclusive":        0,
+		"not_applicable":      0,
+	}
+	switch m := v.(type) {
+	case map[string]int:
+		for k, n := range m {
+			out[k] = n
+		}
+	case map[string]any:
+		for k, raw := range m {
+			switch n := raw.(type) {
+			case int:
+				out[k] = n
+			case float64:
+				out[k] = int(n)
+			}
+		}
+	}
+	return out
+}

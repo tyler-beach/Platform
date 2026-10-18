@@ -11,7 +11,7 @@ on:
         type: string
 
 permissions:
-  contents: read
+  contents: write
   issues: write
 
 concurrency:
@@ -19,23 +19,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  evaluate:
-    name: Evaluate evidence package
+  resolve:
+    name: Resolve issue number
     if: >
       github.event_name == 'workflow_dispatch' ||
       contains(github.event.issue.title, '[Pathfinder analyze]') ||
       contains(join(github.event.issue.labels.*.name, ','), 'pathfinder-analyze')
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    outputs:
+      number: ${{ steps.issue.outputs.number }}
     steps:
-      - name: Check out repository
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-
-      - name: Set up Python
-        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
-        with:
-          python-version: "3.12"
-
       - name: Resolve issue number
         id: issue
         env:
@@ -49,37 +42,13 @@ jobs:
             echo "number=${ISSUE_NUMBER}" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Evaluate package and comment
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          ISSUE_NUMBER: ${{ steps.issue.outputs.number }}
-        run: |
-          mkdir -p "$RUNNER_TEMP/pathfinder-issue"
-          set +e
-          python .poc/issue_analyze/issue_package.py \
-            --issue-number "$ISSUE_NUMBER" \
-            --repo "$GITHUB_REPOSITORY" \
-            --run-url "$RUN_URL" \
-            --work-dir "$RUNNER_TEMP/pathfinder-issue" \
-            --comment
-          status=$?
-          set -e
-          # Always keep the comment/report for artifacts; non-zero means intake/eval failure.
-          if [ ! -f "$RUNNER_TEMP/pathfinder-issue/comment.md" ]; then
-            echo "comment.md missing" >&2
-            exit 1
-          fi
-          exit "$status"
-
-      - name: Publish evaluation artifact
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: pathfinder-issue-evaluation-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            ${{ runner.temp }}/pathfinder-issue/report.json
-            ${{ runner.temp }}/pathfinder-issue/comment.md
-          if-no-files-found: warn
-          retention-days: 14
+  analyze:
+    name: Go staged analyze
+    needs: resolve
+    uses: ./.github/workflows/pathfinder-go-analyze.yml
+    with:
+      issue_number: ${{ needs.resolve.outputs.number }}
+      comment: true
+    permissions:
+      contents: write
+      issues: write
