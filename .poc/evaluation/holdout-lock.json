@@ -1,0 +1,10 @@
+{
+  "schema_version": "pathfinder.locked-holdout.v1",
+  "dataset_path": ".poc/evaluation/locked_holdout.jsonl",
+  "sha256": "1198ed4788e189c32cf99ee575a9e7bae63000c1373e681801554ea7cfc3c14e",
+  "case_ids": ["H-001", "H-002", "H-003", "H-004"],
+  "status": "quarantined_pending_independent_adjudication",
+  "labels_are_ground_truth": false,
+  "access_policy": "Do not use these cases to tune prompts, thresholds, retrieval, rules, or candidate training. Only independent reviewers may adjudicate them; unlock evaluation only in a separately approved evaluation workflow.",
+  "note": "This is a locked, unlabeled provisional holdout seed set. It is not yet an independent accuracy benchmark; labels remain pending."
+}
