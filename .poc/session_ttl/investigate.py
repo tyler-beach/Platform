@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -47,8 +48,12 @@ def validate_json_pointer_evidence(item: dict[str, Any], source: dict[str, Any])
         value: Any = json.loads(source["content"])
         if pointer:
             for raw_token in pointer[1:].split("/"):
+                if re.search(r"~(?![01])", raw_token):
+                    raise ValueError("invalid JSON pointer escape")
                 token = raw_token.replace("~1", "/").replace("~0", "~")
                 if isinstance(value, list):
+                    if not re.fullmatch(r"0|[1-9][0-9]*", token):
+                        raise KeyError(token)
                     value = value[int(token)]
                 elif isinstance(value, dict):
                     value = value[token]
