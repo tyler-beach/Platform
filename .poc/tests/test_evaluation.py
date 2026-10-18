@@ -18,6 +18,13 @@ class LabeledEvaluationTests(unittest.TestCase):
         self.assertEqual({case["gold_label"] for case in cases}, {"deviation", "no_deviation", "ambiguous"})
         self.assertGreaterEqual(len(cases), 12)
 
+    def test_dataset_fingerprint_is_stable_and_tracks_exact_corpus_bytes(self):
+        first = evaluate.dataset_fingerprint()
+        second = evaluate.dataset_fingerprint()
+        self.assertEqual(first, second)
+        self.assertEqual(len(first), 64)
+        self.assertTrue(all(char in "0123456789abcdef" for char in first))
+
     def test_metrics_include_behavior_breakdown(self):
         rows = [
             {"case_id": "D1", "behavior": "direct_provider", "gold_label": "deviation", "predicted_label": "deviation", "accepted_outcome": "supported_deviation", "score_0_to_100": 80.0},
