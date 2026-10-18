@@ -95,8 +95,17 @@ class PagesSnapshotTests(unittest.TestCase):
         self.assertIn("synthetic", page.lower())
         for control in ("demo-previous", "demo-next", "demo-play", "demo-pause", "demo-reload-history"):
             self.assertIn(f'id="{control}"', demo_app)
-        for link in ("demo-open-analysis", "demo-open-evaluation", "demo-open-functional", "demo-guide-analysis", "demo-guide-evaluation", "demo-guide-functional"):
+        for link in (
+            "demo-open-analysis", "demo-open-evaluation", "demo-open-functional",
+            "demo-open-paste-analyze", "demo-open-paste-issue", "demo-open-paste-workflow",
+            "demo-guide-analysis", "demo-guide-evaluation", "demo-guide-functional",
+            "demo-guide-paste-analyze", "demo-guide-paste-issue",
+        ):
             self.assertIn(link, demo_app)
+        self.assertIn("demo-paste-eval", demo_app)
+        self.assertIn("pathfinder-issue-analyze.yml", javascript)
+        self.assertIn("paste-eval-snapshot.json", javascript)
+        self.assertIn("pathfinder-analyze.yml", demo_app)
         self.assertNotIn("https://github.com/tyler-beach/Platform/actions/workflows/", page)
         self.assertIn("aria-live", demo_app)
         self.assertIn("prefers-reduced-motion: reduce", styles)

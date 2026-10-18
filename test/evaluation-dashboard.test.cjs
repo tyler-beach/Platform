@@ -8,13 +8,16 @@ const dashboard = fs.readFileSync(path.join(root, 'src/components/EvaluationDash
 const site = fs.readFileSync(path.join(root, 'src/site.jsx'), 'utf8');
 const styles = fs.readFileSync(path.join(root, 'src/styles.css'), 'utf8');
 
-test('evaluation page keeps three evaluation tracks separate and explicit', () => {
-  for (const key of ['regression', 'coverage', 'holdout']) {
+test('evaluation page keeps evaluation tracks separate and explicit', () => {
+  for (const key of ['regression', 'coverage', 'holdout', 'paste']) {
     assert.match(dashboard, new RegExp(key));
   }
   assert.match(dashboard, /not independently adjudicated/);
   assert.match(dashboard, /not like-for-like/);
   assert.match(dashboard, /holdout stays quarantined/);
+  assert.match(dashboard, /pathfinder-analyze\.yml/);
+  assert.match(dashboard, /pathfinder-issue-analyze\.yml/);
+  assert.match(dashboard, /Four checks, four different questions/);
 });
 
 test('review lifecycle is navigable and preserves independent adjudication', () => {

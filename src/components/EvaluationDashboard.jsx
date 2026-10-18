@@ -47,6 +47,22 @@ const tracks = {
     ],
     status: 'Quarantined · excluded from tuning and routine regression scoring',
   },
+  paste: {
+    eyebrow: 'PASTE → CATALOG (GITHUB BACKBONE)',
+    title: 'Submit a real sample through Issues.',
+    description: 'Paste a tech-spec or Go/Python sample into a Pathfinder analyze issue. Actions extracts allowlisted observations, evaluates the 100-ADR catalog, and comments aggregate results. Pages only hosts a redacted fixture snapshot—execution stays on GitHub.',
+    facts: [
+      ['100', 'synthetic catalog ADRs'],
+      ['Issues', 'intake surface'],
+      ['Actions', 'evaluate + comment'],
+    ],
+    actions: [
+      { label: 'Open Pathfinder analyze issue', href: 'https://github.com/tyler-beach/Platform/issues/new?template=pathfinder-analyze.yml', primary: true },
+      { label: 'Open issue-analyze workflow', href: 'https://github.com/tyler-beach/Platform/actions/workflows/pathfinder-issue-analyze.yml' },
+      { label: 'Read paste workflow docs', href: 'https://github.com/tyler-beach/Platform/blob/main/docs/ISSUE_ANALYZE_WORKFLOW.md' },
+    ],
+    status: 'Public/synthetic content only · unextracted predicates stay inconclusive',
+  },
 };
 
 const reviewStages = [
@@ -70,22 +86,24 @@ export default function EvaluationDashboard() {
       <p>Run the offline checks, compare the candidate with the base revision, and trace reviewer feedback without turning an unverified opinion into a new baseline.</p>
       <div className="evaluation-hero__actions">
         <a className="evaluation-action evaluation-action--primary" href="https://github.com/tyler-beach/Platform/actions/workflows/poc-evaluation.yml" target="_blank" rel="noreferrer"><Play size={15} /> Run evaluation workflow <ArrowUpRight size={14}/></a>
+        <a className="evaluation-action" href="https://github.com/tyler-beach/Platform/issues/new?template=pathfinder-analyze.yml" target="_blank" rel="noreferrer"><GitPullRequest size={15}/> Paste analyze issue <ArrowUpRight size={14}/></a>
         <a className="evaluation-action" href="https://github.com/tyler-beach/Platform/issues?q=is%3Aissue+label%3Apathfinder-review" target="_blank" rel="noreferrer"><GitPullRequest size={15}/> Review issues <ArrowUpRight size={14}/></a>
       </div>
       <div className="evaluation-trust-note"><LockKeyhole size={15}/><span>Offline mock by default · no paid model calls · holdout stays quarantined</span></div>
     </header>
 
     <section className="evaluation-section" aria-labelledby="evaluation-track-title">
-      <div className="evaluation-section__heading"><div><span className="evaluation-kicker">01 / CHOOSE A TRACK</span><h2 id="evaluation-track-title">Three checks, three different questions</h2></div><p>Do not combine these numbers into one score. They measure different things.</p></div>
+      <div className="evaluation-section__heading"><div><span className="evaluation-kicker">01 / CHOOSE A TRACK</span><h2 id="evaluation-track-title">Four checks, four different questions</h2></div><p>Do not combine these numbers into one score. They measure different things.</p></div>
       <div className="evaluation-track-tabs" role="tablist" aria-label="Evaluation track">
         <button type="button" role="tab" aria-selected={track === 'regression'} onClick={() => setTrack('regression')}>Detector regression</button>
         <button type="button" role="tab" aria-selected={track === 'coverage'} onClick={() => setTrack('coverage')}>Evidence coverage</button>
         <button type="button" role="tab" aria-selected={track === 'holdout'} onClick={() => setTrack('holdout')}>Locked holdout</button>
+        <button type="button" role="tab" aria-selected={track === 'paste'} onClick={() => setTrack('paste')}>Paste catalog</button>
       </div>
       <article className="evaluation-track-panel" role="tabpanel">
         <div className="evaluation-track-panel__intro"><span className="evaluation-kicker">{current.eyebrow}</span><h3>{current.title}</h3><p>{current.description}</p></div>
         <div className="evaluation-facts">{current.facts.map(([value, label]) => <div className="evaluation-fact" key={value + label}><strong>{value}</strong><span>{label}</span></div>)}</div>
-        <div className="evaluation-track-panel__footer"><span><CircleHelp size={14}/>{current.status}</span><div>{current.actions.map(action => <a key={action.label} className={action.primary ? 'is-primary' : ''} href={action.href} target="_blank" rel="noreferrer">{action.label}<ArrowUpRight size={13}/></a>)}</div></div>
+        <div className="evaluation-track-panel__footer"><span><CircleHelp size={14}/>{current.status}</span><div>{current.actions.map(action => <a key={action.label} className={action.primary ? 'is-primary' : ''} href={action.href} {...(action.href.startsWith('http') ? { target: '_blank', rel: 'noreferrer' } : {})}>{action.label}<ArrowUpRight size={13}/></a>)}</div></div>
       </article>
     </section>
 

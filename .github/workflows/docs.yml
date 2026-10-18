@@ -112,6 +112,10 @@ jobs:
             --run-dir "$DEMO_ROOT/runs/pages-fixture-walkthrough" \
             --fixture-root .poc/fixtures/go \
             --output site/demo/data/sample-run.json
+      - name: Build redacted paste-evaluation demo snapshot
+        run: |
+          mkdir -p site/demo/data
+          python .poc/demo/export_paste_eval_snapshot.py --output site/demo/data/paste-eval-snapshot.json
       - name: Validate generated walkthrough data
         run: |
           python - <<'PY'
@@ -119,12 +123,22 @@ jobs:
           from pathlib import Path
           page = Path("site/demo/index.html").read_text(encoding="utf-8")
           data = json.loads(Path("site/demo/data/sample-run.json").read_text(encoding="utf-8"))
+          paste = json.loads(Path("site/demo/data/paste-eval-snapshot.json").read_text(encoding="utf-8"))
           assert 'id="root"' in page
           assert data["schema_version"] == "adr-demo-run-v1"
           assert data["sample"]["synthetic"] is True and data["sample"]["provider"] == "mock"
           assert data["stages"] and data["evidence"] and data["confidence"]["components"]
           assert "not a calibrated probability" in data["confidence"]["interpretation"].lower()
+          assert paste["schema_version"] == "pathfinder-paste-eval-demo-v1"
+          assert paste["backbone"] == "github-issues-actions"
+          assert paste["observation_count"] > 0
+          assert "sk-live" not in json.dumps(paste)
+          # Vite embeds the demo mount markers into the JS bundle; HTML shell still has #root.
+          bundle = "\n".join(p.read_text(encoding="utf-8", errors="ignore") for p in Path("site/assets").glob("*.js"))
+          assert "demo-paste-eval" in bundle
+          assert "pathfinder-analyze.yml" in bundle
           print(f"Validated generated demo walkthrough ({len(data['stages'])} stages, {len(data['evidence'])} evidence items).")
+          print(f"Validated paste-eval snapshot ({paste['observation_count']} observations, status={paste['aggregate_status']}).")
           PY
       - name: Generate and validate the synthetic scenario gallery
         env:
