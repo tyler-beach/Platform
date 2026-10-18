@@ -1,6 +1,6 @@
 # Pathfinder first run (collaborators)
 
-Unaided path to a useful catalog evaluation on this repository’s **prototype real ADR pack**.
+Unaided path to a useful catalog evaluation on this repository’s **prototype real ADR pack** (200 org-style ADRs: engineering controls + enterprise standards).
 
 ## 1. Open an analyze issue
 

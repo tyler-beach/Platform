@@ -11,6 +11,41 @@
       ],
       "value_type": "boolean"
     },
+    "api.deprecation.notice_days": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "numeric_min"
+      ],
+      "description": "Public API deprecations MUST give at least 90 days notice.",
+      "domains": [
+        "api"
+      ],
+      "example_limit": 90,
+      "subject_hint": "public-api",
+      "value_type": "number"
+    },
+    "api.idempotency_key.supported": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Payment mutation APIs MUST accept idempotency keys.",
+      "domains": [
+        "api"
+      ],
+      "value_type": "boolean"
+    },
+    "api.input_validation.present": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Public write APIs MUST validate request schemas.",
+      "domains": [
+        "api"
+      ],
+      "value_type": "boolean"
+    },
     "api.openapi.published": {
       "collector": "structured_package",
       "compatible_kinds": [
@@ -22,6 +57,29 @@
       ],
       "value_type": "boolean"
     },
+    "api.pagination.present": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "List endpoints returning unbounded collections MUST paginate.",
+      "domains": [
+        "api"
+      ],
+      "value_type": "boolean"
+    },
+    "api.payments.idempotency_required": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Payment mutation APIs MUST require idempotency keys.",
+      "domains": [
+        "api"
+      ],
+      "subject_hint": "payments",
+      "value_type": "boolean"
+    },
     "api.rate_limit.enabled": {
       "collector": "structured_package",
       "compatible_kinds": [
@@ -30,6 +88,170 @@
       "description": "Public APIs MUST enforce rate limiting.",
       "domains": [
         "api"
+      ],
+      "value_type": "boolean"
+    },
+    "api.request_id.propagated": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Service APIs MUST propagate a request correlation ID.",
+      "domains": [
+        "api"
+      ],
+      "value_type": "boolean"
+    },
+    "api.versioning.breaking_requires_major": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Breaking public API changes MUST bump a major version.",
+      "domains": [
+        "api"
+      ],
+      "subject_hint": "public-api",
+      "value_type": "boolean"
+    },
+    "api.versioning.major_for_breaking": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Public APIs MUST NOT remove fields without a major version bump.",
+      "domains": [
+        "api"
+      ],
+      "value_type": "boolean"
+    },
+    "architecture.adr.required": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Cross-cutting technical decisions MUST be recorded as ADRs.",
+      "domains": [
+        "platform"
+      ],
+      "subject_hint": "cross-cutting",
+      "value_type": "boolean"
+    },
+    "architecture.review.required_tier01": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Tier-0/1 services MUST pass architecture review before major launches.",
+      "domains": [
+        "platform"
+      ],
+      "subject_hint": "service",
+      "value_type": "boolean"
+    },
+    "architecture.service_tier.assigned": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Production services MUST be assigned a service tier (0\u20133).",
+      "domains": [
+        "platform"
+      ],
+      "subject_hint": "service",
+      "value_type": "boolean"
+    },
+    "architecture.tenant_isolation.tested": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Multi-tenant systems MUST have automated tenant-isolation tests.",
+      "domains": [
+        "platform"
+      ],
+      "subject_hint": "multi-tenant",
+      "value_type": "boolean"
+    },
+    "bc.plan.documented": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "The organization MUST maintain a business continuity plan.",
+      "domains": [
+        "reliability"
+      ],
+      "subject_hint": "org",
+      "value_type": "boolean"
+    },
+    "change.cab.required": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Production changes MUST go through change advisory (CAB) when risk is high.",
+      "domains": [
+        "platform"
+      ],
+      "subject_hint": "production",
+      "value_type": "boolean"
+    },
+    "change.feature_flag.required": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "High-risk launches MUST be gated behind a feature flag.",
+      "domains": [
+        "platform"
+      ],
+      "subject_hint": "release",
+      "value_type": "boolean"
+    },
+    "change.maintenance_window.declared": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Disruptive production changes MUST declare a maintenance window.",
+      "domains": [
+        "platform"
+      ],
+      "subject_hint": "production",
+      "value_type": "boolean"
+    },
+    "change.rollback_plan.required": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Production changes MUST include a documented rollback plan.",
+      "domains": [
+        "platform"
+      ],
+      "subject_hint": "production",
+      "value_type": "boolean"
+    },
+    "cicd.branch_protection.deny_force_push": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Default branches MUST deny force pushes.",
+      "domains": [
+        "cicd"
+      ],
+      "value_type": "boolean"
+    },
+    "cicd.branch_protection.required_checks": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Merges MUST require green required status checks.",
+      "domains": [
+        "cicd"
       ],
       "value_type": "boolean"
     },
@@ -44,6 +266,110 @@
       ],
       "value_type": "number"
     },
+    "cicd.dependency_scanning.enabled": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Application CI pipelines MUST enable dependency vulnerability scanning.",
+      "domains": [
+        "cicd"
+      ],
+      "subject_hint": "pipeline",
+      "value_type": "boolean"
+    },
+    "cicd.image.latest_tag": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "dependency_forbidden"
+      ],
+      "description": "Production deploys MUST NOT use the mutable latest image tag.",
+      "domains": [
+        "cicd"
+      ],
+      "value_type": "boolean"
+    },
+    "cicd.image.signed": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Production images MUST be signed.",
+      "domains": [
+        "cicd"
+      ],
+      "value_type": "boolean"
+    },
+    "cicd.image_scanning.enabled": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Container build pipelines MUST scan images before publish.",
+      "domains": [
+        "cicd"
+      ],
+      "subject_hint": "pipeline",
+      "value_type": "boolean"
+    },
+    "cicd.prod.approval_required": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Production deployments MUST require a human approval gate.",
+      "domains": [
+        "cicd"
+      ],
+      "subject_hint": "production",
+      "value_type": "boolean"
+    },
+    "cicd.provenance.attestation_required": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Production releases MUST publish build provenance attestations.",
+      "domains": [
+        "cicd"
+      ],
+      "subject_hint": "release",
+      "value_type": "boolean"
+    },
+    "cicd.provenance.present": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Production deploys MUST attach build provenance.",
+      "domains": [
+        "cicd"
+      ],
+      "value_type": "boolean"
+    },
+    "cicd.sast.enabled": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Application CI pipelines MUST enable SAST.",
+      "domains": [
+        "cicd"
+      ],
+      "subject_hint": "pipeline",
+      "value_type": "boolean"
+    },
+    "cicd.sbom.published": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Released services MUST publish an SBOM artifact.",
+      "domains": [
+        "cicd"
+      ],
+      "value_type": "boolean"
+    },
     "cicd.secret_scanning.enabled": {
       "collector": "structured_package",
       "compatible_kinds": [
@@ -55,12 +381,725 @@
       ],
       "value_type": "boolean"
     },
+    "cloud.audit.org_trail_enabled": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "The organization MUST enable an organization-wide audit trail.",
+      "domains": [
+        "cloud"
+      ],
+      "subject_hint": "org",
+      "value_type": "boolean"
+    },
+    "cloud.audit_trail.enabled": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Accounts MUST enable control-plane audit logging.",
+      "domains": [
+        "cloud"
+      ],
+      "value_type": "boolean"
+    },
+    "cloud.iac.drift_detection": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "IaC-managed environments MUST enable drift detection.",
+      "domains": [
+        "cloud"
+      ],
+      "subject_hint": "infrastructure",
+      "value_type": "boolean"
+    },
+    "cloud.iac.required": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Production infrastructure MUST be managed as code.",
+      "domains": [
+        "cloud"
+      ],
+      "subject_hint": "infrastructure",
+      "value_type": "boolean"
+    },
+    "cloud.iam.admin_equivalent": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "dependency_forbidden"
+      ],
+      "description": "Runtime roles MUST NOT use AdministratorAccess-equivalent policies.",
+      "domains": [
+        "cloud"
+      ],
+      "value_type": "boolean"
+    },
+    "cloud.object_storage.public_blocked": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Object storage public ACLs MUST be blocked at the org policy layer.",
+      "domains": [
+        "cloud"
+      ],
+      "subject_hint": "bucket",
+      "value_type": "boolean"
+    },
+    "cloud.object_storage.public_read": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "dependency_forbidden"
+      ],
+      "description": "Object storage holding customer data MUST NOT use public-read ACLs.",
+      "domains": [
+        "cloud"
+      ],
+      "value_type": "boolean"
+    },
+    "cloud.object_storage.versioning_enabled": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Critical document buckets MUST enable versioning.",
+      "domains": [
+        "cloud"
+      ],
+      "value_type": "boolean"
+    },
+    "cloud.rds.public_access_disabled": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Managed databases MUST disable public accessibility.",
+      "domains": [
+        "cloud"
+      ],
+      "value_type": "boolean"
+    },
+    "cloud.root.mfa_enabled": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Cloud account root users MUST have MFA enabled.",
+      "domains": [
+        "cloud"
+      ],
+      "value_type": "boolean"
+    },
+    "cloud.security_group.ssh_open": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "dependency_forbidden"
+      ],
+      "description": "SSH security groups MUST NOT allow 0.0.0.0/0.",
+      "domains": [
+        "cloud"
+      ],
+      "value_type": "boolean"
+    },
+    "cloud.tags.standard_enforced": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Cloud resources MUST carry the org tagging standard (owner, env, cost-center).",
+      "domains": [
+        "cloud"
+      ],
+      "subject_hint": "resource",
+      "value_type": "boolean"
+    },
+    "cloud.threat_detection.enabled": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Cloud accounts MUST enable threat detection (e.g. GuardDuty or equivalent).",
+      "domains": [
+        "cloud"
+      ],
+      "subject_hint": "account",
+      "value_type": "boolean"
+    },
+    "compliance.access_review.quarterly": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Privileged access MUST be reviewed at least quarterly.",
+      "domains": [
+        "compliance"
+      ],
+      "value_type": "boolean"
+    },
+    "compliance.audit_log.immutable": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Security audit logs MUST use append-only or WORM storage controls.",
+      "domains": [
+        "compliance"
+      ],
+      "value_type": "boolean"
+    },
+    "compliance.audit_log.immutable_store": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Security audit logs MUST be written to an immutable or WORM-capable store.",
+      "domains": [
+        "compliance"
+      ],
+      "subject_hint": "audit",
+      "value_type": "boolean"
+    },
+    "compliance.audit_log.retention_days": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "numeric_min"
+      ],
+      "description": "Security audit logs MUST retain at least 365 days.",
+      "domains": [
+        "compliance"
+      ],
+      "value_type": "number"
+    },
+    "compliance.audit_log.retention_years": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "numeric_min"
+      ],
+      "description": "Security audit logs MUST be retained at least 1 year.",
+      "domains": [
+        "compliance"
+      ],
+      "example_limit": 1,
+      "subject_hint": "audit",
+      "value_type": "number"
+    },
+    "compliance.change_ticket.required": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Production config changes MUST reference a change ticket.",
+      "domains": [
+        "compliance"
+      ],
+      "value_type": "boolean"
+    },
+    "compliance.dpia.recorded": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "New personal-data processors MUST record a DPIA reference.",
+      "domains": [
+        "compliance"
+      ],
+      "value_type": "boolean"
+    },
+    "compliance.framework.mapping_owned": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Applicable regulatory frameworks MUST have a named control-mapping owner.",
+      "domains": [
+        "compliance"
+      ],
+      "subject_hint": "org",
+      "value_type": "boolean"
+    },
+    "data.backup.encryption_enabled": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Backups MUST be encrypted at rest.",
+      "domains": [
+        "data"
+      ],
+      "value_type": "boolean"
+    },
+    "data.backup.restore_tested": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Critical backups MUST have periodic restore tests.",
+      "domains": [
+        "reliability"
+      ],
+      "subject_hint": "backup",
+      "value_type": "boolean"
+    },
+    "data.backup.retention_days": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "numeric_min"
+      ],
+      "description": "Critical system backups MUST retain at least 30 days.",
+      "domains": [
+        "data"
+      ],
+      "value_type": "number"
+    },
+    "data.backup.rpo_minutes": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "numeric_max"
+      ],
+      "description": "Tier-1 services MUST keep RPO at most 60 minutes.",
+      "domains": [
+        "reliability"
+      ],
+      "example_limit": 60,
+      "subject_hint": "tier1",
+      "value_type": "number"
+    },
+    "data.backup.rto_minutes": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "numeric_max"
+      ],
+      "description": "Tier-1 services MUST keep RTO at most 240 minutes.",
+      "domains": [
+        "reliability"
+      ],
+      "example_limit": 240,
+      "subject_hint": "tier1",
+      "value_type": "number"
+    },
+    "data.batch.idempotent": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Scheduled batch jobs that mutate state MUST be idempotent.",
+      "domains": [
+        "data"
+      ],
+      "subject_hint": "job",
+      "value_type": "boolean"
+    },
+    "data.classification.label_required": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Datasets containing personal or confidential data MUST carry a classification label.",
+      "domains": [
+        "compliance"
+      ],
+      "subject_hint": "dataset",
+      "value_type": "boolean"
+    },
+    "data.client.tls_required": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Datastore clients MUST use TLS.",
+      "domains": [
+        "data"
+      ],
+      "value_type": "boolean"
+    },
+    "data.field.classification_present": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Persisted customer profile fields MUST carry a data classification.",
+      "domains": [
+        "data"
+      ],
+      "value_type": "boolean"
+    },
+    "data.migration.destructive_flagged": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Destructive schema migrations MUST be explicitly flagged.",
+      "domains": [
+        "data"
+      ],
+      "value_type": "boolean"
+    },
+    "data.nonprod.anonymized": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Non-production environments MUST NOT use raw production PII without anonymization.",
+      "domains": [
+        "privacy"
+      ],
+      "subject_hint": "nonprod",
+      "value_type": "boolean"
+    },
+    "data.owner.assigned": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Authoritative datasets MUST have an assigned data owner.",
+      "domains": [
+        "compliance"
+      ],
+      "subject_hint": "dataset",
+      "value_type": "boolean"
+    },
+    "data.replica.lag_alerting": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Primary/replica datastores MUST alert on lag above threshold.",
+      "domains": [
+        "data"
+      ],
+      "value_type": "boolean"
+    },
+    "dr.test.yearly": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Tier-1 DR plans MUST be tested at least yearly.",
+      "domains": [
+        "reliability"
+      ],
+      "subject_hint": "tier1",
+      "value_type": "boolean"
+    },
+    "endpoint.disk_encryption.required": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Corporate laptops MUST enable full-disk encryption.",
+      "domains": [
+        "security"
+      ],
+      "subject_hint": "laptop",
+      "value_type": "boolean"
+    },
+    "endpoint.edr.deployed": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Corporate endpoints MUST run approved EDR.",
+      "domains": [
+        "security"
+      ],
+      "subject_hint": "laptop",
+      "value_type": "boolean"
+    },
+    "endpoint.screen_lock_minutes": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "numeric_max"
+      ],
+      "description": "Corporate endpoints MUST auto lock within 15 minutes.",
+      "domains": [
+        "security"
+      ],
+      "example_limit": 15,
+      "subject_hint": "laptop",
+      "value_type": "number"
+    },
+    "endpoint.usb_storage.restricted": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Removable USB storage MUST be restricted on corporate endpoints.",
+      "domains": [
+        "security"
+      ],
+      "subject_hint": "laptop",
+      "value_type": "boolean"
+    },
+    "finops.budget.alerts_configured": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Cloud accounts MUST configure budget alerts.",
+      "domains": [
+        "cloud"
+      ],
+      "subject_hint": "account",
+      "value_type": "boolean"
+    },
+    "finops.commit.coverage_percent": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "numeric_min"
+      ],
+      "description": "Steady-state compute MUST maintain at least 60% commit/reservation coverage.",
+      "domains": [
+        "cloud"
+      ],
+      "example_limit": 60,
+      "subject_hint": "compute",
+      "value_type": "number"
+    },
+    "finops.cost_center.tagged": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Billable cloud resources MUST include a cost-center tag.",
+      "domains": [
+        "cloud"
+      ],
+      "subject_hint": "resource",
+      "value_type": "boolean"
+    },
+    "finops.idle_review.monthly": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Accounts MUST run a monthly idle-resource review.",
+      "domains": [
+        "cloud"
+      ],
+      "subject_hint": "account",
+      "value_type": "boolean"
+    },
+    "frontend.a11y.wcag_level": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "set_membership"
+      ],
+      "description": "Customer-facing web apps MUST target WCAG 2.2 AA.",
+      "domains": [
+        "frontend"
+      ],
+      "subject_hint": "web",
+      "value_type": "string"
+    },
+    "frontend.cdn.sri_required": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Third-party CDN scripts MUST use Subresource Integrity.",
+      "domains": [
+        "frontend"
+      ],
+      "subject_hint": "cdn",
+      "value_type": "boolean"
+    },
+    "frontend.cookie.secure_httponly": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Session cookies MUST set Secure and HttpOnly.",
+      "domains": [
+        "frontend"
+      ],
+      "value_type": "boolean"
+    },
+    "frontend.cors.allowlist_only": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Browser clients MUST use an explicit CORS allowlist (no `*`).",
+      "domains": [
+        "frontend"
+      ],
+      "subject_hint": "web",
+      "value_type": "boolean"
+    },
+    "frontend.csp.present": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Browser apps MUST set a Content-Security-Policy.",
+      "domains": [
+        "frontend"
+      ],
+      "value_type": "boolean"
+    },
+    "frontend.deps.audit_gate": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Frontend releases MUST fail on high/critical dependency advisories.",
+      "domains": [
+        "frontend"
+      ],
+      "value_type": "boolean"
+    },
+    "frontend.secret_in_bundle.present": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "dependency_forbidden"
+      ],
+      "description": "Client bundles MUST NOT embed API secrets.",
+      "domains": [
+        "frontend"
+      ],
+      "value_type": "boolean"
+    },
+    "frontend.sri.required": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Third-party scripts MUST use Subresource Integrity when loaded from CDN.",
+      "domains": [
+        "frontend"
+      ],
+      "value_type": "boolean"
+    },
+    "iam.access_review.quarterly": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Privileged access MUST undergo quarterly access review.",
+      "domains": [
+        "identity"
+      ],
+      "subject_hint": "privileged",
+      "value_type": "boolean"
+    },
+    "iam.break_glass.monitored": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Break-glass accounts MUST be monitored and alerted.",
+      "domains": [
+        "identity"
+      ],
+      "subject_hint": "emergency",
+      "value_type": "boolean"
+    },
+    "iam.contractor.time_bound": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Contractor accounts MUST be time-bound with an expiry.",
+      "domains": [
+        "identity"
+      ],
+      "subject_hint": "contractor",
+      "value_type": "boolean"
+    },
+    "iam.jml.process_defined": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Workforce access MUST follow a joiner-mover-leaver process.",
+      "domains": [
+        "identity"
+      ],
+      "subject_hint": "workforce",
+      "value_type": "boolean"
+    },
+    "iam.mfa.hardware_for_admins": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Administrators MUST use hardware-backed MFA.",
+      "domains": [
+        "identity"
+      ],
+      "subject_hint": "admin",
+      "value_type": "boolean"
+    },
+    "iam.password_manager.required": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Workforce credentials MUST be stored in an approved password manager.",
+      "domains": [
+        "identity"
+      ],
+      "subject_hint": "workforce",
+      "value_type": "boolean"
+    },
+    "iam.privileged.jit_required": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Standing admin access is forbidden; privileged access MUST be just-in-time.",
+      "domains": [
+        "identity"
+      ],
+      "subject_hint": "admin",
+      "value_type": "boolean"
+    },
+    "iam.scim.provisioning_enabled": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Enterprise SaaS with SCIM support MUST enable SCIM provisioning.",
+      "domains": [
+        "identity"
+      ],
+      "subject_hint": "saas",
+      "value_type": "boolean"
+    },
+    "iam.sso.required": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Business applications MUST use organization SSO.",
+      "domains": [
+        "identity"
+      ],
+      "subject_hint": "business-app",
+      "value_type": "boolean"
+    },
     "identity.mfa.required": {
       "collector": "structured_package",
       "compatible_kinds": [
         "boolean_required"
       ],
       "description": "Administrative interactive login MUST require MFA.",
+      "domains": [
+        "identity"
+      ],
+      "value_type": "boolean"
+    },
+    "identity.oauth.redirect_allowlist": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "OAuth clients MUST use an allowlisted redirect URI set.",
       "domains": [
         "identity"
       ],
@@ -88,6 +1127,30 @@
       ],
       "value_type": "boolean"
     },
+    "incident.postmortem.required": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Sev-1 incidents MUST produce a blameless post-incident review.",
+      "domains": [
+        "platform"
+      ],
+      "subject_hint": "sev1",
+      "value_type": "boolean"
+    },
+    "incident.severity.taxonomy_defined": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "The organization MUST define a severity taxonomy for incidents.",
+      "domains": [
+        "platform"
+      ],
+      "subject_hint": "org",
+      "value_type": "boolean"
+    },
     "kubernetes.deployment.replicas": {
       "collector": "structured_package",
       "compatible_kinds": [
@@ -98,6 +1161,28 @@
         "reliability"
       ],
       "value_type": "number"
+    },
+    "kubernetes.hpa.present": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Variable-load production services MUST configure horizontal pod autoscaling.",
+      "domains": [
+        "reliability"
+      ],
+      "value_type": "boolean"
+    },
+    "kubernetes.ingress.tls_enabled": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Public ingresses MUST terminate TLS.",
+      "domains": [
+        "networking"
+      ],
+      "value_type": "boolean"
     },
     "kubernetes.liveness_probe.present": {
       "collector": "structured_package",
@@ -120,6 +1205,28 @@
         "networking"
       ],
       "value_type": "boolean"
+    },
+    "kubernetes.pod_anti_affinity.present": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Tier-1 services MUST spread pods across nodes.",
+      "domains": [
+        "reliability"
+      ],
+      "value_type": "boolean"
+    },
+    "kubernetes.pod_disruption_budget.max_unavailable": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "numeric_max"
+      ],
+      "description": "Tier-1 PDBs MUST set maxUnavailable to at most 1.",
+      "domains": [
+        "reliability"
+      ],
+      "value_type": "number"
     },
     "kubernetes.pod_disruption_budget.min_available": {
       "collector": "structured_package",
@@ -144,6 +1251,17 @@
       ],
       "value_type": "boolean"
     },
+    "kubernetes.pod_disruption_budget.selector_matches": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "PDB selectors MUST match the workload labels.",
+      "domains": [
+        "reliability"
+      ],
+      "value_type": "boolean"
+    },
     "kubernetes.readiness_probe.present": {
       "collector": "structured_package",
       "compatible_kinds": [
@@ -155,6 +1273,28 @@
       ],
       "value_type": "boolean"
     },
+    "messaging.consumer.idempotent": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "At-least-once consumers MUST be idempotent.",
+      "domains": [
+        "messaging"
+      ],
+      "value_type": "boolean"
+    },
+    "messaging.consumer.max_retries": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "numeric_max"
+      ],
+      "description": "Consumers MUST bound retry attempts before DLQ.",
+      "domains": [
+        "messaging"
+      ],
+      "value_type": "number"
+    },
     "messaging.dlq.present": {
       "collector": "structured_package",
       "compatible_kinds": [
@@ -163,6 +1303,350 @@
       "description": "Durable consumers MUST configure a dead-letter queue.",
       "domains": [
         "messaging"
+      ],
+      "value_type": "boolean"
+    },
+    "messaging.event.pii_forbidden": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Domain events MUST NOT carry raw government IDs or full payment PANs.",
+      "domains": [
+        "messaging"
+      ],
+      "subject_hint": "event",
+      "value_type": "boolean"
+    },
+    "messaging.event.raw_gov_id": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "dependency_forbidden"
+      ],
+      "description": "Events MUST NOT carry raw government IDs.",
+      "domains": [
+        "messaging"
+      ],
+      "value_type": "boolean"
+    },
+    "messaging.outbox.present": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "DB+message dual writes MUST use an outbox or equivalent.",
+      "domains": [
+        "messaging"
+      ],
+      "value_type": "boolean"
+    },
+    "messaging.poison.quarantine_enabled": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Consumers MUST quarantine poison messages after retry exhaustion.",
+      "domains": [
+        "messaging"
+      ],
+      "subject_hint": "consumer",
+      "value_type": "boolean"
+    },
+    "messaging.publish.blocking_unbounded": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "dependency_forbidden"
+      ],
+      "description": "Request handlers MUST NOT block on unbounded broker publish retries.",
+      "domains": [
+        "messaging"
+      ],
+      "value_type": "boolean"
+    },
+    "messaging.schema.compatibility_checked": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Evolving event schemas MUST pass compatibility checks in CI.",
+      "domains": [
+        "messaging"
+      ],
+      "subject_hint": "topic",
+      "value_type": "boolean"
+    },
+    "messaging.schema_registry.used": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "External event contracts MUST use a schema registry.",
+      "domains": [
+        "messaging"
+      ],
+      "value_type": "boolean"
+    },
+    "ml.agent.human_approval_high_risk": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "High-risk agent tools MUST require human approval.",
+      "domains": [
+        "ml"
+      ],
+      "value_type": "boolean"
+    },
+    "ml.agent.unrestricted_shell": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "dependency_forbidden"
+      ],
+      "description": "Agent runtimes MUST NOT allow unrestricted shell tool execution in production.",
+      "domains": [
+        "ml"
+      ],
+      "value_type": "boolean"
+    },
+    "ml.dataset.access_audited": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Training dataset access MUST be audited.",
+      "domains": [
+        "ml"
+      ],
+      "value_type": "boolean"
+    },
+    "ml.feature_store.access_controlled": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Feature stores MUST enforce authenticated, authorized access.",
+      "domains": [
+        "ml"
+      ],
+      "subject_hint": "feature-store",
+      "value_type": "boolean"
+    },
+    "ml.gateway.log_redaction": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "LLM gateway logs MUST redact secrets and raw PII.",
+      "domains": [
+        "ml"
+      ],
+      "value_type": "boolean"
+    },
+    "ml.llm.output_filtered": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "LLM applications MUST filter outputs for secrets and disallowed content classes.",
+      "domains": [
+        "ml"
+      ],
+      "subject_hint": "llm-app",
+      "value_type": "boolean"
+    },
+    "ml.llm.prompt_injection_controls": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "LLM applications MUST implement prompt-injection controls for untrusted input.",
+      "domains": [
+        "ml"
+      ],
+      "subject_hint": "llm-app",
+      "value_type": "boolean"
+    },
+    "ml.model.approval_recorded": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Production model promotions MUST record an approval record.",
+      "domains": [
+        "ml"
+      ],
+      "value_type": "boolean"
+    },
+    "ml.model.approval_required": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Production model promotion MUST pass an approval gate.",
+      "domains": [
+        "ml"
+      ],
+      "subject_hint": "model",
+      "value_type": "boolean"
+    },
+    "ml.model.eval_report_present": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Model ships MUST attach an evaluation report reference.",
+      "domains": [
+        "ml"
+      ],
+      "value_type": "boolean"
+    },
+    "ml.notebook.secrets_from_vault": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Notebooks MUST load secrets from a vault, not plaintext cells.",
+      "domains": [
+        "ml"
+      ],
+      "subject_hint": "notebook",
+      "value_type": "boolean"
+    },
+    "ml.training.lineage_recorded": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Production models MUST record training data lineage.",
+      "domains": [
+        "ml"
+      ],
+      "subject_hint": "model",
+      "value_type": "boolean"
+    },
+    "ml.training_data.retention_days": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "numeric_max"
+      ],
+      "description": "Training datasets with personal data MUST NOT retain raw samples beyond 180 days.",
+      "domains": [
+        "ml"
+      ],
+      "value_type": "number"
+    },
+    "mobile.crash.pii_scrubbed": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Mobile crash reports MUST scrub PII before upload.",
+      "domains": [
+        "privacy"
+      ],
+      "subject_hint": "mobile-app",
+      "value_type": "boolean"
+    },
+    "mobile.secrets.not_in_binary": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Mobile app binaries MUST NOT embed long-lived API secrets.",
+      "domains": [
+        "security"
+      ],
+      "subject_hint": "mobile-app",
+      "value_type": "boolean"
+    },
+    "mobile.tls.pinning_enabled": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Mobile apps handling sensitive data MUST enable certificate pinning.",
+      "domains": [
+        "security"
+      ],
+      "subject_hint": "mobile-app",
+      "value_type": "boolean"
+    },
+    "network.data_tier.private_subnet": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Data tiers MUST run in private subnets without public IPs.",
+      "domains": [
+        "networking"
+      ],
+      "subject_hint": "data-tier",
+      "value_type": "boolean"
+    },
+    "network.datastore.private_only": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Datastores MUST not attach public IPs.",
+      "domains": [
+        "networking"
+      ],
+      "value_type": "boolean"
+    },
+    "network.default_vpc.prod_forbidden": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Production workloads MUST NOT run in the account default VPC.",
+      "domains": [
+        "networking"
+      ],
+      "subject_hint": "production",
+      "value_type": "boolean"
+    },
+    "network.egress.allowlist_enabled": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "PCI workloads MUST use an egress allowlist.",
+      "domains": [
+        "networking"
+      ],
+      "value_type": "boolean"
+    },
+    "network.mesh.mtls_required": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Mesh-enrolled services MUST require mTLS.",
+      "domains": [
+        "networking"
+      ],
+      "value_type": "boolean"
+    },
+    "network.ssh.public_exposure": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "dependency_forbidden"
+      ],
+      "description": "Bastion access MUST NOT expose SSH to 0.0.0.0/0.",
+      "domains": [
+        "networking"
+      ],
+      "value_type": "boolean"
+    },
+    "observability.alerting.error_budget": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "SLO services MUST alert when error budget burn is high.",
+      "domains": [
+        "observability"
       ],
       "value_type": "boolean"
     },
@@ -177,6 +1661,17 @@
       ],
       "value_type": "boolean"
     },
+    "observability.logging.retention_days": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "numeric_min"
+      ],
+      "description": "Application logs MUST retain at least 30 days.",
+      "domains": [
+        "observability"
+      ],
+      "value_type": "number"
+    },
     "observability.logging.structured_json": {
       "collector": "structured_package",
       "compatible_kinds": [
@@ -186,6 +1681,321 @@
       "domains": [
         "observability"
       ],
+      "value_type": "boolean"
+    },
+    "observability.metrics.red_present": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "User-facing endpoints MUST expose rate/error/duration metrics.",
+      "domains": [
+        "observability"
+      ],
+      "value_type": "boolean"
+    },
+    "observability.oncall.defined": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Production services MUST define on-call routing.",
+      "domains": [
+        "observability"
+      ],
+      "value_type": "boolean"
+    },
+    "observability.tracing.context_propagated": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Service-to-service calls MUST propagate trace context.",
+      "domains": [
+        "observability"
+      ],
+      "value_type": "boolean"
+    },
+    "ops.alert.runbook_linked": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Paging alerts MUST link to a runbook.",
+      "domains": [
+        "observability"
+      ],
+      "subject_hint": "alert",
+      "value_type": "boolean"
+    },
+    "ops.oncall.coverage_24x7": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Production services MUST have 24x7 on-call coverage.",
+      "domains": [
+        "observability"
+      ],
+      "subject_hint": "production",
+      "value_type": "boolean"
+    },
+    "platform.cache.tenant_namespaced": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Caches MUST namespace keys by tenant.",
+      "domains": [
+        "platform"
+      ],
+      "value_type": "boolean"
+    },
+    "platform.tenant_isolation.enforced": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Multi-tenant query paths MUST enforce tenant predicates.",
+      "domains": [
+        "platform"
+      ],
+      "value_type": "boolean"
+    },
+    "privacy.analytics.consent_gated": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Non-essential analytics MUST be consent-gated.",
+      "domains": [
+        "privacy"
+      ],
+      "subject_hint": "web",
+      "value_type": "boolean"
+    },
+    "privacy.breach.notify_hours": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "numeric_max"
+      ],
+      "description": "Confirmed personal-data breaches MUST begin customer/regulator notification workflows within 72 hours.",
+      "domains": [
+        "privacy"
+      ],
+      "example_limit": 72,
+      "subject_hint": "breach",
+      "value_type": "number"
+    },
+    "privacy.consent.recorded": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Marketing personalization MUST record consent state.",
+      "domains": [
+        "privacy"
+      ],
+      "value_type": "boolean"
+    },
+    "privacy.cross_border.controls": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Cross-border personal data transfers MUST use approved transfer controls.",
+      "domains": [
+        "privacy"
+      ],
+      "subject_hint": "personal-data",
+      "value_type": "boolean"
+    },
+    "privacy.data_retention_days": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "numeric_max"
+      ],
+      "description": "Personal data retention MUST NOT exceed 365 days without an approved exception.",
+      "domains": [
+        "privacy"
+      ],
+      "value_type": "number"
+    },
+    "privacy.deletion_api.present": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Customer data platforms MUST expose a deletion fulfillment path.",
+      "domains": [
+        "privacy"
+      ],
+      "value_type": "boolean"
+    },
+    "privacy.dpia.required": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "High-risk personal data processing MUST complete a DPIA.",
+      "domains": [
+        "privacy"
+      ],
+      "subject_hint": "high-risk",
+      "value_type": "boolean"
+    },
+    "privacy.erasure.workflow_present": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Customer personal data systems MUST support a right-to-erasure workflow.",
+      "domains": [
+        "privacy"
+      ],
+      "subject_hint": "personal-data",
+      "value_type": "boolean"
+    },
+    "privacy.pii_inventory.maintained": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Systems processing PII MUST maintain a PII inventory entry.",
+      "domains": [
+        "privacy"
+      ],
+      "subject_hint": "org",
+      "value_type": "boolean"
+    },
+    "privacy.sensitive_log.present": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "dependency_forbidden"
+      ],
+      "description": "Services MUST NOT log raw government ID or full payment PAN values.",
+      "domains": [
+        "privacy"
+      ],
+      "value_type": "boolean"
+    },
+    "records.legal_hold.supported": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Systems of record MUST support legal hold.",
+      "domains": [
+        "compliance"
+      ],
+      "subject_hint": "record-store",
+      "value_type": "boolean"
+    },
+    "records.retention.schedule_documented": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Record classes MUST have a documented retention schedule.",
+      "domains": [
+        "compliance"
+      ],
+      "subject_hint": "record-class",
+      "value_type": "boolean"
+    },
+    "runtime.version.deprecated_forbidden": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "dependency_forbidden"
+      ],
+      "description": "Services MUST NOT deploy on deprecated language runtimes.",
+      "domains": [
+        "supply-chain"
+      ],
+      "subject_hint": "service",
+      "value_type": "string"
+    },
+    "saas.catalog.approved_only": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Workforce SaaS MUST be limited to the approved catalog unless exceptioned.",
+      "domains": [
+        "platform"
+      ],
+      "subject_hint": "workforce",
+      "value_type": "boolean"
+    },
+    "security.casb.enabled": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Unmanaged SaaS access MUST be mediated by approved CASB/proxy controls.",
+      "domains": [
+        "security"
+      ],
+      "subject_hint": "saas",
+      "value_type": "boolean"
+    },
+    "security.certificate.inventory_maintained": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "TLS certificates MUST be tracked in a certificate inventory.",
+      "domains": [
+        "security"
+      ],
+      "subject_hint": "org",
+      "value_type": "boolean"
+    },
+    "security.certificate.validity_days": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "numeric_max"
+      ],
+      "description": "Public certificates MUST NOT exceed 90 days validity.",
+      "domains": [
+        "security"
+      ],
+      "value_type": "number"
+    },
+    "security.dns.caa_present": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Public DNS zones MUST publish CAA records.",
+      "domains": [
+        "security"
+      ],
+      "subject_hint": "public-zone",
+      "value_type": "boolean"
+    },
+    "security.edge.waf_required": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Internet-facing applications MUST sit behind a WAF.",
+      "domains": [
+        "security"
+      ],
+      "subject_hint": "public-app",
+      "value_type": "boolean"
+    },
+    "security.email_dlp.enabled": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Corporate email MUST enable DLP for sensitive content.",
+      "domains": [
+        "security"
+      ],
+      "subject_hint": "email",
       "value_type": "boolean"
     },
     "security.encryption_at_rest.enabled": {
@@ -210,6 +2020,66 @@
       ],
       "value_type": "boolean"
     },
+    "security.kms.rotation_days": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "numeric_max"
+      ],
+      "description": "Symmetric data keys MUST rotate at least every 365 days.",
+      "domains": [
+        "security"
+      ],
+      "example_limit": 365,
+      "subject_hint": "key",
+      "value_type": "number"
+    },
+    "security.kms.rotation_enabled": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Customer-managed keys MUST enable annual rotation.",
+      "domains": [
+        "security"
+      ],
+      "value_type": "boolean"
+    },
+    "security.prod_access.session_recorded": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Interactive production access MUST be session-recorded.",
+      "domains": [
+        "security"
+      ],
+      "subject_hint": "production",
+      "value_type": "boolean"
+    },
+    "security.secret_in_source.present": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "dependency_forbidden"
+      ],
+      "description": "Application secrets MUST NOT be hard-coded in source.",
+      "domains": [
+        "security"
+      ],
+      "value_type": "boolean"
+    },
+    "security.secrets.max_age_days": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "numeric_max"
+      ],
+      "description": "Long-lived application secrets MUST rotate within 90 days.",
+      "domains": [
+        "security"
+      ],
+      "example_limit": 90,
+      "subject_hint": "secret",
+      "value_type": "number"
+    },
     "security.tls_policy.id": {
       "collector": "structured_package",
       "compatible_kinds": [
@@ -220,6 +2090,43 @@
         "security"
       ],
       "value_type": "string"
+    },
+    "security.vuln.critical_fix_days": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "numeric_max"
+      ],
+      "description": "Critical vulnerabilities MUST be remediated within 7 days.",
+      "domains": [
+        "security"
+      ],
+      "example_limit": 7,
+      "subject_hint": "asset",
+      "value_type": "number"
+    },
+    "security.vuln.high_fix_days": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "numeric_max"
+      ],
+      "description": "High vulnerabilities MUST be remediated within 30 days.",
+      "domains": [
+        "security"
+      ],
+      "example_limit": 30,
+      "subject_hint": "asset",
+      "value_type": "number"
+    },
+    "security.waf.enabled": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Public HTTP edges MUST enable a web application firewall.",
+      "domains": [
+        "security"
+      ],
+      "value_type": "boolean"
     },
     "session.idle_timeout_seconds": {
       "collector": "structured_package",
@@ -232,6 +2139,17 @@
       ],
       "value_type": "number"
     },
+    "session.server_enforced": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Session absolute lifetime MUST be server-enforced.",
+      "domains": [
+        "identity"
+      ],
+      "value_type": "boolean"
+    },
     "session.ttl_seconds": {
       "collector": "structured_package",
       "compatible_kinds": [
@@ -242,6 +2160,157 @@
         "identity"
       ],
       "value_type": "number"
+    },
+    "sre.error_budget.policy_defined": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "SLI/SLO services MUST define an error-budget policy.",
+      "domains": [
+        "reliability"
+      ],
+      "subject_hint": "service",
+      "value_type": "boolean"
+    },
+    "sre.slo.dashboard_published": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Services with SLOs MUST publish an SLO dashboard.",
+      "domains": [
+        "reliability"
+      ],
+      "subject_hint": "service",
+      "value_type": "boolean"
+    },
+    "storage.snapshot.retention_days": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "numeric_min"
+      ],
+      "description": "Stateful production volumes MUST retain snapshots for at least 7 days.",
+      "domains": [
+        "storage"
+      ],
+      "value_type": "number"
+    },
+    "storage.volume.encryption_enabled": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Block volumes MUST use encryption.",
+      "domains": [
+        "storage"
+      ],
+      "value_type": "boolean"
+    },
+    "supply_chain.dependencies.pinned": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Application manifests MUST pin dependency versions.",
+      "domains": [
+        "supply-chain"
+      ],
+      "value_type": "boolean"
+    },
+    "supply_chain.dependency.legacy_crypto": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "dependency_forbidden"
+      ],
+      "description": "Services MUST NOT depend on the discontinued legacy-crypto package.",
+      "domains": [
+        "supply-chain"
+      ],
+      "value_type": "boolean"
+    },
+    "supply_chain.license.compliance_tracked": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Applications MUST track open-source license compliance.",
+      "domains": [
+        "supply-chain"
+      ],
+      "subject_hint": "application",
+      "value_type": "boolean"
+    },
+    "supply_chain.license.id": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "set_membership"
+      ],
+      "description": "Released artifacts MUST use licenses from the approved set.",
+      "domains": [
+        "supply-chain"
+      ],
+      "value_type": "string"
+    },
+    "supply_chain.registry.internal_required": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Builds MUST pull private packages from the internal registry.",
+      "domains": [
+        "supply-chain"
+      ],
+      "subject_hint": "build",
+      "value_type": "boolean"
+    },
+    "vendor.assurance.soc2_or_equivalent": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Critical vendors MUST provide SOC 2 or equivalent assurance.",
+      "domains": [
+        "compliance"
+      ],
+      "subject_hint": "critical-vendor",
+      "value_type": "boolean"
+    },
+    "vendor.dpa.required": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Vendors processing personal data MUST have a signed DPA.",
+      "domains": [
+        "privacy"
+      ],
+      "subject_hint": "vendor",
+      "value_type": "boolean"
+    },
+    "vendor.offboarding.checklist": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Vendor offboarding MUST follow a checklist including access revocation and data return/destruction.",
+      "domains": [
+        "compliance"
+      ],
+      "subject_hint": "vendor",
+      "value_type": "boolean"
+    },
+    "vendor.security.questionnaire_required": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "New vendors processing company or customer data MUST complete a security questionnaire.",
+      "domains": [
+        "compliance"
+      ],
+      "subject_hint": "vendor",
+      "value_type": "boolean"
     }
   }
 }

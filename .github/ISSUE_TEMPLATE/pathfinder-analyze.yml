@@ -7,7 +7,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Submit a **pinned evidence package** for evaluation against the **prototype real ADR pack** (20 platform-style ADRs under `data/adr_catalog`).
+        Submit a **pinned evidence package** for evaluation against the **prototype real ADR pack** (200 org-style ADRs under `data/adr_catalog`).
 
         **First run:** see `docs/PATHFINDER_FIRST_RUN.md`.
 
@@ -45,7 +45,7 @@ body:
     id: domains
     attributes:
       label: Domains (optional scope filter)
-      description: Comma-separated. Leave blank to evaluate all active pack domains (api, cicd, identity, messaging, observability, reliability, security). Narrowing domains marks other requirements not_applicable — not aligned.
+      description: Comma-separated. Leave blank to evaluate all active pack domains (api, cicd, cloud, compliance, data, frontend, identity, messaging, ml, networking, observability, platform, privacy, reliability, security, storage, supply-chain). Narrowing domains marks other requirements not_applicable — not aligned.
       placeholder: identity, security, reliability
     validations:
       required: false
