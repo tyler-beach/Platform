@@ -2,7 +2,7 @@ from __future__ import annotations
 import sys, unittest
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2]
-sys.path.insert(0,str(ROOT/".poc"/"evaluation"))
+sys.path.insert(0,str(ROOT/".poc"/"evaluation"/"requirements"))
 import evaluate_requirements as ev
 
 class RequirementCorpusTests(unittest.TestCase):
