@@ -35,6 +35,10 @@ python3 .poc/requirement_engine/evaluate_package.py \
 
 Per-requirement outcomes remain `supported_deviation`, `no_deviation_found`, `not_applicable`, or `inconclusive`. Aggregate status may be `mixed` (product language for partial alignment: some aligned, others deviant and/or inconclusive). Regenerate with `python3 .poc/requirement_catalog/generate_catalog.py`.
 
+### GitHub Issue intake
+
+Open a **Pathfinder analyze package** issue (public/synthetic content only). Actions parses the issue into a package, runs catalog evaluation, comments aggregate status + outcome counts, and uploads the full report artifact. See `docs/ISSUE_ANALYZE_WORKFLOW.md`.
+
 ## Requirement kinds
 
 | Kind | Meaning | Example |
