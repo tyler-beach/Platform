@@ -187,6 +187,25 @@ export default function RunExplorer() {
     if (!selectedStepKey && allSteps[0]) setSelectedStepKey(allSteps[0].key);
   }, [allSteps, selectedStepKey]);
 
+  function downloadManifest() {
+    if (!selectedRun) return;
+    const manifest = {
+      schema: 'pathfinder.github-actions-run-manifest/v1',
+      generated_at: new Date().toISOString(),
+      source: { provider: 'GitHub Actions public REST API', repository: OWNER_REPO, run_url: selectedRun.html_url },
+      run: { id: selectedRun.id, run_number: selectedRun.run_number, workflow: selectedRun.name, title: selectedRun.display_title, status: selectedRun.status, conclusion: selectedRun.conclusion, event: selectedRun.event, branch: selectedRun.head_branch, commit: selectedRun.head_sha, attempt_selected: selectedAttempt, attempt_latest: selectedRun.run_attempt, created_at: selectedRun.created_at, started_at: selectedRun.run_started_at, updated_at: selectedRun.updated_at },
+      jobs: jobs.map((job) => ({ id: job.id, name: job.name, status: job.status, conclusion: job.conclusion, started_at: job.started_at, completed_at: job.completed_at, html_url: job.html_url, steps: (job.steps || []).map((step) => ({ number: step.number, name: step.name, status: step.status, conclusion: step.conclusion, started_at: step.started_at, completed_at: step.completed_at })) })),
+      artifacts: artifacts.map((artifact) => ({ id: artifact.id, name: artifact.name, size_in_bytes: artifact.size_in_bytes, expired: artifact.expired, created_at: artifact.created_at, expires_at: artifact.expires_at, archive_download_url: artifact.archive_download_url })),
+      evidence_boundary: 'Manifest contains GitHub-reported run metadata only. It is not a compliance verdict and does not prove ADR satisfaction. Artifact contents are represented only when inspected separately.'
+    };
+    const blob = new Blob([JSON.stringify(manifest, null, 2)], { type: 'application/json' });
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = objectUrl; link.download = `pathfinder-run-${selectedRun.id}-attempt-${selectedAttempt}-manifest.json`;
+    document.body.appendChild(link); link.click(); link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+  }
+
   const runUrl = selectedRun?.html_url || `https://github.com/${OWNER_REPO}/actions`;
   const stepOutput = selectedStep ? {
     step: { name: selectedStep.name, number: selectedStep.number, status: selectedStep.status, conclusion: selectedStep.conclusion, started_at: selectedStep.started_at, completed_at: selectedStep.completed_at, duration: duration(selectedStep.started_at, selectedStep.completed_at) },
@@ -218,7 +237,7 @@ export default function RunExplorer() {
 
     {selectedRun && <>
       <section className="run-summary">
-        <div className="run-summary__title"><div><span className="run-explorer__kicker">SELECTED RUN · #{selectedRun.run_number}</span><h2>{selectedRun.display_title || selectedRun.name}</h2><p>{selectedRun.name} · attempt {selectedRun.run_attempt || 1}</p></div><Status value={selectedRun.conclusion || selectedRun.status} /></div>
+        <div className="run-summary__title"><div><span className="run-explorer__kicker">SELECTED RUN · #{selectedRun.run_number}</span><h2>{selectedRun.display_title || selectedRun.name}</h2><p>{selectedRun.name} · selected attempt {selectedAttempt} of {selectedRun.run_attempt || 1}</p></div><div className="run-summary__controls"><Status value={selectedRun.conclusion || selectedRun.status} /><button className="run-manifest-button" onClick={downloadManifest} disabled={loadingDetails || !jobs.length}><ArrowDownToLine size={15} /> Export run manifest</button></div></div>
         <div className="run-summary__grid">
           <div><span>TRIGGER</span><strong>{selectedRun.event || '—'}</strong></div>
           <div><span>BRANCH</span><strong>{selectedRun.head_branch || '—'}</strong></div>
@@ -228,6 +247,16 @@ export default function RunExplorer() {
         <div className="run-summary__bottom"><span><Clock3 size={14} /> Started {prettyDate(selectedRun.run_started_at || selectedRun.created_at)}</span><div className="run-summary__links"><label className="run-attempt-picker">Attempt <select aria-label="Workflow run attempt" value={selectedAttempt} onChange={(event) => setSelectedAttempt(Number(event.target.value))}>{Array.from({ length: Math.max(1, selectedRun.run_attempt || 1) }, (_, index) => index + 1).map((attempt) => <option key={attempt} value={attempt}>#{attempt}{attempt === (selectedRun.run_attempt || 1) ? ' · latest' : ''}</option>)}</select></label><a href={runUrl} target="_blank" rel="noreferrer">Open run in GitHub <ArrowUpRight size={14} /></a></div></div>
       </section>
 
+      <section className="run-signal-graph" aria-label="Execution signal flow">
+        <div className="run-signal-graph__heading"><div><span className="run-explorer__kicker">SIGNAL FLOW</span><h2>Run → jobs → artifacts</h2></div><span>{jobs.length} jobs · {allSteps.length} steps · {artifacts.length} artifacts</span></div>
+        <div className="run-graph-track">
+          <div className="run-graph-node run-graph-node--source"><span className="run-graph-node__type">SOURCE RUN</span><strong>#{selectedRun.run_number}</strong><small>{selectedRun.name}</small><Status value={selectedRun.conclusion || selectedRun.status} /></div>
+          <div className="run-graph-connector" aria-hidden="true"><span /></div>
+          {jobs.map((job) => <React.Fragment key={job.id}><button className={`run-graph-node run-graph-node--job ${job.conclusion === 'failure' ? 'is-failed' : ''}`} onClick={() => { const first = allSteps.find((step) => step.jobId === job.id); if (first) { setSelectedStepKey(first.key); setTab('summary'); } }}><span className="run-graph-node__type">JOB · {job.id}</span><strong>{job.name}</strong><small>{(job.steps || []).length} steps · {duration(job.started_at, job.completed_at)}</small><Status value={job.conclusion || job.status} /></button><div className="run-graph-connector" aria-hidden="true"><span /></div></React.Fragment>)}
+          <div className="run-graph-node run-graph-node--artifact"><span className="run-graph-node__type">OUTPUTS</span><strong>{artifacts.length} artifacts</strong><small>{artifacts.length ? 'Inspectable run bundles' : 'No artifacts reported'}</small><button onClick={() => setTab('artifacts')}>Inspect outputs <ArrowUpRight size={13} /></button></div>
+        </div>
+        <p className="run-signal-graph__note">Connectors show the execution hierarchy reported by GitHub, not a dependency graph between jobs. Selecting a job focuses its first reported step.</p>
+      </section>
       <div className="run-explorer__section-heading"><div><span className="run-explorer__kicker">EXECUTION GRAPH</span><h2>Jobs & steps</h2></div><p>Select any step to inspect its status, timing, parent job, and available run outputs.</p></div>
       {detailsError && <div className="run-inline-alert"><AlertCircle size={16} /><span>{detailsError}</span><a href={runUrl} target="_blank" rel="noreferrer">View run <ExternalLink size={13} /></a></div>}
       {loadingDetails ? <div className="run-loading"><LoaderCircle size={19} className="run-spin" /> Loading jobs, steps, and artifacts…</div> : <div className="run-workspace">
