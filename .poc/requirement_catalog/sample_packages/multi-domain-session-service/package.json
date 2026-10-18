@@ -1,0 +1,245 @@
+{
+  "schema_version": "pathfinder-evidence-package-v1",
+  "package_id": "multi-domain-session-service",
+  "scope": {
+    "domains": [
+      "identity",
+      "security",
+      "reliability",
+      "messaging",
+      "privacy",
+      "api",
+      "cicd",
+      "observability",
+      "cloud"
+    ]
+  },
+  "tech_spec": {
+    "artifact_id": "tech_spec",
+    "path": "docs/tech-spec.md",
+    "revision": "sha256:3240e9d1069481a2685c6606ffe1bd9b1a1e974fad02eac5084e2ed64afc46ff",
+    "sha256": "3240e9d1069481a2685c6606ffe1bd9b1a1e974fad02eac5084e2ed64afc46ff",
+    "content": "# Multi-domain session service (synthetic)\n\n## Identity\nSessions expire after 12 minutes absolute.\n\n## Security\nEncryption at rest is enabled. TLS policy is legacy-ssl.\n\n## Reliability\nDeployment replicas: 2. Readiness probe configured.\n\n## Messaging\nConsumer max retries: 25 (no DLQ mentioned).\n\n## Privacy\nApplication logs may include PAN for debugging (bad).\n"
+  },
+  "code": [
+    {
+      "artifact_id": "code-0",
+      "path": "src/handler.js",
+      "revision": "sha256:d9855d65d3835a1e162b0757217c5df8d326c63400e27981aaa16301b1aea36b",
+      "sha256": "d9855d65d3835a1e162b0757217c5df8d326c63400e27981aaa16301b1aea36b",
+      "content": "\nconst API_KEY = \"sk-live-example\"; // forbidden secret in source\nexport function handler() { return API_KEY; }\n"
+    }
+  ],
+  "observations": [
+    {
+      "evidence_id": "EV-TTL",
+      "predicate": "session.ttl_seconds",
+      "subject": "session",
+      "value": 720,
+      "artifact_id": "tech_spec",
+      "revision": "sha256:3240e9d1069481a2685c6606ffe1bd9b1a1e974fad02eac5084e2ed64afc46ff",
+      "path": "docs/tech-spec.md",
+      "source_sha256": "3240e9d1069481a2685c6606ffe1bd9b1a1e974fad02eac5084e2ed64afc46ff",
+      "locator": {
+        "kind": "tech_spec_claim",
+        "value": "session.ttl_seconds"
+      }
+    },
+    {
+      "evidence_id": "EV-ENC",
+      "predicate": "security.encryption_at_rest.enabled",
+      "subject": "datastore",
+      "value": true,
+      "artifact_id": "tech_spec",
+      "revision": "sha256:3240e9d1069481a2685c6606ffe1bd9b1a1e974fad02eac5084e2ed64afc46ff",
+      "path": "docs/tech-spec.md",
+      "source_sha256": "3240e9d1069481a2685c6606ffe1bd9b1a1e974fad02eac5084e2ed64afc46ff",
+      "locator": {
+        "kind": "tech_spec_claim",
+        "value": "security.encryption_at_rest.enabled"
+      }
+    },
+    {
+      "evidence_id": "EV-TLS",
+      "predicate": "security.tls_policy.id",
+      "subject": "edge",
+      "value": "legacy-ssl",
+      "artifact_id": "tech_spec",
+      "revision": "sha256:3240e9d1069481a2685c6606ffe1bd9b1a1e974fad02eac5084e2ed64afc46ff",
+      "path": "docs/tech-spec.md",
+      "source_sha256": "3240e9d1069481a2685c6606ffe1bd9b1a1e974fad02eac5084e2ed64afc46ff",
+      "locator": {
+        "kind": "tech_spec_claim",
+        "value": "security.tls_policy.id"
+      }
+    },
+    {
+      "evidence_id": "EV-SEC",
+      "predicate": "security.secret_in_source.present",
+      "subject": "repository",
+      "value": true,
+      "artifact_id": "tech_spec",
+      "revision": "sha256:3240e9d1069481a2685c6606ffe1bd9b1a1e974fad02eac5084e2ed64afc46ff",
+      "path": "docs/tech-spec.md",
+      "source_sha256": "3240e9d1069481a2685c6606ffe1bd9b1a1e974fad02eac5084e2ed64afc46ff",
+      "locator": {
+        "kind": "tech_spec_claim",
+        "value": "security.secret_in_source.present"
+      }
+    },
+    {
+      "evidence_id": "EV-REP",
+      "predicate": "kubernetes.deployment.replicas",
+      "subject": "workload",
+      "value": 2,
+      "artifact_id": "tech_spec",
+      "revision": "sha256:3240e9d1069481a2685c6606ffe1bd9b1a1e974fad02eac5084e2ed64afc46ff",
+      "path": "docs/tech-spec.md",
+      "source_sha256": "3240e9d1069481a2685c6606ffe1bd9b1a1e974fad02eac5084e2ed64afc46ff",
+      "locator": {
+        "kind": "tech_spec_claim",
+        "value": "kubernetes.deployment.replicas"
+      }
+    },
+    {
+      "evidence_id": "EV-RDY",
+      "predicate": "kubernetes.readiness_probe.present",
+      "subject": "workload",
+      "value": true,
+      "artifact_id": "tech_spec",
+      "revision": "sha256:3240e9d1069481a2685c6606ffe1bd9b1a1e974fad02eac5084e2ed64afc46ff",
+      "path": "docs/tech-spec.md",
+      "source_sha256": "3240e9d1069481a2685c6606ffe1bd9b1a1e974fad02eac5084e2ed64afc46ff",
+      "locator": {
+        "kind": "tech_spec_claim",
+        "value": "kubernetes.readiness_probe.present"
+      }
+    },
+    {
+      "evidence_id": "EV-PDB",
+      "predicate": "kubernetes.pod_disruption_budget.present",
+      "subject": "workload",
+      "value": false,
+      "artifact_id": "tech_spec",
+      "revision": "sha256:3240e9d1069481a2685c6606ffe1bd9b1a1e974fad02eac5084e2ed64afc46ff",
+      "path": "docs/tech-spec.md",
+      "source_sha256": "3240e9d1069481a2685c6606ffe1bd9b1a1e974fad02eac5084e2ed64afc46ff",
+      "locator": {
+        "kind": "tech_spec_claim",
+        "value": "kubernetes.pod_disruption_budget.present"
+      }
+    },
+    {
+      "evidence_id": "EV-RETRY",
+      "predicate": "messaging.consumer.max_retries",
+      "subject": "consumer",
+      "value": 25,
+      "artifact_id": "tech_spec",
+      "revision": "sha256:3240e9d1069481a2685c6606ffe1bd9b1a1e974fad02eac5084e2ed64afc46ff",
+      "path": "docs/tech-spec.md",
+      "source_sha256": "3240e9d1069481a2685c6606ffe1bd9b1a1e974fad02eac5084e2ed64afc46ff",
+      "locator": {
+        "kind": "tech_spec_claim",
+        "value": "messaging.consumer.max_retries"
+      }
+    },
+    {
+      "evidence_id": "EV-PII",
+      "predicate": "privacy.sensitive_log.present",
+      "subject": "logging",
+      "value": true,
+      "artifact_id": "tech_spec",
+      "revision": "sha256:3240e9d1069481a2685c6606ffe1bd9b1a1e974fad02eac5084e2ed64afc46ff",
+      "path": "docs/tech-spec.md",
+      "source_sha256": "3240e9d1069481a2685c6606ffe1bd9b1a1e974fad02eac5084e2ed64afc46ff",
+      "locator": {
+        "kind": "tech_spec_claim",
+        "value": "privacy.sensitive_log.present"
+      }
+    },
+    {
+      "evidence_id": "EV-AUTH",
+      "predicate": "api.auth_middleware.present",
+      "subject": "public-api",
+      "value": true,
+      "artifact_id": "tech_spec",
+      "revision": "sha256:3240e9d1069481a2685c6606ffe1bd9b1a1e974fad02eac5084e2ed64afc46ff",
+      "path": "docs/tech-spec.md",
+      "source_sha256": "3240e9d1069481a2685c6606ffe1bd9b1a1e974fad02eac5084e2ed64afc46ff",
+      "locator": {
+        "kind": "tech_spec_claim",
+        "value": "api.auth_middleware.present"
+      }
+    },
+    {
+      "evidence_id": "EV-RATE",
+      "predicate": "api.rate_limit.enabled",
+      "subject": "public-api",
+      "value": false,
+      "artifact_id": "tech_spec",
+      "revision": "sha256:3240e9d1069481a2685c6606ffe1bd9b1a1e974fad02eac5084e2ed64afc46ff",
+      "path": "docs/tech-spec.md",
+      "source_sha256": "3240e9d1069481a2685c6606ffe1bd9b1a1e974fad02eac5084e2ed64afc46ff",
+      "locator": {
+        "kind": "tech_spec_claim",
+        "value": "api.rate_limit.enabled"
+      }
+    },
+    {
+      "evidence_id": "EV-LATEST",
+      "predicate": "cicd.image.latest_tag",
+      "subject": "deployment",
+      "value": true,
+      "artifact_id": "tech_spec",
+      "revision": "sha256:3240e9d1069481a2685c6606ffe1bd9b1a1e974fad02eac5084e2ed64afc46ff",
+      "path": "docs/tech-spec.md",
+      "source_sha256": "3240e9d1069481a2685c6606ffe1bd9b1a1e974fad02eac5084e2ed64afc46ff",
+      "locator": {
+        "kind": "tech_spec_claim",
+        "value": "cicd.image.latest_tag"
+      }
+    },
+    {
+      "evidence_id": "EV-STRUCT",
+      "predicate": "observability.logging.structured_json",
+      "subject": "service",
+      "value": true,
+      "artifact_id": "tech_spec",
+      "revision": "sha256:3240e9d1069481a2685c6606ffe1bd9b1a1e974fad02eac5084e2ed64afc46ff",
+      "path": "docs/tech-spec.md",
+      "source_sha256": "3240e9d1069481a2685c6606ffe1bd9b1a1e974fad02eac5084e2ed64afc46ff",
+      "locator": {
+        "kind": "tech_spec_claim",
+        "value": "observability.logging.structured_json"
+      }
+    },
+    {
+      "evidence_id": "EV-MFA",
+      "predicate": "identity.mfa.required",
+      "subject": "admin-login",
+      "value": false,
+      "artifact_id": "tech_spec",
+      "revision": "sha256:3240e9d1069481a2685c6606ffe1bd9b1a1e974fad02eac5084e2ed64afc46ff",
+      "path": "docs/tech-spec.md",
+      "source_sha256": "3240e9d1069481a2685c6606ffe1bd9b1a1e974fad02eac5084e2ed64afc46ff",
+      "locator": {
+        "kind": "tech_spec_claim",
+        "value": "identity.mfa.required"
+      }
+    },
+    {
+      "evidence_id": "EV-BUCKET",
+      "predicate": "cloud.object_storage.public_read",
+      "subject": "bucket",
+      "value": false,
+      "artifact_id": "tech_spec",
+      "revision": "sha256:3240e9d1069481a2685c6606ffe1bd9b1a1e974fad02eac5084e2ed64afc46ff",
+      "path": "docs/tech-spec.md",
+      "source_sha256": "3240e9d1069481a2685c6606ffe1bd9b1a1e974fad02eac5084e2ed64afc46ff",
+      "locator": {
+        "kind": "tech_spec_claim",
+        "value": "cloud.object_storage.public_read"
+      }
+    }
+  ]
+}

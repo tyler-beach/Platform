@@ -22,6 +22,19 @@ The platform separates five concerns:
 
 New ADRs MUST reuse an existing kind + registered predicate whenever possible. Unknown predicates fail closed. Unsupported prose stays `unnormalized` or inconclusive — never a new `investigate_<adr>.py`.
 
+## Multi-ADR catalog (synthetic)
+
+`.poc/requirement_catalog/` contains **100** synthetic ADRs (`ADR-101`–`ADR-200`) with approved typed requirements and a predicate seed file. Label status is `synthetic_unadjudicated`.
+
+Evaluate a tech-spec/code evidence package against the whole catalog:
+
+```sh
+python3 .poc/requirement_engine/evaluate_package.py \
+  .poc/requirement_catalog/sample_packages/multi-domain-session-service/package.json
+```
+
+Per-requirement outcomes remain `supported_deviation`, `no_deviation_found`, `not_applicable`, or `inconclusive`. Aggregate status may be `mixed` (product language for partial alignment: some aligned, others deviant and/or inconclusive). Regenerate with `python3 .poc/requirement_catalog/generate_catalog.py`.
+
 ## Requirement kinds
 
 | Kind | Meaning | Example |

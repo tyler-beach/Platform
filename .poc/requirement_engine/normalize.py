@@ -38,8 +38,12 @@ def validate_candidate(candidate: Any) -> list[str]:
                 predicate_registry.asserts_compatible(kind, predicate)
         except predicate_registry.CapabilityError as exc:
             issues.append(str(exc))
-    if kind == "numeric_max" and (type(candidate.get("limit")) not in (int, float) or isinstance(candidate.get("limit"), bool) or candidate.get("limit", -1) < 0):
-        issues.append("numeric_max requires a non-negative numeric limit")
+    if kind in {"numeric_max", "numeric_min"} and (
+        type(candidate.get("limit")) not in (int, float)
+        or isinstance(candidate.get("limit"), bool)
+        or candidate.get("limit", -1) < 0
+    ):
+        issues.append(f"{kind} requires a non-negative numeric limit")
     if kind == "set_membership":
         approved = candidate.get("approved_set")
         if not isinstance(approved, list) or not approved or any(not _nonempty_string(x) for x in approved):
@@ -84,7 +88,7 @@ def normalize(candidate: Any, *, approval_state: str = "proposed", approved_by: 
         },
     }
     if isinstance(candidate, dict):
-        if candidate.get("kind") == "numeric_max" and "limit" in candidate:
+        if candidate.get("kind") in {"numeric_max", "numeric_min"} and "limit" in candidate:
             record["requirement"]["limit"] = candidate["limit"]
         if candidate.get("kind") == "set_membership" and "approved_set" in candidate:
             record["requirement"]["approved_set"] = list(candidate["approved_set"])
