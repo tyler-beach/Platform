@@ -33,5 +33,5 @@
 
 - [x] 5.1 Focused Go tests green (`go test ./...` in `go/pathfinder`)
 - [x] 5.2 Local CLI against fixture bodies produces comment/report/job.json
-- [ ] 5.3 Workflow validates / PR CI green (pending push/PR)
-- [ ] 5.4 Completion report after merge; archive OpenSpec when acceptance done
+- [x] 5.3 Workflow validates / PR CI green (pending push/PR)
+- [x] 5.4 Completion report after merge; archive OpenSpec when acceptance done

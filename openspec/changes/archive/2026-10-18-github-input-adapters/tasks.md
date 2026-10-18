@@ -15,4 +15,4 @@
 ## 3. Verification
 
 - [x] 3.1 Go tests green
-- [ ] 3.2 Workflow CI green / PR merge
+- [x] 3.2 Workflow CI green / PR merge

@@ -2,7 +2,7 @@
 
 ### Requirement: Evaluate a user-submitted evidence package from a GitHub Issue
 
-When a Pathfinder analyze issue is opened or updated with a valid evidence package, extractable paste content, **or a same-repo PR adapter package**, the system MUST pin the package, ensure typed observations, evaluate it against the approved typed ADR catalog using the Go Pathfinder runtime, publish a workflow artifact report, comment aggregate status plus per-requirement outcomes, and attempt a job-ledger append. The comment MUST NOT paste the full tech-spec or code contents. Findings remain advisory.
+When a Pathfinder analyze issue is opened or updated with a valid evidence package, extractable paste content, **or a same-repo PR adapter package**, the system MUST pin the package, ensure typed observations, evaluate it against the approved typed ADR catalog using the Go Pathfinder runtime, publish a workflow artifact report, comment aggregate status plus per-requirement outcomes via staged GitHub Actions orchestration, and attempt a job-ledger append. The comment MUST NOT paste the full tech-spec or code contents. Findings remain advisory. The production workflow MUST NOT invoke Python `.poc/issue_analyze/issue_package.py` or `.poc/requirement_engine/evaluate_package.py` as the evaluate entrypoint.
 
 #### Scenario: Valid package yields result comment
 - **GIVEN** a GitHub issue titled with `[Pathfinder analyze]` containing a valid `pathfinder-evidence-package-v1` JSON block and public/synthetic attestation
@@ -22,6 +22,12 @@ When a Pathfinder analyze issue is opened or updated with a valid evidence packa
 - **WHEN** the result comment is posted
 - **THEN** the comment includes hashes/paths/outcomes
 - **AND** the comment does not include the full tech_spec or code body
+
+#### Scenario: Production entrypoint is Go not Python
+- **GIVEN** the Pathfinder issue analyze workflow definition on the default branch
+- **WHEN** the evaluate/publish path is inspected
+- **THEN** the production steps invoke the Go `pathfinder-issue-analyze` binary (or stage-specific Go commands built from `go/pathfinder`)
+- **AND** they do not call `python .poc/issue_analyze/issue_package.py` for production evaluation
 
 #### Scenario: Same-repo PR input evaluates
 - **GIVEN** an analyze issue with attestation and a same-repo PR reference that resolves within caps
