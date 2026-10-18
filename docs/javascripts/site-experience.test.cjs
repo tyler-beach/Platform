@@ -75,3 +75,18 @@ test('Run Explorer is a separate route backed by live Actions metadata', () => {
   assert.ok(explorer.includes('Evidence boundary'));
   assert.ok(css.includes('.run-workspace'));
 });
+
+
+test('Run Explorer inspects logs, artifact payloads, attempts, and provenance without inventing step inputs', () => {
+  const explorer = fs.readFileSync(path.join(root, 'src/components/RunExplorer.jsx'), 'utf8');
+  assert.ok(explorer.includes('/actions/jobs/${selectedStep.jobId}/logs'));
+  assert.ok(explorer.includes('/actions/artifacts/${artifact.id}/zip'));
+  assert.ok(explorer.includes('/attempts/${selectedAttempt}/jobs'));
+  assert.ok(explorer.includes("['evidence','Evidence']"));
+  assert.ok(explorer.includes("['inputs','Inputs']"));
+  assert.ok(explorer.includes('does not expose action input values'));
+  assert.ok(explorer.includes('readZipEntries'));
+  assert.ok(explorer.includes('source commit'));
+  assert.ok(css.includes('.run-log-file'));
+  assert.ok(css.includes('.run-attempt-picker'));
+});
