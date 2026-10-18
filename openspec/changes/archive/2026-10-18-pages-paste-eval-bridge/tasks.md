@@ -7,4 +7,4 @@
 ## 2. Verification
 
 - [x] 2.1 Unit/contract tests for snapshot and page markers
-- [ ] 2.2 PR / CI / merge
+- [x] 2.2 PR / CI / merge
