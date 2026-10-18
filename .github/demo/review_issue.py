@@ -64,6 +64,7 @@ def render_issue(report: dict[str, Any], manifest: dict[str, Any], evidence: dic
     if not evidence_lines:
         evidence_lines = ["| none | none | unavailable | unavailable |"]
     cited = model.get("candidate", {}).get("evidence_ids", [])
+    cited_text = ", ".join("`" + str(item) + "`" for item in cited) if cited else "none"
     checks = validation.get("checks", [])
     check_lines = [f"- [{'x' if item.get('passed') else ' '}] {item.get('name', 'unnamed check')}" for item in checks if isinstance(item, dict)]
     title = f"[Pathfinder review] {outcome} · {comparison} · run {run_id}"
@@ -81,7 +82,7 @@ Please verify whether the analysis outcome is justified by the pinned requiremen
 - **Outcome:** `{outcome}`
 - **Validation:** `{validation.get('status', 'unknown')}`
 - **Evidence count:** {report.get('evidence_item_count', len(evidence_items))}
-- **Cited evidence IDs:** {', '.join(f'`{item}`' for item in cited) if cited else 'none'}
+- **Cited evidence IDs:** {cited_text}
 
 ## Pinned artifact versions
 
