@@ -271,5 +271,30 @@ class SessionTTLInvestigationTests(unittest.TestCase):
                 investigate.load_case(case_path)
 
 
+    def test_invalid_observation_prevents_confident_decision_with_valid_value(self):
+        case = fixture(720)
+        source_content = json.dumps({"observations": [
+            {"predicate": "session.ttl_seconds", "value": 720},
+            {"predicate": "session.ttl_seconds", "value": -1},
+        ]}, separators=(",", ":"))
+        case["source"] = artifact("service-config", "git:def456", "config/session.json", source_content)
+        case["evidence"].append({
+            "evidence_id": "EV-TTL-2",
+            "artifact_id": case["source"]["artifact_id"],
+            "revision": case["source"]["revision"],
+            "locator": {"kind": "json_pointer", "value": "/observations/1/value"},
+            "predicate": "session.ttl_seconds",
+            "value": -1,
+        })
+        result = investigate.investigate(case)
+        self.assertEqual(result["outcome"], "inconclusive")
+        self.assertEqual(result["relationship"], "invalid_observation")
+        self.assertEqual(result["considered_evidence_ids"], ["EV-TTL-1", "EV-TTL-2"])
+        self.assertEqual(result["accepted_evidence_ids"], ["EV-TTL-1"])
+        self.assertEqual(result["rejected_observations"], [
+            {"evidence_id": "EV-TTL-2", "reason_code": "negative_value"}
+        ])
+
+
 if __name__ == "__main__":
     unittest.main()
