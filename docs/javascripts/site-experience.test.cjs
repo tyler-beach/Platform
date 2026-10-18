@@ -59,9 +59,21 @@ test('all workflow experiences remain discoverable from the home page', () => {
 test('animated workflow uses one motion system and aligned evidence bus/stages', () => {
   assert.match(flow, /EVIDENCE BUS/);
   assert.match(flow, /M427 143 V522/);
-  assert.match(flow, /<div class="stage"><i>06<\/i> Disposition<\/div>/);
+  assert.match(flow, /<div class="stage"><i>03<\/i> Normalize<\/div>/);
+  assert.match(flow, /data-node="normalize"/);
+  assert.match(flow, /Typed requirement/);
+  assert.match(flow, /<div class="stage"><i>07<\/i> Disposition<\/div>/);
+  assert.match(flow, /NORMALIZE → COLLECT BY DOMAIN → EVALUATE BY KIND/);
   assert.doesNotMatch(flow, /offset-path:path\(/);
   assert.match(flow, /<animateMotion/);
+});
+
+test('home pipeline surfaces normalization on the shared evaluation spine', () => {
+  assert.match(app, /Normalize requirement/);
+  assert.match(app, /Evaluate by kind/);
+  assert.match(app, /SHARED EVALUATION SPINE/);
+  assert.match(demo, /Shared evaluation spine/);
+  assert.match(demo, /normalize → evaluate/);
 });
 
 

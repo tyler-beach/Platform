@@ -2,6 +2,7 @@
 
 This is an offline reference engine. It consumes normalized, provenance-bound
 observations; it does not parse arbitrary ADR prose or collect repository evidence.
+Handlers branch on requirement kind, never on ADR identifiers.
 """
 from __future__ import annotations
 
@@ -10,9 +11,9 @@ import json
 import re
 from typing import Any
 
-ENGINE_VERSION = "generic-requirement-engine-v1"
+ENGINE_VERSION = "generic-requirement-engine-v2"
 RESULT_SCHEMA_VERSION = "adr-requirement-result-v1"
-KINDS = {"numeric_max", "resource_present"}
+KINDS = {"numeric_max", "resource_present", "boolean_required", "set_membership"}
 OUTCOMES = {"supported_deviation", "no_deviation_found", "not_applicable", "inconclusive"}
 
 
@@ -28,13 +29,7 @@ def _nonempty_string(value: Any) -> bool:
     return isinstance(value, str) and bool(value.strip())
 
 
-def evaluate(requirement: Any, observations: Any, *, adr_status: str, scope_match: bool) -> dict[str, Any]:
-    """Evaluate a typed requirement against normalized evidence conservatively.
-
-    Supported kinds:
-      * numeric_max: numeric observations must not exceed requirement.limit
-      * resource_present: boolean observation must be true
-    """
+def _validate_requirement(requirement: Any) -> str:
     if not isinstance(requirement, dict):
         raise ValueError("requirement must be an object")
     for field in ("requirement_id", "kind", "predicate", "subject"):
@@ -45,8 +40,46 @@ def evaluate(requirement: Any, observations: Any, *, adr_status: str, scope_matc
         raise ValueError("unsupported requirement kind")
     if kind == "numeric_max" and (type(requirement.get("limit")) not in (int, float) or requirement["limit"] < 0):
         raise ValueError("numeric_max requires a non-negative numeric limit")
-    if kind == "resource_present" and "limit" in requirement:
-        raise ValueError("resource_present does not accept a limit")
+    if kind in {"resource_present", "boolean_required"} and "limit" in requirement:
+        raise ValueError(f"{kind} does not accept a limit")
+    if kind == "set_membership":
+        approved = requirement.get("approved_set")
+        if not isinstance(approved, list) or not approved or any(not _nonempty_string(item) for item in approved):
+            raise ValueError("set_membership requires a non-empty approved_set of strings")
+        if "limit" in requirement:
+            raise ValueError("set_membership does not accept a limit")
+    return kind
+
+
+def _value_valid(kind: str, value: Any) -> bool:
+    if kind == "numeric_max":
+        return type(value) in (int, float) and not isinstance(value, bool) and value >= 0
+    if kind in {"resource_present", "boolean_required"}:
+        return type(value) is bool
+    if kind == "set_membership":
+        return _nonempty_string(value)
+    return False
+
+
+def _deviates(kind: str, requirement: dict[str, Any], value: Any) -> bool:
+    if kind == "numeric_max":
+        return value > requirement["limit"]
+    if kind in {"resource_present", "boolean_required"}:
+        return value is False
+    if kind == "set_membership":
+        return value not in requirement["approved_set"]
+    raise ValueError("unsupported requirement kind")
+
+
+def evaluate(requirement: Any, observations: Any, *, adr_status: str, scope_match: bool) -> dict[str, Any]:
+    """Evaluate a typed requirement against normalized evidence conservatively.
+
+    Supported kinds:
+      * numeric_max: numeric observations must not exceed requirement.limit
+      * resource_present / boolean_required: boolean observation must be true
+      * set_membership: string observation must be in requirement.approved_set
+    """
+    kind = _validate_requirement(requirement)
     if not isinstance(observations, list):
         raise ValueError("observations must be a list")
     if not _nonempty_string(adr_status) or type(scope_match) is not bool:
@@ -87,16 +120,11 @@ def evaluate(requirement: Any, observations: Any, *, adr_status: str, scope_matc
         uncertainty = ["missing_observation"]
     else:
         values = [item.get("value") for item in matching]
-        if kind == "numeric_max":
-            valid = all(type(value) in (int, float) and value >= 0 for value in values)
-        else:
-            valid = all(type(value) is bool for value in values)
-        if not valid:
+        valid_flags = [_value_valid(kind, value) for value in values]
+        if not all(valid_flags):
             outcome, relationship = "inconclusive", "invalid_observation"
             rationale = "At least one matching observation has an invalid value type or range."
-            rejected_ids = [item["evidence_id"] for item, value in zip(matching, values)
-                            if (kind == "numeric_max" and (type(value) not in (int, float) or value < 0))
-                            or (kind == "resource_present" and type(value) is not bool)]
+            rejected_ids = [item["evidence_id"] for item, ok in zip(matching, valid_flags) if not ok]
             uncertainty = ["invalid_observation"]
         elif any(value != values[0] for value in values[1:]):
             outcome, relationship = "inconclusive", "conflicting_evidence"
@@ -105,8 +133,7 @@ def evaluate(requirement: Any, observations: Any, *, adr_status: str, scope_matc
         else:
             accepted_ids = [item["evidence_id"] for item in matching]
             value = values[0]
-            deviates = value > requirement["limit"] if kind == "numeric_max" else value is False
-            if deviates:
+            if _deviates(kind, requirement, value):
                 outcome, relationship = "supported_deviation", "contradicts"
                 rationale = "The normalized observation violates the typed requirement."
             else:

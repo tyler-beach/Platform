@@ -23,11 +23,11 @@ export default function DemoExplorer() {
         <p>Start with a short example. See how a written decision is checked against implementation evidence, what the evidence shows, and what still needs a closer look.</p>
         <div className="demo-launch-actions"><button type="button" className="demo-launch-button demo-launch-button--primary" onClick={() => { document.getElementById("requirement-lab-title")?.scrollIntoView({ behavior: "smooth", block: "start" }); document.getElementById("journey-watch-button")?.click(); }}><Play size={14} fill="currentColor" /> Watch an investigation <ArrowRight size={13} /></button><button type="button" className="demo-launch-button demo-launch-button--explore" onClick={() => { if (supportingDetailsRef.current) supportingDetailsRef.current.open = true; document.getElementById("demo-gallery-heading")?.scrollIntoView({ behavior: "smooth", block: "start" }); }}>Explore the evidence <ArrowRight size={13} /></button><Link to="/evaluation" className="demo-launch-button demo-launch-button--explore">Evaluation &amp; feedback <ArrowRight size={13} /></Link></div>
       </div>
-      <div className="demo-hero__visual" aria-hidden="true"><div className="demo-ring demo-ring--outer" /><div className="demo-ring demo-ring--inner" /><div className="demo-hero-node demo-hero-node--top"><GitBranch size={16} /></div><div className="demo-hero-node demo-hero-node--left"><ShieldCheck size={16} /></div><div className="demo-hero-node demo-hero-node--right"><CheckCircle2 size={16} /></div><div className="demo-hero-core"><Workflow size={25} /><span>INVESTIGATION</span><small>5 stages</small></div><i className="demo-orbit-dot demo-orbit-dot--one" /><i className="demo-orbit-dot demo-orbit-dot--two" /></div>
-      <div className="demo-hero__footer"><span><span className="demo-hero__status-dot" /> GUIDED EXAMPLE</span><span>Move from a written rule to a reviewable finding</span></div>
+      <div className="demo-hero__visual" aria-hidden="true"><div className="demo-ring demo-ring--outer" /><div className="demo-ring demo-ring--inner" /><div className="demo-hero-node demo-hero-node--top"><GitBranch size={16} /></div><div className="demo-hero-node demo-hero-node--left"><ShieldCheck size={16} /></div><div className="demo-hero-node demo-hero-node--right"><CheckCircle2 size={16} /></div><div className="demo-hero-core"><Workflow size={25} /><span>SHARED SPINE</span><small>normalize → evaluate</small></div><i className="demo-orbit-dot demo-orbit-dot--one" /><i className="demo-orbit-dot demo-orbit-dot--two" /></div>
+      <div className="demo-hero__footer"><span><span className="demo-hero__status-dot" /> GUIDED EXAMPLE</span><span>Normalize the rule, collect by domain, evaluate by kind</span></div>
     </section>
 
-    <div className="demo-trust-banner"><div className="demo-trust-banner__icon"><ShieldCheck size={19} /></div><div><strong>This walkthrough uses example data</strong><p>The guided scenarios are synthetic and do not inspect a live system. You can open the separate PoC workflow and inspect its run artifacts when you want to see the underlying implementation.</p></div><Link to="/architecture/SECURITY">How trust is handled <ArrowRight size={14} /></Link></div>
+    <div className="demo-trust-banner"><div className="demo-trust-banner__icon"><ShieldCheck size={19} /></div><div><strong>Shared evaluation spine · example data</strong><p>ADR prose is normalized into a typed kind and predicate, collectors bind by evidence domain (not ADR ID), and the shared engine decides deviation or alignment. Scenarios are synthetic; they do not inspect a live system.</p></div><Link to="/architecture/reusable_requirement_evaluation">How normalization works <ArrowRight size={14} /></Link></div>
 
     <section className="technical-trace demo-example-library" aria-labelledby="demo-example-library-title">
       <div className="technical-trace__heading">
@@ -255,9 +255,9 @@ const requirementExamples = {
     gaps: 'Confirm the budget selector resolves to the intended workload and that the replica count is from the same environment and source version.',
     stages: [
       ['Scope', 'Resolve workload ownership and availability classification.'],
-      ['Requirements', 'Extract the minimum availability invariant.'],
+      ['Normalize', 'Type the availability invariant as kind + predicate for shared evaluation.'],
       ['Evidence', 'Bind workload, objective, and effective budget to source versions.'],
-      ['Assessment', 'Compare the configured disruption allowance with the objective.'],
+      ['Assessment', 'Compare the configured disruption allowance with the typed requirement.'],
       ['Validation', 'Check selector identity, freshness, and evidence completeness.'],
     ],
   },
@@ -276,9 +276,9 @@ const requirementExamples = {
     gaps: 'Inspect refresh-token behavior and server-side session acceptance. A 60-minute token claim does not prove the system rejects a refreshed or otherwise accepted session after the absolute boundary.',
     stages: [
       ['Scope', 'Identify the authentication components and session types covered.'],
-      ['Requirements', 'Extract the 60-minute absolute lifetime invariant.'],
-      ['Evidence', 'Inspect configured expiration, token claims, and renewal behavior.'],
-      ['Assessment', 'Compare the effective maximum with the requirement.'],
+      ['Normalize', 'Type the lifetime rule as numeric_max on session.ttl_seconds; require approval before evaluate.'],
+      ['Evidence', 'Collect config/runtime observations through the registered predicate, not an ADR-specific path.'],
+      ['Assessment', 'Shared engine compares observations with the typed requirement by kind.'],
       ['Validation', 'Verify expiry rejection and that activity cannot extend the same session indefinitely.'],
     ],
   },
@@ -329,7 +329,7 @@ function RequirementLab() {
     tabRefs.current[nextKey]?.focus();
   }
 
-  const stepNames = ['Decision', 'Scope', 'Evidence', 'Assessment', 'Review'];
+  const stepNames = ['Decision', 'Scope', 'Normalize', 'Evidence', 'Review'];
   const progress = ((activeStage + 1) / example.stages.length) * 100;
 
   return <section className="requirement-lab journey-lab" aria-labelledby="requirement-lab-title">
@@ -358,7 +358,7 @@ function RequirementLab() {
       <aside className="journey-rail" aria-label="Investigation progress">
         <div className="journey-rail__heading"><span className="demo-label">INVESTIGATION</span><strong>{String(activeStage + 1).padStart(2, '0')} <small>/ 05</small></strong></div>
         <div className="journey-rail__track" aria-hidden="true"><span style={{height: progress + '%'}}/></div>
-        {example.stages.map((item, index) => <button key={item[0]} type="button" className={'journey-rail__step' + (index === activeStage ? ' is-active' : '') + (index < activeStage ? ' is-complete' : '')} aria-current={index === activeStage ? 'step' : undefined} onClick={() => goToStage(index)}><span>{index < activeStage ? <CheckCircle2 size={15}/> : String(index + 1).padStart(2, '0')}</span><span><strong>{stepNames[index]}</strong><small>{['The rule', 'Applicability', 'Source facts', 'Compare values', 'Human decision'][index]}</small></span><ChevronRight size={14}/></button>)}
+        {example.stages.map((item, index) => <button key={item[0]} type="button" className={'journey-rail__step' + (index === activeStage ? ' is-active' : '') + (index < activeStage ? ' is-complete' : '')} aria-current={index === activeStage ? 'step' : undefined} onClick={() => goToStage(index)}><span>{index < activeStage ? <CheckCircle2 size={15}/> : String(index + 1).padStart(2, '0')}</span><span><strong>{stepNames[index]}</strong><small>{['The rule', 'Applicability', 'Typed kind', 'Source facts', 'Human decision'][index]}</small></span><ChevronRight size={14}/></button>)}
         <div className="journey-rail__note"><ShieldCheck size={15}/><span>Evidence first.<br/>Human decision.</span></div>
       </aside>
 
