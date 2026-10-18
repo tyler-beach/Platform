@@ -48,7 +48,7 @@ python .poc/session_ttl/investigate.py .poc/session_ttl/fixtures/over-limit.json
 python -m unittest discover -s .poc/tests -p 'test_session_ttl_investigation.py' -v
 ```
 
-The fixture is synthetic and pins both ADR and source content hashes/revisions. The rule checks applicability before comparing the explicit TTL value to the 600-second maximum, validates every evidence reference and source revision, and emits a canonical result fingerprint. Tests cover compliant, deviating, out-of-scope, missing/conflicting evidence, unknown citations, stale revisions, hash tampering, and replay determinism.
+The fixture is synthetic and pins both ADR and source content hashes/revisions. Policy version `session-ttl-policy-v1` fixes the maximum at 600 seconds; case data cannot override that threshold. Applicability is checked before comparison. TTL evidence must resolve through a JSON Pointer into the pinned source, and decision evidence IDs include only TTL observations actually used (including conflicting observations). Non-applicable cases return `not_applicable`, not a compliance result. The canonical result fingerprint includes the versioned policy parameters. Tests cover compliant, deviating, non-applicable, missing/conflicting/invalid observations, unsupported locators, policy override attempts, unknown citations, stale revisions, hash tampering, and replay determinism.
 
 This is a deterministic contract/reference slice, not yet a source parser, model-backed semantic extractor, durable database write, or production connector. The JSON fixture supplies a normalized observation; extraction from arbitrary prose or code remains a separate stage.
 
