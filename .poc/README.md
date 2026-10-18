@@ -39,6 +39,19 @@ The 20 labeled cases currently exercise one narrow async-boundary domain and are
 
 For TypeScript/JavaScript, Node.js 20+ and the pinned TypeScript compiler are required. For Go, Go 1.24+ is required. For Java, JDK 21+ is required. Python uses the standard-library AST and scope/index resolver, in addition to shared Tree-sitter syntax diagnostics.
 
+## Session TTL vertical slice (offline)
+
+Run the deterministic, evidence-bound reference investigation:
+
+```sh
+python .poc/session_ttl/investigate.py .poc/session_ttl/fixtures/over-limit.json --verify-repeat
+python -m unittest discover -s .poc/tests -p 'test_session_ttl_investigation.py' -v
+```
+
+The fixture is synthetic and pins both ADR and source content hashes/revisions. Policy version `session-ttl-policy-v1` fixes the maximum at 600 seconds; case data cannot override that threshold. Applicability is checked before comparison. TTL evidence must resolve through a JSON Pointer into the pinned source, and decision evidence IDs include only TTL observations actually used (including conflicting observations). Non-applicable cases return `not_applicable`, not a compliance result. The canonical result fingerprint includes the versioned policy parameters. Tests cover compliant, deviating, non-applicable, missing/conflicting/invalid observations, unsupported locators, policy override attempts, unknown citations, stale revisions, hash tampering, and replay determinism.
+
+This is a deterministic contract/reference slice, not yet a source parser, model-backed semantic extractor, durable database write, or production connector. The JSON fixture supplies a normalized observation; extraction from arbitrary prose or code remains a separate stage.
+
 ## Enable Anthropic
 
 Set MODEL_PROVIDER=anthropic, ANTHROPIC_API_KEY, and optionally ANTHROPIC_MODEL. The default model is configurable; no key is needed in mock mode. Live calls can be billable. The adapter records request metadata and token usage, never the API key or full authorization headers. Keep mock mode as the default until outbound provider calls are explicitly enabled.
