@@ -20,6 +20,10 @@
 @media(max-width:760px){.playback{grid-template-columns:1fr;gap:9px}.playback-controls{flex-wrap:wrap}.playback-controls input[type=range]{order:5;flex-basis:100%}.playback-controls .control{flex:1}.playback-label{grid-template-columns:auto 1fr;align-items:center}.map-layout{display:flex;flex-direction:column}.canvas-wrap{order:0}.inspector{order:1}.inspector-head{padding:16px}.inspector-body{grid-template-columns:1fr 1fr}.inspector-foot{padding:12px 16px}.canvas-wrap{max-height:64vh;overflow:auto}.diagram{min-width:760px;min-height:560px}.toolbar-actions .control{flex:1}.toolbar-actions #resetView{flex:0 0 auto}}
 @media(max-width:480px){.stage-list{width:100%;overflow-x:auto;flex-wrap:nowrap}.stage{flex:0 0 auto}.toolbar-actions{display:grid;grid-template-columns:1fr 1fr}.node-search{grid-column:1/-1}.toolbar-actions #resetView{flex:auto}.intro h1{font-size:34px}.intro p{font-size:12px}.inspector-body{grid-template-columns:1fr}.inspector-body section:first-child,.inspector-body section:nth-child(3){grid-column:auto}.bottom-bar{gap:12px}.legend{gap:10px}}
 
+
+.canvas-tools{pointer-events:auto;display:flex;gap:5px;align-items:center}.canvas-tools .control{min-width:30px;padding:6px 9px;background:#1b2331eF}.canvas-wrap{cursor:grab}.canvas-wrap.is-panning{cursor:grabbing}.diagram{transform-origin:0 0;will-change:transform}.canvas-topline{align-items:center}.stage{cursor:pointer;user-select:none}.stage:focus-visible{outline:2px solid #b5a4ff;outline-offset:2px}.playback-controls input[type=range]{min-width:90px}.edge:focus-visible{stroke:#fff;stroke-width:3;opacity:1}.node-search input{min-height:30px}
+@media(max-width:760px){.canvas-topline{position:sticky;left:0;width:100%;min-width:720px}.canvas-tools .control{min-width:34px}.canvas-wrap{overscroll-behavior:contain}}
+
 </style>
 </head>
 <body>
@@ -35,7 +39,7 @@
 <section class="workspace" aria-label="Interactive Pathfinder signal flow">
  <div class="toolbar"><div class="stage-list"><div class="stage current"><i>01</i> Decision</div><div class="stage"><i>02</i> Scope</div><div class="stage"><i>03</i> Evidence</div><div class="stage"><i>04</i> Assessment</div><div class="stage"><i>05</i> Review</div></div><div class="toolbar-actions"><label class="node-search"><span aria-hidden="true">⌕</span><input id="nodeSearch" type="search" placeholder="Find a node…" aria-label="Find a node" list="nodeOptions"><datalist id="nodeOptions"><option value="Session TTL"><option value="Affected services"><option value="Session config"><option value="Observed TTL"><option value="Code diff"><option value="Workload state"><option value="Evidence bundle"><option value="Compare against decision"><option value="Observed value needs review"><option value="Inspect evidence & decide"><option value="Reviewer disposition"></datalist></label><button class="control active" data-filter="all">All signals</button><button class="control" data-filter="evidence">Evidence paths</button><button class="control" data-filter="risk">Assessment path</button><button class="control" id="resetView">Reset view ↺</button></div></div><div class="playback" aria-label="Investigation playback"><div class="playback-label"><span>TRACE PLAYBACK</span><span id="playbackStatus">Ready · illustrative path</span></div><div class="playback-controls"><button class="control" id="stepBack" aria-label="Previous stage">← Step</button><button class="control active" id="playTrace" aria-pressed="false">▶ Play trace</button><button class="control" id="stepForward" aria-label="Next stage">Step →</button><input id="traceProgress" type="range" min="0" max="5" value="0" step="1" aria-label="Investigation stage" /><button class="control" id="resetTrace">Restart</button></div></div>
  <div class="map-layout">
- <div class="canvas-wrap"><div class="canvas-topline"><span>PATHFINDER / SIGNAL MAP</span><span>SELECT NODE TO INSPECT ↗</span></div>
+ <div class="canvas-wrap"><div class="canvas-topline"><span>PATHFINDER / SIGNAL MAP</span><div class="canvas-tools" aria-label="Graph view controls"><button class="control" id="zoomOut" aria-label="Zoom out">−</button><button class="control" id="zoomIn" aria-label="Zoom in">+</button><button class="control" id="fitGraph" aria-label="Fit graph to view">Fit</button></div></div>
  <svg class="diagram" viewBox="0 0 940 700" role="img" aria-label="Connected diagram showing ADR, scope, source evidence, assessment, and review">
  <defs><linearGradient id="spine" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#a98aff"/><stop offset="1" stop-color="#586ff0"/></linearGradient><filter id="glow"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
  <rect class="zone" x="20" y="48" width="175" height="600" rx="12"/><text class="zone-number" x="36" y="72">01</text><text class="zone-label" x="61" y="72">DECISION</text>
@@ -116,6 +120,22 @@ function emphasizeNode(id){clearNodeEmphasis();const chosen=document.querySelect
 nodeSearch.addEventListener("input",()=>{const q=nodeSearch.value.trim().toLowerCase();if(!q){clearNodeEmphasis();return}const match=nodes.find(n=>{const d=details[n.dataset.node];return d&&(d.title.toLowerCase().includes(q)||d.kicker.toLowerCase().includes(q)||d.klass.toLowerCase().includes(q))});nodes.forEach(n=>n.classList.toggle("dimmed",!!q&&n!==match));if(match){render(match.dataset.node);emphasizeNode(match.dataset.node)}else{clearNodeEmphasis();nodes.forEach(n=>n.classList.add("dimmed"))}});
 nodes.forEach(n=>n.addEventListener("click",()=>{stopTrace();if(nodeSearch.value)nodeSearch.value="";activeRelation=null;document.getElementById("relationBanner").hidden=true;document.querySelectorAll(".edge").forEach(e=>e.classList.remove("selected-edge"));emphasizeNode(n.dataset.node);const i=stageOrder.indexOf(n.dataset.node);if(i>=0)updateTrace(i)}));
 document.addEventListener("keydown",e=>{if(e.key==="Escape"){nodeSearch.value="";clearNodeEmphasis();nodeSearch.blur()}if(e.key==="/"&&document.activeElement!==nodeSearch&&!["INPUT","TEXTAREA"].includes(document.activeElement?.tagName)){e.preventDefault();nodeSearch.focus()}});
+
+
+/* Viewport navigation: bounded zoom and pointer-based pan; graph content stays read-only. */
+const diagram=document.querySelector(".diagram"),canvas=document.querySelector(".canvas-wrap");
+let zoom=1,panX=0,panY=0,drag=null;
+function applyView(){diagram.style.transform="translate("+panX+"px,"+panY+"px) scale("+zoom+")";document.getElementById("playbackStatus").dataset.zoom=Math.round(zoom*100)+"%"}
+function fitGraph(){zoom=1;panX=0;panY=0;applyView()}
+document.getElementById("zoomIn").addEventListener("click",()=>{zoom=Math.min(1.8,+(zoom+.12).toFixed(2));applyView()});
+document.getElementById("zoomOut").addEventListener("click",()=>{zoom=Math.max(.65,+(zoom-.12).toFixed(2));applyView()});
+document.getElementById("fitGraph").addEventListener("click",fitGraph);
+canvas.addEventListener("pointerdown",e=>{if(e.target.closest(".node,.edge,.canvas-tools,button"))return;drag={x:e.clientX,y:e.clientY,px:panX,py:panY,id:e.pointerId};canvas.classList.add("is-panning");canvas.setPointerCapture(e.pointerId)});
+canvas.addEventListener("pointermove",e=>{if(!drag||drag.id!==e.pointerId)return;panX=drag.px+e.clientX-drag.x;panY=drag.py+e.clientY-drag.y;applyView()});
+function endPan(e){if(drag&&drag.id===e.pointerId){drag=null;canvas.classList.remove("is-panning")}}
+canvas.addEventListener("pointerup",endPan);canvas.addEventListener("pointercancel",endPan);
+canvas.addEventListener("wheel",e=>{if(!e.ctrlKey&&!e.metaKey)return;e.preventDefault();zoom=Math.max(.65,Math.min(1.8,zoom+(e.deltaY<0?.08:-.08)));applyView()},{passive:false});
+document.querySelectorAll(".stage").forEach((s,i)=>{s.setAttribute("tabindex","0");s.setAttribute("role","button");s.addEventListener("click",()=>{stopTrace();updateTrace(Math.min(i,stageOrder.length-1))});s.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();stopTrace();updateTrace(Math.min(i,stageOrder.length-1))}})});
 
 </script>
 </body></html>
