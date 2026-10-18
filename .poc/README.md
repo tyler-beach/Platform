@@ -45,7 +45,7 @@ Run the deterministic, evidence-bound reference investigation:
 
 ```sh
 python .poc/session_ttl/investigate.py .poc/session_ttl/fixtures/over-limit.json --verify-repeat
-python -m unittest .poc.tests.test_session_ttl_investigation -v
+python -m unittest discover -s .poc/tests -p 'test_session_ttl_investigation.py' -v
 ```
 
 The fixture is synthetic and pins both ADR and source content hashes/revisions. The rule checks applicability before comparing the explicit TTL value to the 600-second maximum, validates every evidence reference and source revision, and emits a canonical result fingerprint. Tests cover compliant, deviating, out-of-scope, missing/conflicting evidence, unknown citations, stale revisions, hash tampering, and replay determinism.
