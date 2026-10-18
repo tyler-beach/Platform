@@ -22,6 +22,18 @@ func repoRoot(t *testing.T) string {
 	return filepath.Clean(filepath.Join(filepath.Dir(file), "..", "..", "..", ".."))
 }
 
+func TestCatalogModeFromIssueBody(t *testing.T) {
+	if got := issueintake.CatalogModeFromIssueBody("### Catalog pack\n\nSynthetic demo catalog (ADR-101–200)\n"); got != "synthetic" {
+		t.Fatalf("got %q", got)
+	}
+	if got := issueintake.CatalogModeFromIssueBody("### Catalog pack\n\nReal prototype pack (default)\n"); got != "real" {
+		t.Fatalf("got %q", got)
+	}
+	if got := issueintake.CatalogModeFromIssueBody("### Domains\n\nidentity\n"); got != "" {
+		t.Fatalf("empty want, got %q", got)
+	}
+}
+
 func TestPackageFromPasteFixtureNoSourceEcho(t *testing.T) {
 	root := repoRoot(t)
 	catalogDir := filepath.Join(root, ".poc", "requirement_catalog")

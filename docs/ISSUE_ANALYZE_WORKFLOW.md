@@ -1,6 +1,6 @@
 # Issue → package → catalog evaluation
 
-Submit a **pinned evidence package** through a GitHub Issue and receive a catalog evaluation comment. This is the inbound path for the synthetic multi-ADR catalog (`ADR-101`–`ADR-200`).
+Submit a **pinned evidence package** through a GitHub Issue and receive a catalog evaluation comment. The default pack is the **prototype real ADR corpus** (`data/adr_catalog`, 20 ADRs). Synthetic ADR-101–200 remains an explicit demo opt-in. Start with `docs/PATHFINDER_FIRST_RUN.md`.
 
 ## Safety (public repository)
 
@@ -46,7 +46,7 @@ Unmatched requirements stay `inconclusive`. Aggregate status is often `mixed` fo
 
 Production evaluate runs on **GitHub Actions** via the Go Pathfinder runtime (`go/pathfinder`), orchestrated as staged reusable workflow jobs (intake → ensure observations → evaluate → publish → job ledger). AWS is not required. Python under `.poc/` remains an offline oracle, not the production entrypoint.
 
-Catalog mode defaults to **synthetic** (`.poc/requirement_catalog`, ADR-101–200). Opt into the checked-in **real** pack (`data/adr_catalog`, SESSION-TTL + PodDisruptionBudgets) with `PATHFINDER_CATALOG=real` or `--catalog-mode=real`. Reports and comments include catalog identity (id, mode, manifest hash). Applicability filtering marks out-of-scope requirements `not_applicable` (never “aligned”).
+Catalog mode defaults to **real** (`data/adr_catalog`). Opt into **synthetic** (`.poc/requirement_catalog`, ADR-101–200) with `PATHFINDER_CATALOG=synthetic`, `--catalog-mode=synthetic`, or the issue **Catalog pack** dropdown. Reports and comments include catalog identity (id, mode, manifest hash) and coverage guidance. Applicability filtering marks out-of-scope requirements `not_applicable` (never “aligned”). Ops notes: `docs/PATHFINDER_OPERATIONS.md`.
 
 Lean job index lines append to the `pathfinder-jobs` branch (`jobs/jobs.jsonl`). Full reports stay in workflow artifacts. Findings are advisory (`synthetic_unadjudicated`); they do not block merges. Same-repo PR changed-file intake is supported (forks denied); multi-file code arrives only through that adapter.
 

@@ -16,7 +16,7 @@ import (
 
 const (
 	ExtractorID      = "paste_heuristic_v1"
-	ExtractorVersion = "paste-heuristic-v2"
+	ExtractorVersion = "paste-heuristic-v3"
 )
 
 var trueOnlyPredicates = map[string]struct{}{

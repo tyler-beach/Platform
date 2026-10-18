@@ -57,8 +57,11 @@ func TestEnsureObservationsExtractsSamplePackage(t *testing.T) {
 	if !ok {
 		t.Fatalf("extraction=%T, want object", got["extraction"])
 	}
-	if extraction["extractor"] != paste.ExtractorID || extraction["extractor_version"] != paste.ExtractorVersion {
+	if extraction["extractor"] != paste.ExtractorID {
 		t.Fatalf("unexpected extraction metadata: %#v", extraction)
+	}
+	if extraction["extractor_version"] != "paste-heuristic-v3" {
+		t.Fatalf("extractor_version=%v", extraction["extractor_version"])
 	}
 }
 

@@ -25,14 +25,14 @@ type Identity struct {
 	Size           int    `json:"requirement_count,omitempty"`
 }
 
-// ResolveMode returns synthetic|real from flag/env (empty → synthetic).
+// ResolveMode returns synthetic|real from flag/env (empty → real prototype pack).
 func ResolveMode(flagOrEnv string) (string, error) {
 	mode := strings.ToLower(strings.TrimSpace(flagOrEnv))
 	if mode == "" {
 		mode = strings.ToLower(strings.TrimSpace(os.Getenv("PATHFINDER_CATALOG")))
 	}
 	if mode == "" {
-		return ModeSynthetic, nil
+		return ModeReal, nil
 	}
 	switch mode {
 	case ModeSynthetic, ModeReal:
@@ -58,9 +58,27 @@ func ResolveDir(repoRoot, mode string) (string, error) {
 
 // LoadIdentity reads catalog_manifest.json when present, else fingerprints requirements.jsonl.
 func LoadIdentity(catalogDir, mode string) (Identity, error) {
-	resolved, err := ResolveMode(mode)
-	if err != nil {
-		return Identity{}, err
+	resolved := strings.ToLower(strings.TrimSpace(mode))
+	if resolved == "" {
+		slash := filepath.ToSlash(catalogDir)
+		switch {
+		case strings.Contains(slash, ".poc/requirement_catalog"):
+			resolved = ModeSynthetic
+		case strings.Contains(slash, "data/adr_catalog"):
+			resolved = ModeReal
+		default:
+			var err error
+			resolved, err = ResolveMode("")
+			if err != nil {
+				return Identity{}, err
+			}
+		}
+	} else {
+		var err error
+		resolved, err = ResolveMode(resolved)
+		if err != nil {
+			return Identity{}, err
+		}
 	}
 	id := Identity{Mode: resolved, Path: catalogDir}
 	manifestPath := filepath.Join(catalogDir, "catalog_manifest.json")

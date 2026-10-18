@@ -1,15 +1,33 @@
 {
   "schema_version": "pathfinder-evidence-package-v1",
-  "package_id": "real-catalog-session-pdb-sample",
+  "package_id": "real-catalog-prototype-sample",
   "scope": {
-    "domains": ["identity", "reliability"]
+    "domains": [
+      "identity",
+      "security",
+      "reliability",
+      "api",
+      "messaging",
+      "observability",
+      "cicd"
+    ]
   },
   "tech_spec": {
     "artifact_id": "tech-spec",
     "path": "tech-spec.md",
-    "revision": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    "text": "Sessions expire after 45 minutes absolute. Production payments Deployment has a PodDisruptionBudget with minAvailable: 2."
+    "revision": "sha256:1a5472dcc8dcf9534670e2db2d009cbd85fa5af069ad12d2f1db5d653ab78e7b",
+    "sha256": "1a5472dcc8dcf9534670e2db2d009cbd85fa5af069ad12d2f1db5d653ab78e7b",
+    "content": "# Checkout API (prototype sample)\n\nSessions expire after 90 minutes absolute. Idle timeout after 20 minutes.\nPassword minimum length: 8.\nMFA is required for administrative login.\nRefresh tokens use rotation.\n\nEncryption at rest is enabled. Edge TLS policy is tls-1-2-strict. HSTS is enabled.\n\nRate limiting is enforced. All routes require auth via authentication middleware.\nOpenAPI document is published.\n\nProduction deployment runs with 3 replicas. Readiness probe is configured. Liveness probe is configured.\nPodDisruptionBudget is present with minAvailable: 2. Network policies are configured.\n\nDead-letter queue (DLQ) is configured. Structured JSON logging is required. PII scrubbing is enabled.\nSecret scanning is enabled. Required reviews: 1.\n"
   },
+  "code": [
+    {
+      "artifact_id": "deploy",
+      "path": "deploy/app.yaml",
+      "language": "yaml",
+      "revision": "sha256:14eed958d463549e8c32915d334678c063cc7b187e60517d02ef5360c6f75715",
+      "sha256": "14eed958d463549e8c32915d334678c063cc7b187e60517d02ef5360c6f75715",
+      "content": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: checkout\nspec:\n  replicas: 3\n  template:\n    spec:\n      containers:\n      - name: api\n        readinessProbe:\n          httpGet: { path: /ready, port: 8080 }\n        livenessProbe:\n          httpGet: { path: /live, port: 8080 }\n---\napiVersion: policy/v1\nkind: PodDisruptionBudget\nmetadata:\n  name: checkout\nspec:\n  minAvailable: 2\n  selector:\n    matchLabels: { app: checkout }\n"
+    }
+  ],
   "observations": []
 }

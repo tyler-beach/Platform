@@ -82,7 +82,7 @@ export default function DemoExplorer() {
         </article>
         <article className="technical-trace__panel technical-trace__panel--wide" id="demo-paste-eval">
           <div className="technical-trace__panel-title"><Workflow size={17} /><div><strong>04 / Issue / PR → catalog evaluation</strong><small>GitHub Issues + Actions · Go runtime</small></div></div>
-          <p className="technical-trace__explain">Prepare a tech-spec, optional same-repo PR link, and/or a single code sample here, then open GitHub. Go on Actions extracts allowlisted observations, evaluates synthetic ADR-101–200, comments results, and records a lean job ledger. This page never evaluates in the browser.</p>
+          <p className="technical-trace__explain">Prepare a tech-spec, optional same-repo PR link, and/or a single code sample here, then open GitHub. Go on Actions extracts allowlisted observations, evaluates the prototype real ADR pack by default (synthetic demo opt-in), comments results, and records a lean job ledger. This page never evaluates in the browser. First run: architecture → PATHFINDER_FIRST_RUN.</p>
           <div className="demo-paste-eval-summary" aria-live="polite">
             <p id="demo-paste-eval-status" className="demo-muted">Loading catalog-evaluation snapshot…</p>
             <ul id="demo-paste-eval-counts" className="technical-trace__notes" />
@@ -104,6 +104,7 @@ export default function DemoExplorer() {
           <div className="demo-workflow-links">
             <a id="demo-open-paste-issue" href={`https://github.com/${repository}/issues/new?template=pathfinder-analyze.yml`}>Open empty Pathfinder analyze form <ArrowUpRight size={13} /></a>
             <a id="demo-open-paste-workflow" href={`https://github.com/${repository}/actions/workflows/pathfinder-issue-analyze.yml`}>Open issue-analyze workflow <ArrowUpRight size={13} /></a>
+            <Link to="/architecture/PATHFINDER_FIRST_RUN">First-run guide <ArrowRight size={13} /></Link>
             <Link to="/architecture/issue_analyze_workflow">How issue / PR evaluation works <ArrowRight size={13} /></Link>
           </div>
         </article>

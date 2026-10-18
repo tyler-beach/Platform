@@ -1,5 +1,126 @@
 {
   "predicates": {
+    "api.auth_middleware.present": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Public API routes MUST require authentication middleware.",
+      "domains": [
+        "api"
+      ],
+      "value_type": "boolean"
+    },
+    "api.openapi.published": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Externally consumed APIs MUST publish an OpenAPI document.",
+      "domains": [
+        "api"
+      ],
+      "value_type": "boolean"
+    },
+    "api.rate_limit.enabled": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Public APIs MUST enforce rate limiting.",
+      "domains": [
+        "api"
+      ],
+      "value_type": "boolean"
+    },
+    "cicd.branch_protection.required_reviews": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "numeric_min"
+      ],
+      "description": "Default branch protection MUST require at least one review.",
+      "domains": [
+        "cicd"
+      ],
+      "value_type": "number"
+    },
+    "cicd.secret_scanning.enabled": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Repositories MUST enable secret scanning.",
+      "domains": [
+        "cicd"
+      ],
+      "value_type": "boolean"
+    },
+    "identity.mfa.required": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Administrative interactive login MUST require MFA.",
+      "domains": [
+        "identity"
+      ],
+      "value_type": "boolean"
+    },
+    "identity.password.min_length": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "numeric_min"
+      ],
+      "description": "Password minimum length MUST be at least 12 characters.",
+      "domains": [
+        "identity"
+      ],
+      "value_type": "number"
+    },
+    "identity.refresh_token.rotation_enabled": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Refresh tokens MUST use rotation on use.",
+      "domains": [
+        "identity"
+      ],
+      "value_type": "boolean"
+    },
+    "kubernetes.deployment.replicas": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "numeric_min"
+      ],
+      "description": "Production deployments MUST run at least three replicas.",
+      "domains": [
+        "reliability"
+      ],
+      "value_type": "number"
+    },
+    "kubernetes.liveness_probe.present": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Long-running services MUST define a liveness probe.",
+      "domains": [
+        "reliability"
+      ],
+      "value_type": "boolean"
+    },
+    "kubernetes.network_policy.present": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Namespaced production workloads MUST have a default-deny NetworkPolicy baseline.",
+      "domains": [
+        "networking"
+      ],
+      "value_type": "boolean"
+    },
     "kubernetes.pod_disruption_budget.min_available": {
       "collector": "structured_package",
       "compatible_kinds": [
@@ -22,6 +143,94 @@
         "reliability"
       ],
       "value_type": "boolean"
+    },
+    "kubernetes.readiness_probe.present": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "HTTP services MUST define a readiness probe.",
+      "domains": [
+        "reliability"
+      ],
+      "value_type": "boolean"
+    },
+    "messaging.dlq.present": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Durable consumers MUST configure a dead-letter queue.",
+      "domains": [
+        "messaging"
+      ],
+      "value_type": "boolean"
+    },
+    "observability.logging.pii_scrubbing": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Log pipelines MUST scrub known PII fields.",
+      "domains": [
+        "observability"
+      ],
+      "value_type": "boolean"
+    },
+    "observability.logging.structured_json": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Services MUST emit structured JSON logs.",
+      "domains": [
+        "observability"
+      ],
+      "value_type": "boolean"
+    },
+    "security.encryption_at_rest.enabled": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Datastores holding customer data MUST enable encryption at rest.",
+      "domains": [
+        "security"
+      ],
+      "value_type": "boolean"
+    },
+    "security.hsts.enabled": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "boolean_required"
+      ],
+      "description": "Public HTTPS services MUST send HSTS.",
+      "domains": [
+        "security"
+      ],
+      "value_type": "boolean"
+    },
+    "security.tls_policy.id": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "set_membership"
+      ],
+      "description": "Edge TLS MUST use an approved policy identifier.",
+      "domains": [
+        "security"
+      ],
+      "value_type": "string"
+    },
+    "session.idle_timeout_seconds": {
+      "collector": "structured_package",
+      "compatible_kinds": [
+        "numeric_max"
+      ],
+      "description": "Idle session timeout MUST NOT exceed 300 seconds.",
+      "domains": [
+        "identity"
+      ],
+      "value_type": "number"
     },
     "session.ttl_seconds": {
       "collector": "structured_package",

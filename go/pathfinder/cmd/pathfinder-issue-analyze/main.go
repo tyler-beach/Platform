@@ -52,21 +52,6 @@ func main() {
 	}
 
 	repoRoot := findRepoRoot()
-	mode, modeErr := catalog.ResolveMode(*catalogModeFlag)
-	if modeErr != nil {
-		fmt.Fprintln(os.Stderr, modeErr)
-		os.Exit(2)
-	}
-	catalogDir := *catalogDirFlag
-	if catalogDir == "" {
-		var resolveErr error
-		catalogDir, resolveErr = catalog.ResolveDir(repoRoot, mode)
-		if resolveErr != nil {
-			fmt.Fprintln(os.Stderr, resolveErr)
-			os.Exit(2)
-		}
-	}
-
 	exitCode := 0
 	var body, title string
 	var err error
@@ -93,6 +78,25 @@ func main() {
 			!strings.Contains(lowerBody, "pathfinder-analyze") &&
 			!strings.Contains(lowerBody, "public / synthetic attestation") {
 			err = &issueintake.Error{Msg: "issue is not a Pathfinder analyze submission"}
+		}
+	}
+
+	modeFlag := *catalogModeFlag
+	if modeFlag == "" && body != "" {
+		modeFlag = issueintake.CatalogModeFromIssueBody(body)
+	}
+	mode, modeErr := catalog.ResolveMode(modeFlag)
+	if modeErr != nil {
+		fmt.Fprintln(os.Stderr, modeErr)
+		os.Exit(2)
+	}
+	catalogDir := *catalogDirFlag
+	if catalogDir == "" {
+		var resolveErr error
+		catalogDir, resolveErr = catalog.ResolveDir(repoRoot, mode)
+		if resolveErr != nil {
+			fmt.Fprintln(os.Stderr, resolveErr)
+			os.Exit(2)
 		}
 	}
 

@@ -31,11 +31,11 @@ Evaluate a tech-spec/code evidence package against the whole catalog (production
 ```sh
 cd go/pathfinder
 go build -o /tmp/pathfinder-evaluate-package ./cmd/pathfinder-evaluate-package
-# Default: synthetic ADR-101–200
+# Default: real prototype pack (data/adr_catalog)
 /tmp/pathfinder-evaluate-package \
-  ../../.poc/requirement_catalog/sample_packages/multi-domain-session-service/package.json
-# Opt-in real pack (docs/adr-derived rows under data/adr_catalog)
-/tmp/pathfinder-evaluate-package --catalog-mode=real \
+  ../../data/adr_catalog/sample_packages/session-and-pdb/package.json
+# Opt-in synthetic ADR-101–200 demo pack
+/tmp/pathfinder-evaluate-package --catalog-mode=synthetic \
   ../../.poc/requirement_catalog/sample_packages/multi-domain-session-service/package.json
 ```
 

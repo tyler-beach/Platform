@@ -21,7 +21,9 @@ The documentation source is in the docs folder and is presented through a React 
 - [PoC analysis workflow (GitHub Actions)](https://github.com/tyler-beach/Platform/actions/workflows/poc-analysis.yml)
 - [Pathfinder issue / PR catalog evaluation (Go on Actions)](https://github.com/tyler-beach/Platform/actions/workflows/pathfinder-issue-analyze.yml)
 - [Issue analyze workflow docs](docs/ISSUE_ANALYZE_WORKFLOW.md)
-- [Real ADR catalog pack (opt-in)](data/adr_catalog/README.md)
+- [Pathfinder first run](docs/PATHFINDER_FIRST_RUN.md)
+- [Real ADR catalog pack (default prototype)](data/adr_catalog/README.md)
+- [Pathfinder operations](docs/PATHFINDER_OPERATIONS.md)
 - [Executable semantic-analysis PoC](https://tyler-beach.github.io/Platform/EXECUTABLE_POC/)
 
 This public Pages deployment contains the synthetic mock walkthrough. Actions history and detailed CSV run-data exports are disabled by default; the workflow rejects those exports unless the repository is an organization-owned private/internal repository with Pages visibility and explicit opt-ins configured. Before using real source data for a demo, clone the project into the intended private organization and verify its Pages visibility settings. The REST/OpenAPI document is a proposed façade, not a claim of a deployed HTTP server.

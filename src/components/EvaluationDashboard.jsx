@@ -50,9 +50,9 @@ const tracks = {
   paste: {
     eyebrow: 'ISSUE / PR → CATALOG (GITHUB BACKBONE)',
     title: 'Submit a sample through Issues—or a same-repo PR.',
-    description: 'Open a Pathfinder analyze issue with a tech-spec, a single code sample, and/or a same-repo pull request. Go on Actions extracts allowlisted observations, evaluates the synthetic 100-ADR catalog, comments aggregate results, and appends a lean job ledger. Pages only prepares the issue and hosts a redacted fixture snapshot—execution stays on GitHub.',
+    description: 'Open a Pathfinder analyze issue with a tech-spec, a single code sample, and/or a same-repo pull request. Go on Actions extracts allowlisted observations, evaluates the prototype real ADR pack by default (20 platform-style ADRs; synthetic demo opt-in), comments aggregate results, and appends a lean job ledger. Pages only prepares the issue and hosts a redacted fixture snapshot—execution stays on GitHub.',
     facts: [
-      ['100', 'synthetic catalog ADRs'],
+      ['20', 'prototype real ADRs'],
       ['Go', 'production evaluate runtime'],
       ['Actions', 'stages + comment + ledger'],
     ],
@@ -61,7 +61,7 @@ const tracks = {
       { label: 'Open analyze workflow', href: 'https://github.com/tyler-beach/Platform/actions/workflows/pathfinder-issue-analyze.yml' },
       { label: 'Read issue-analyze docs', href: 'https://github.com/tyler-beach/Platform/blob/main/docs/ISSUE_ANALYZE_WORKFLOW.md' },
     ],
-    status: 'Default catalog: synthetic ADR-101–200 · real pack opt-in (data/adr_catalog) · forks denied · unextracted stay inconclusive',
+    status: 'Default catalog: real prototype pack · synthetic demo opt-in · forks denied · unextracted stay inconclusive',
   },
 };
 
