@@ -16,10 +16,11 @@ test("guided ADR journey explains the investigation in five plain-language steps
     "The values do not line up.",
     "What it does not prove",
     "Your local choice:",
-    "This walkthrough uses example data",
+    "Shared evaluation spine · example data",
     "Example data only · no live systems checked",
   ]) assert.ok(component.includes(phrase), "missing guided journey content: " + phrase);
-  assert.ok(component.includes("const stepNames = ['Decision', 'Scope', 'Evidence', 'Assessment', 'Review']"));
+  assert.ok(component.includes("const stepNames = ['Decision', 'Scope', 'Normalize', 'Evidence', 'Review']"));
+  assert.ok(component.includes("Typed kind"), "missing normalization cue in demo journey rail");
   assert.ok(component.includes("What this supports"));
   for (const id of ["demo-open-analysis", "demo-open-evaluation", "demo-open-functional"]) assert.ok(component.includes(`id="${id}"`), "missing technical workflow link: " + id);
   assert.ok(component.includes("No source excerpt supplied for this example"));
