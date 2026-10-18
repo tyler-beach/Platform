@@ -57,9 +57,13 @@ def mock_assess(context: dict[str,Any]) -> dict[str,Any]:
         and e.get("resolution_status") in {"resolved","resolved_static"}
         for e in entry_edges
     )
+    diff_text=str(context.get("diff_excerpt","")).lower()
     uncertain_dispatch=any(
-        e.get("dispatch_kind") in {"conditional","dynamic","cha"}
-        or e.get("resolution_status")=="resolved_approximate"
+        e.get("dispatch_kind") in {"conditional","dynamic"}
+        or (
+            e.get("dispatch_kind")=="cha"
+            and "possible dispatch target" in diff_text
+        )
         for e in entry_provider_edges
     )
     requires_async=any(x in req for x in ("asynchronous","asynchronously","queue","queued","enqueue","outbox","background worker","must not block","must not synchronously","must not wait","not synchronously","non-blocking"))
@@ -82,7 +86,6 @@ def mock_assess(context: dict[str,Any]) -> dict[str,Any]:
                        0 if e.get("evidence_type")=="resolved_call_edge" else 1))
     ids.extend(e["evidence_id"] for e in scored_edges if e.get("evidence_id"))
     ids.extend(e["evidence_id"] for e in evidence_items if e.get("evidence_type")=="diff_line" and e.get("evidence_id"))
-    diff_text=str(context.get("diff_excerpt","")).lower()
     inline_semantics_proven=any(phrase in diff_text for phrase in (
         "synchronously before returning",
         "returns the provider result inline",
