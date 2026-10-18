@@ -35,6 +35,31 @@ def validate_pinned_artifact(artifact: dict[str, Any], label: str) -> None:
         raise ValueError(f"{label} content hash does not match pinned sha256")
 
 
+def validate_json_pointer_evidence(item: dict[str, Any], source: dict[str, Any]) -> None:
+    """Require JSON-pointer evidence to resolve to the claimed value in pinned source."""
+    locator = item["locator"]
+    if item.get("artifact_id") != source["artifact_id"] or locator.get("kind") != "json_pointer":
+        return
+    pointer = locator.get("value")
+    if not isinstance(pointer, str) or (pointer and not pointer.startswith("/")):
+        raise ValueError(f"evidence {item['evidence_id']} has an invalid JSON pointer")
+    try:
+        value: Any = json.loads(source["content"])
+        if pointer:
+            for raw_token in pointer[1:].split("/"):
+                token = raw_token.replace("~1", "/").replace("~0", "~")
+                if isinstance(value, list):
+                    value = value[int(token)]
+                elif isinstance(value, dict):
+                    value = value[token]
+                else:
+                    raise KeyError(token)
+    except (json.JSONDecodeError, KeyError, IndexError, TypeError, ValueError) as exc:
+        raise ValueError(f"evidence {item['evidence_id']} JSON pointer does not resolve in pinned source") from exc
+    if value != item.get("value"):
+        raise ValueError(f"evidence {item['evidence_id']} value does not match pinned source locator")
+
+
 def investigate(case: dict[str, Any]) -> dict[str, Any]:
     """Evaluate a normalized, pinned fixture and return a deterministic result."""
     adr = case.get("adr")
@@ -59,6 +84,7 @@ def investigate(case: dict[str, Any]) -> dict[str, Any]:
             raise ValueError(f"evidence {item['evidence_id']} points to a stale artifact revision")
         if not isinstance(item.get("locator"), dict) or not item["locator"].get("kind"):
             raise ValueError(f"evidence {item['evidence_id']} requires a typed locator")
+        validate_json_pointer_evidence(item, source)
 
     requested_ids = case.get("proposed_evidence_ids", [item["evidence_id"] for item in evidence])
     if not isinstance(requested_ids, list) or any(not isinstance(x, str) for x in requested_ids):
