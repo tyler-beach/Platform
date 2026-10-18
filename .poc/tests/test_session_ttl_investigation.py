@@ -61,12 +61,13 @@ class SessionTTLInvestigationTests(unittest.TestCase):
     def test_out_of_scope_decision_is_not_applied(self):
         result = investigate.investigate(fixture(720, scope_match=False))
         self.assertFalse(result["applicability"]["applicable"])
-        self.assertEqual(result["outcome"], "no_deviation_found")
+        self.assertEqual(result["outcome"], "not_applicable")
         self.assertEqual(result["relationship"], "not_applicable")
 
     def test_superseded_decision_is_not_applied(self):
         result = investigate.investigate(fixture(720, adr_status="superseded"))
         self.assertFalse(result["applicability"]["applicable"])
+        self.assertEqual(result["outcome"], "not_applicable")
         self.assertEqual(result["relationship"], "not_applicable")
 
     def test_missing_ttl_is_inconclusive(self):
