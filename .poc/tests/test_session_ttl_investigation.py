@@ -109,6 +109,21 @@ class SessionTTLInvestigationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "does not match pinned source locator"):
             investigate.investigate(case)
 
+    def test_boolean_source_value_cannot_be_relabelled_as_integer_ttl(self):
+        case = fixture(1)
+        source_content = json.dumps({"observations": [{"predicate": "session.ttl_seconds", "value": True}]}, separators=(",", ":"))
+        case["source"] = artifact("service-config", "git:def456", "config/session.json", source_content)
+        with self.assertRaisesRegex(ValueError, "does not match pinned source locator"):
+            investigate.investigate(case)
+
+    def test_duplicate_proposed_evidence_ids_are_rejected(self):
+        with self.assertRaisesRegex(ValueError, "must be unique"):
+            investigate.investigate(fixture(720, proposed_evidence_ids=["EV-TTL-1", "EV-TTL-1"]))
+
+    def test_invalid_policy_limit_is_rejected_even_when_not_applicable(self):
+        with self.assertRaisesRegex(ValueError, "max_ttl_seconds"):
+            investigate.investigate(fixture(720, scope_match=False, max_ttl_seconds=-1))
+
     def test_mutated_pinned_artifact_hash_is_rejected(self):
         case = fixture(720)
         case["source"]["content"] += " "
