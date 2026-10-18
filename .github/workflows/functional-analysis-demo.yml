@@ -33,9 +33,15 @@ on:
           - deviation
           - aligned
           - insufficient-evidence
+      create_review_issue:
+        description: "Create a GitHub Issue for human review after successful validation"
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: read
+  issues: write
 
 concurrency:
   group: functional-analysis-demo-${{ github.run_id }}-${{ github.run_attempt }}
@@ -206,6 +212,12 @@ jobs:
         run: |
           python .github/demo/pipeline.py report --output run-data
           cat run-data/functional-analysis-report.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Create opt-in GitHub review issue
+        if: ${{ inputs.create_review_issue == true && github.event_name == 'workflow_dispatch' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PATHFINDER_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: python .github/demo/review_issue.py --run-data run-data
       - name: Upload complete end-to-end run
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:

@@ -1,0 +1,146 @@
+name: Pathfinder finding review
+description: Review an ADR deviation analysis and record a structured human disposition.
+title: "[Pathfinder review] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for a review packet tied to a specific analysis run and immutable evidence snapshot. Do not include secrets, credentials, private customer data, or large source excerpts. A reviewer disposition is not an adjudicated evaluation label.
+  - type: input
+    id: analysis_run
+    attributes:
+      label: Analysis run URL or immutable run ID
+      description: Link to the workflow/run and identify the exact analysis attempt.
+      placeholder: https://github.com/owner/repo/actions/runs/123456
+    validations:
+      required: true
+  - type: input
+    id: analysis_version
+    attributes:
+      label: Analysis/pipeline version
+      description: Commit, pipeline version, or analysis fingerprint.
+    validations:
+      required: true
+  - type: input
+    id: requirement_ref
+    attributes:
+      label: ADR / requirement reference
+      description: ADR ID and requirement identifier; include revision if known.
+    validations:
+      required: true
+  - type: input
+    id: artifact_version
+    attributes:
+      label: Artifact snapshot / source revision
+      description: Immutable commit, artifact ID, and/or content digest.
+    validations:
+      required: true
+  - type: dropdown
+    id: machine_outcome
+    attributes:
+      label: Original machine outcome
+      options:
+        - supported_deviation
+        - potential_deviation
+        - no_deviation_found
+        - inconclusive
+        - unknown
+    validations:
+      required: true
+  - type: dropdown
+    id: disposition
+    attributes:
+      label: Human disposition
+      options:
+        - confirmed_deviation
+        - false_positive
+        - aligned_confirmed
+        - missed_deviation
+        - inconclusive_correct
+        - needs_more_evidence
+        - cannot_review
+    validations:
+      required: true
+  - type: dropdown
+    id: reason_code
+    attributes:
+      label: Primary reason
+      options:
+        - evidence_supports_claim
+        - incorrect_adr
+        - out_of_scope
+        - valid_exception
+        - incorrect_observation
+        - invalid_inference
+        - missing_counter_evidence
+        - stale_or_wrong_locator
+        - missing_runtime_evidence
+        - conflicting_requirements
+        - reviewer_disagreement
+        - insufficient_context
+        - other
+    validations:
+      required: true
+  - type: textarea
+    id: supporting_evidence
+    attributes:
+      label: Supporting evidence references
+      description: Evidence IDs, file paths/line ranges, or immutable artifact references. Prefer IDs over pasted excerpts.
+      placeholder: |
+        - EV-REQ-01 — ADR-12 requirement, revision …
+        - EV-OBS-04 — src/session.go:44, source digest …
+    validations:
+      required: true
+  - type: textarea
+    id: counter_evidence
+    attributes:
+      label: Contradicting or missing evidence
+      description: Include evidence IDs or explicitly state what evidence is missing. Absence is not proof of compliance.
+      placeholder: "EV-… contradicts … / Runtime deployment evidence was not available."
+    validations:
+      required: true
+  - type: textarea
+    id: rationale
+    attributes:
+      label: Reviewer rationale
+      description: Explain why the disposition follows from the requirement and evidence. Separate observed facts from inference.
+      placeholder: "The requirement states … The pinned source shows … This does/does not establish …"
+    validations:
+      required: true
+  - type: dropdown
+    id: feedback_route
+    attributes:
+      label: Where should the feedback improve the system?
+      options:
+        - applicability_retrieval
+        - collector_provenance
+        - evidence_retrieval
+        - inference_evaluation
+        - deterministic_guardrails
+        - exception_lifecycle
+        - runtime_evidence
+        - policy_adjudication
+        - other
+    validations:
+      required: true
+  - type: dropdown
+    id: needs_adjudication
+    attributes:
+      label: Independent adjudication needed?
+      options:
+        - "yes"
+        - "no"
+        - "unsure"
+    validations:
+      required: true
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: Review guardrails
+      options:
+        - label: I reviewed the original requirement and pinned artifact revision.
+          required: true
+        - label: I checked available contradicting evidence and recorded gaps.
+          required: true
+        - label: I have not treated an evidence-strength score as a probability.
+          required: true
