@@ -4,7 +4,7 @@
 
 When a Pathfinder analyze issue is opened or updated with a valid evidence package or extractable paste content, the system MUST pin the package, ensure typed observations, evaluate it against the approved typed ADR catalog using the **Go Pathfinder runtime**, publish a workflow artifact report, and comment aggregate status plus per-requirement outcomes via **staged GitHub Actions orchestration**. The comment MUST NOT paste the full tech-spec or code contents. The production workflow MUST NOT invoke Python `.poc/issue_analyze/issue_package.py` or `.poc/requirement_engine/evaluate_package.py` as the evaluate entrypoint.
 
-#### Scenario: Valid package yields result comment via Go stages
+#### Scenario: Valid package yields result comment
 - **GIVEN** a GitHub issue titled with `[Pathfinder analyze]` containing a valid `pathfinder-evidence-package-v1` JSON block and public/synthetic attestation
 - **WHEN** the analyze workflow runs
 - **THEN** Go catalog evaluation executes through staged Actions jobs or reusable workflows
