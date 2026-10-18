@@ -39,7 +39,7 @@ def canonical(value: Any) -> str:
 def export_candidates(events: list[dict[str, Any]]) -> dict[str, Any]:
     candidates = []
     excluded = {"not_adjudicated": 0, "not_approved": 0, "holdout_or_eval_split": 0,
-                "invalid_label": 0, "missing_route": 0}
+                "invalid_label": 0, "missing_route": 0, "missing_provenance": 0}
     seen = set()
     for event in events:
         if event.get("event_type") != "review.adjudicated":
@@ -51,9 +51,15 @@ def export_candidates(events: list[dict[str, Any]]) -> dict[str, Any]:
         if event.get("promotion_status") != "approved":
             excluded["not_approved"] += 1
             continue
-        split = event.get("evaluation_split", "candidate_train")
+        # Fail closed: missing split metadata must never default into a training pool.
+        split = event.get("evaluation_split")
         if split not in {"candidate_train", "candidate_validation"}:
             excluded["holdout_or_eval_split"] += 1
+            continue
+        required_provenance = ("unit_id", "analysis_run_id", "analysis_version", "timestamp",
+                               "evidence_refs", "rationale_summary", "event_hash")
+        if any(not event.get(field) for field in required_provenance) or not event.get("adjudicator_id"):
+            excluded["missing_provenance"] += 1
             continue
         label = event.get("evaluation_label")
         if label not in LABELS:
