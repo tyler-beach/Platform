@@ -46,6 +46,8 @@ Unmatched requirements stay `inconclusive`. Aggregate status is often `mixed` fo
 
 Production evaluate runs on **GitHub Actions** via the Go Pathfinder runtime (`go/pathfinder`), orchestrated as staged reusable workflow jobs (intake → ensure observations → evaluate → publish → job ledger). AWS is not required. Python under `.poc/` remains an offline oracle, not the production entrypoint.
 
+Catalog mode defaults to **synthetic** (`.poc/requirement_catalog`, ADR-101–200). Opt into the checked-in **real** pack (`data/adr_catalog`, SESSION-TTL + PodDisruptionBudgets) with `PATHFINDER_CATALOG=real` or `--catalog-mode=real`. Reports and comments include catalog identity (id, mode, manifest hash). Applicability filtering marks out-of-scope requirements `not_applicable` (never “aligned”).
+
 Lean job index lines append to the `pathfinder-jobs` branch (`jobs/jobs.jsonl`). Full reports stay in workflow artifacts. Findings are advisory (`synthetic_unadjudicated`); they do not block merges. Same-repo PR changed-file intake is supported (forks denied); multi-file code arrives only through that adapter.
 
 ## Local dry-run

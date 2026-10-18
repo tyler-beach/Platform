@@ -1,0 +1,12 @@
+{
+  "catalog_id": "platform-real-adr-v0",
+  "catalog_mode": "real",
+  "manifest_sha256": "40e358e3cec50b277a395ecaaef65bf8951c665c43b92de7c9f605548f8dfb2c",
+  "requirement_count": 3,
+  "schema_version": "pathfinder-catalog-manifest-v1",
+  "source_adrs": [
+    "adrs/SESSION-TTL.md",
+    "adrs/POD-DISRUPTION-BUDGETS.md"
+  ],
+  "version": "0.1.0"
+}

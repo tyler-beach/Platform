@@ -3,6 +3,7 @@ package evaluate
 import (
 	"fmt"
 
+	"github.com/tyler-beach/Platform/go/pathfinder/internal/applicability"
 	"github.com/tyler-beach/Platform/go/pathfinder/internal/canonical"
 	"github.com/tyler-beach/Platform/go/pathfinder/internal/catalog"
 	"github.com/tyler-beach/Platform/go/pathfinder/internal/collect/pkgcollect"
@@ -78,25 +79,19 @@ func aggregateMeaning(status string) string {
 	}
 }
 
-func scopeMatch(row, packageObj map[string]any) bool {
-	scope, _ := packageObj["scope"].(map[string]any)
-	domains, _ := scope["domains"].([]any)
-	if len(domains) == 0 {
-		return true
-	}
-	domain := row["domain"]
-	for _, d := range domains {
-		if d == domain {
-			return true
-		}
-	}
-	return false
-}
-
 // EvaluatePackage runs ensure-observations, collect, and engine evaluation.
 func EvaluatePackage(packageObj map[string]any, catalogDir string, adrStatus string) (map[string]any, error) {
+	return EvaluatePackageWithMode(packageObj, catalogDir, adrStatus, "")
+}
+
+// EvaluatePackageWithMode is EvaluatePackage plus optional catalog mode for identity metadata.
+func EvaluatePackageWithMode(packageObj map[string]any, catalogDir string, adrStatus, catalogMode string) (map[string]any, error) {
 	if adrStatus == "" {
 		adrStatus = "accepted"
+	}
+	identity, err := catalog.LoadIdentity(catalogDir, catalogMode)
+	if err != nil {
+		return nil, err
 	}
 	reg, err := predicates.Load(catalogDir)
 	if err != nil {
@@ -120,10 +115,15 @@ func EvaluatePackage(packageObj map[string]any, catalogDir string, adrStatus str
 		obsAny[i] = o
 	}
 
+	pkgScope := applicability.ScopeFromPackage(ensured)
 	var results []map[string]any
 	var outcomes []string
+	inScopeCount := 0
 	for _, row := range rows {
-		sm := scopeMatch(row, ensured)
+		sm := applicability.InScope(pkgScope, applicability.MetaFromRow(row))
+		if sm {
+			inScopeCount++
+		}
 		decision, err := engine.Evaluate(catalog.RequirementForEngine(row), obsAny, adrStatus, sm)
 		if err != nil {
 			return nil, fmt.Errorf("evaluate %v: %w", row["requirement_id"], err)
@@ -147,6 +147,7 @@ func EvaluatePackage(packageObj map[string]any, catalogDir string, adrStatus str
 			"uncertainty":           decision["uncertainty"],
 			"result_sha256":         decision["result_sha256"],
 			"label_status":          label,
+			"in_scope":              sm,
 		})
 		outcomes = append(outcomes, decision["outcome"].(string))
 	}
@@ -164,17 +165,28 @@ func EvaluatePackage(packageObj map[string]any, catalogDir string, adrStatus str
 	if pkgID == "" {
 		pkgID = "unnamed"
 	}
+	identity.Size = len(rows)
+	catalogPath := catalogRelativePath(identity.Mode)
 	report := map[string]any{
 		"schema_version":     ReportSchema,
 		"engine_version":     engine.EngineVersion,
 		"package_id":         pkgID,
 		"catalog_size":       len(rows),
-		"observation_count":  len(observations),
-		"extraction":         ensured["extraction"],
-		"aggregate_status":   status,
-		"aggregate_meaning":  aggregateMeaning(status),
-		"counts":             counts,
-		"results":            results,
+		"in_scope_count":     inScopeCount,
+		"catalog": map[string]any{
+			"mode":              identity.Mode,
+			"catalog_id":        identity.CatalogID,
+			"version":           identity.Version,
+			"manifest_sha256":   identity.ManifestSHA256,
+			"path":              catalogPath,
+			"requirement_count": identity.Size,
+		},
+		"observation_count": len(observations),
+		"extraction":        ensured["extraction"],
+		"aggregate_status":  status,
+		"aggregate_meaning": aggregateMeaning(status),
+		"counts":            counts,
+		"results":           results,
 	}
 	fp, err := canonical.Fingerprint(report)
 	if err != nil {
@@ -182,4 +194,11 @@ func EvaluatePackage(packageObj map[string]any, catalogDir string, adrStatus str
 	}
 	report["report_sha256"] = fp
 	return report, nil
+}
+
+func catalogRelativePath(mode string) string {
+	if mode == catalog.ModeReal {
+		return "data/adr_catalog"
+	}
+	return ".poc/requirement_catalog"
 }
