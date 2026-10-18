@@ -8,7 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / ".poc" / "review_sampling"))
-from github_issue_intake import build_frame, build_issue, prepare
+from github_issue_intake import build_frame, build_issue, existing_review_unit_ids, prepare
 
 
 class GitHubIssueIntakeTests(unittest.TestCase):
@@ -74,6 +74,18 @@ class GitHubIssueIntakeTests(unittest.TestCase):
             self.assertEqual(first["selected_review_units"], second["selected_review_units"])
             self.assertEqual(original, batch_path.read_text(encoding="utf-8"))
             self.assertEqual(first["frame"]["fingerprint_sha256"], second["frame"]["fingerprint_sha256"])
+
+    def test_existing_issue_markers_make_retries_idempotent(self):
+        issues = [
+            {"body": "<!-- pathfinder-review-unit: SCOPE-1:ADR-001:catalog -->\\nreview"},
+            {"body": "ordinary issue without marker"},
+            {"body": None},
+            {"body": "<!-- pathfinder-review-unit: SCOPE-2:NO-APPLICABLE-ADR:catalog -->"},
+        ]
+        self.assertEqual(
+            existing_review_unit_ids(issues),
+            {"SCOPE-1:ADR-001:catalog", "SCOPE-2:NO-APPLICABLE-ADR:catalog"},
+        )
 
     def test_unknown_outcome_becomes_inconclusive(self):
         report = self.report()
