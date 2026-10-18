@@ -329,7 +329,7 @@ function RequirementLab() {
     tabRefs.current[nextKey]?.focus();
   }
 
-  const stepNames = ['Decision', 'Scope', 'Evidence', 'Assessment', 'Review'];
+  const stepNames = ['Decision', 'Scope', 'Normalize', 'Evidence', 'Review'];
   const progress = ((activeStage + 1) / example.stages.length) * 100;
 
   return <section className="requirement-lab journey-lab" aria-labelledby="requirement-lab-title">
@@ -358,7 +358,7 @@ function RequirementLab() {
       <aside className="journey-rail" aria-label="Investigation progress">
         <div className="journey-rail__heading"><span className="demo-label">INVESTIGATION</span><strong>{String(activeStage + 1).padStart(2, '0')} <small>/ 05</small></strong></div>
         <div className="journey-rail__track" aria-hidden="true"><span style={{height: progress + '%'}}/></div>
-        {example.stages.map((item, index) => <button key={item[0]} type="button" className={'journey-rail__step' + (index === activeStage ? ' is-active' : '') + (index < activeStage ? ' is-complete' : '')} aria-current={index === activeStage ? 'step' : undefined} onClick={() => goToStage(index)}><span>{index < activeStage ? <CheckCircle2 size={15}/> : String(index + 1).padStart(2, '0')}</span><span><strong>{stepNames[index]}</strong><small>{['The rule', 'Applicability', 'Source facts', 'Compare values', 'Human decision'][index]}</small></span><ChevronRight size={14}/></button>)}
+        {example.stages.map((item, index) => <button key={item[0]} type="button" className={'journey-rail__step' + (index === activeStage ? ' is-active' : '') + (index < activeStage ? ' is-complete' : '')} aria-current={index === activeStage ? 'step' : undefined} onClick={() => goToStage(index)}><span>{index < activeStage ? <CheckCircle2 size={15}/> : String(index + 1).padStart(2, '0')}</span><span><strong>{stepNames[index]}</strong><small>{['The rule', 'Applicability', 'Typed kind', 'Source facts', 'Human decision'][index]}</small></span><ChevronRight size={14}/></button>)}
         <div className="journey-rail__note"><ShieldCheck size={15}/><span>Evidence first.<br/>Human decision.</span></div>
       </aside>
 
