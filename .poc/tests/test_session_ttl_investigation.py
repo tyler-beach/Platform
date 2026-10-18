@@ -170,7 +170,7 @@ class SessionTTLInvestigationTests(unittest.TestCase):
         case = fixture(-1)
         result = investigate.investigate(case)
         self.assertEqual(result["outcome"], "inconclusive")
-        self.assertEqual(result["relationship"], "insufficient_evidence")
+        self.assertEqual(result["relationship"], "invalid_observation")
         self.assertEqual(result["evidence_ids"], ["EV-TTL-1"])
         self.assertEqual(result["rejected_observations"], [{"evidence_id": "EV-TTL-1", "reason_code": "negative_value"}])
 
@@ -182,7 +182,7 @@ class SessionTTLInvestigationTests(unittest.TestCase):
         case["evidence"][0]["value"] = 12.5
         result = investigate.investigate(case)
         self.assertEqual(result["outcome"], "inconclusive")
-        self.assertEqual(result["relationship"], "insufficient_evidence")
+        self.assertEqual(result["relationship"], "invalid_observation")
         self.assertEqual(result["evidence_ids"], ["EV-TTL-1"])
         self.assertEqual(result["rejected_observations"], [{"evidence_id": "EV-TTL-1", "reason_code": "unexpected_numeric_type"}])
 
