@@ -40,7 +40,7 @@ def validate_json_pointer_evidence(item: dict[str, Any], source: dict[str, Any])
     locator = item["locator"]
     if item.get("artifact_id") != source["artifact_id"] or locator.get("kind") != "json_pointer":
         return
-    pointer = locator.get("value")
+    pointer = locator.get("pointer", locator.get("value"))
     if not isinstance(pointer, str) or (pointer and not pointer.startswith("/")):
         raise ValueError(f"evidence {item['evidence_id']} has an invalid JSON pointer")
     try:
