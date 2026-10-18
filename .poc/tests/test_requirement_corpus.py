@@ -18,6 +18,15 @@ class RequirementCorpusTests(unittest.TestCase):
             group=[c for c in cases if c["requirement_type"]==t]
             self.assertEqual(sum(c["split"]=="development" for c in group),16)
             self.assertEqual(sum(c["split"]=="locked_holdout" for c in group),4)
+
+    def test_locked_holdout_is_stratified_by_expected_outcome(self):
+        cases=ev.load_cases()
+        from collections import Counter
+        for t in {c["requirement_type"] for c in cases}:
+            holdout=Counter(c["gold_label"] for c in cases if c["requirement_type"]==t and c["split"]=="locked_holdout")
+            development=Counter(c["gold_label"] for c in cases if c["requirement_type"]==t and c["split"]=="development")
+            self.assertEqual(holdout,{"deviation":1,"no_deviation":1,"ambiguous":2})
+            self.assertEqual(development,{"deviation":6,"no_deviation":6,"ambiguous":4})
     def test_independent_adjudication_is_not_fabricated(self):
         self.assertTrue(all(c["independent_adjudication_status"]=="pending" for c in ev.load_cases()))
         self.assertEqual(ev.evaluate()["independently_adjudicated_cases"],0)
