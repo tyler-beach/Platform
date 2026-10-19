@@ -1,0 +1,94 @@
+{
+  "schema_version": "pathfinder-usage-dashboard-v2",
+  "generated_at": "2026-10-19T17:42:49Z",
+  "window_days": 90,
+  "records_seen": 0,
+  "rejected_records": 0,
+  "totals": {
+    "jobs": 0,
+    "succeeded": 0,
+    "failed": 0,
+    "aggregate_statuses": {
+      "all_aligned": 0,
+      "deviations_found": 0,
+      "insufficient_coverage": 0,
+      "mixed": 0,
+      "not_applicable_only": 0,
+      "other": 0
+    },
+    "outcomes": {
+      "supported_deviation": 0,
+      "no_deviation_found": 0,
+      "inconclusive": 0,
+      "not_applicable": 0
+    },
+    "operational_metrics": {
+      "catalog_load": {
+        "runs": 0,
+        "errors": 0,
+        "skipped": 0,
+        "duration_total_ns": 0,
+        "duration_max_ns": 0
+      },
+      "evaluation": {
+        "runs": 0,
+        "errors": 0,
+        "skipped": 0,
+        "duration_total_ns": 0,
+        "duration_max_ns": 0
+      },
+      "intake": {
+        "runs": 0,
+        "errors": 0,
+        "skipped": 0,
+        "duration_total_ns": 0,
+        "duration_max_ns": 0
+      },
+      "ledger": {
+        "runs": 0,
+        "errors": 0,
+        "skipped": 0,
+        "duration_total_ns": 0,
+        "duration_max_ns": 0
+      },
+      "other": {
+        "runs": 0,
+        "errors": 0,
+        "skipped": 0,
+        "duration_total_ns": 0,
+        "duration_max_ns": 0
+      },
+      "package_build": {
+        "runs": 0,
+        "errors": 0,
+        "skipped": 0,
+        "duration_total_ns": 0,
+        "duration_max_ns": 0
+      },
+      "publication": {
+        "runs": 0,
+        "errors": 0,
+        "skipped": 0,
+        "duration_total_ns": 0,
+        "duration_max_ns": 0
+      },
+      "report_write": {
+        "runs": 0,
+        "errors": 0,
+        "skipped": 0,
+        "duration_total_ns": 0,
+        "duration_max_ns": 0
+      },
+      "summary": {
+        "runs": 0,
+        "errors": 0,
+        "skipped": 0,
+        "duration_total_ns": 0,
+        "duration_max_ns": 0
+      }
+    }
+  },
+  "daily": [],
+  "model_metering": "not_metered",
+  "operational_telemetry": "not_available"
+}

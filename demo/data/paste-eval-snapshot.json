@@ -1,0 +1,222 @@
+{
+  "aggregate_meaning": "Partial alignment: some requirements aligned, others deviant and/or inconclusive.",
+  "aggregate_status": "mixed",
+  "backbone": "github-issues-actions",
+  "boundaries": [
+    "Pages shows a redacted fixture snapshot only.",
+    "Live paste evaluation runs on GitHub Issues and Actions.",
+    "Full tech-spec/code bodies are never embedded in this snapshot.",
+    "Unextracted predicates remain inconclusive."
+  ],
+  "catalog_size": 100,
+  "counts": {
+    "inconclusive": 46,
+    "no_deviation_found": 7,
+    "not_applicable": 40,
+    "supported_deviation": 7
+  },
+  "docs_path": "docs/ISSUE_ANALYZE_WORKFLOW.md",
+  "extracted_observations": [
+    {
+      "locator_kind": "paste_span",
+      "path": "fixtures/real_paste_tech_spec.md",
+      "predicate": "api.auth_middleware.present",
+      "subject": "public-api",
+      "value": true
+    },
+    {
+      "locator_kind": "paste_span",
+      "path": "fixtures/real_paste_tech_spec.md",
+      "predicate": "api.rate_limit.enabled",
+      "subject": "public-api",
+      "value": true
+    },
+    {
+      "locator_kind": "paste_span",
+      "path": "fixtures/real_paste_tech_spec.md",
+      "predicate": "kubernetes.deployment.replicas",
+      "subject": "workload",
+      "value": 2
+    },
+    {
+      "locator_kind": "paste_span",
+      "path": "fixtures/real_paste_tech_spec.md",
+      "predicate": "kubernetes.readiness_probe.present",
+      "subject": "workload",
+      "value": true
+    },
+    {
+      "locator_kind": "paste_span",
+      "path": "fixtures/real_paste_tech_spec.md",
+      "predicate": "messaging.consumer.max_retries",
+      "subject": "consumer",
+      "value": 25
+    },
+    {
+      "locator_kind": "paste_span",
+      "path": "fixtures/real_paste_tech_spec.md",
+      "predicate": "messaging.dlq.present",
+      "subject": "consumer",
+      "value": false
+    },
+    {
+      "locator_kind": "paste_span",
+      "path": "fixtures/real_paste_tech_spec.md",
+      "predicate": "observability.oncall.defined",
+      "subject": "service",
+      "value": true
+    },
+    {
+      "locator_kind": "paste_span",
+      "path": "fixtures/real_paste_tech_spec.md",
+      "predicate": "privacy.sensitive_log.present",
+      "subject": "logging",
+      "value": true
+    },
+    {
+      "locator_kind": "paste_span",
+      "path": "fixtures/real_paste_tech_spec.md",
+      "predicate": "security.encryption_at_rest.enabled",
+      "subject": "datastore",
+      "value": true
+    },
+    {
+      "locator_kind": "paste_span",
+      "path": "fixtures/real_paste_session.go",
+      "predicate": "security.secret_in_source.present",
+      "subject": "repository",
+      "value": true
+    },
+    {
+      "locator_kind": "paste_span",
+      "path": "fixtures/real_paste_tech_spec.md",
+      "predicate": "security.tls_policy.id",
+      "subject": "edge",
+      "value": "legacy-ssl"
+    },
+    {
+      "locator_kind": "paste_span",
+      "path": "fixtures/real_paste_tech_spec.md",
+      "predicate": "session.ttl_seconds",
+      "subject": "session",
+      "value": 720
+    },
+    {
+      "locator_kind": "paste_span",
+      "path": "fixtures/real_paste_tech_spec.md",
+      "predicate": "supply_chain.dependencies.pinned",
+      "subject": "service",
+      "value": true
+    },
+    {
+      "locator_kind": "paste_span",
+      "path": "fixtures/real_paste_tech_spec.md",
+      "predicate": "supply_chain.license.id",
+      "subject": "release",
+      "value": "MIT"
+    }
+  ],
+  "extractor": {
+    "extractor": "paste_heuristic_v1",
+    "extractor_version": "paste-heuristic-v2",
+    "observation_count": 14
+  },
+  "fixtures": [
+    "real_paste_tech_spec.md",
+    "real_paste_session.go"
+  ],
+  "issue_template": "pathfinder-analyze.yml",
+  "label_status": "synthetic_unadjudicated",
+  "notable_results": [
+    {
+      "adr_id": "ADR-101",
+      "domain": "identity",
+      "outcome": "supported_deviation",
+      "predicate": "session.ttl_seconds"
+    },
+    {
+      "adr_id": "ADR-106",
+      "domain": "security",
+      "outcome": "no_deviation_found",
+      "predicate": "security.encryption_at_rest.enabled"
+    },
+    {
+      "adr_id": "ADR-107",
+      "domain": "security",
+      "outcome": "supported_deviation",
+      "predicate": "security.tls_policy.id"
+    },
+    {
+      "adr_id": "ADR-108",
+      "domain": "security",
+      "outcome": "supported_deviation",
+      "predicate": "security.secret_in_source.present"
+    },
+    {
+      "adr_id": "ADR-111",
+      "domain": "privacy",
+      "outcome": "supported_deviation",
+      "predicate": "privacy.sensitive_log.present"
+    },
+    {
+      "adr_id": "ADR-119",
+      "domain": "reliability",
+      "outcome": "supported_deviation",
+      "predicate": "kubernetes.deployment.replicas"
+    },
+    {
+      "adr_id": "ADR-122",
+      "domain": "reliability",
+      "outcome": "no_deviation_found",
+      "predicate": "kubernetes.readiness_probe.present"
+    },
+    {
+      "adr_id": "ADR-131",
+      "domain": "api",
+      "outcome": "no_deviation_found",
+      "predicate": "api.auth_middleware.present"
+    },
+    {
+      "adr_id": "ADR-132",
+      "domain": "api",
+      "outcome": "no_deviation_found",
+      "predicate": "api.rate_limit.enabled"
+    },
+    {
+      "adr_id": "ADR-153",
+      "domain": "messaging",
+      "outcome": "supported_deviation",
+      "predicate": "messaging.dlq.present"
+    },
+    {
+      "adr_id": "ADR-155",
+      "domain": "messaging",
+      "outcome": "supported_deviation",
+      "predicate": "messaging.consumer.max_retries"
+    },
+    {
+      "adr_id": "ADR-174",
+      "domain": "supply-chain",
+      "outcome": "no_deviation_found",
+      "predicate": "supply_chain.dependencies.pinned"
+    },
+    {
+      "adr_id": "ADR-175",
+      "domain": "supply-chain",
+      "outcome": "no_deviation_found",
+      "predicate": "supply_chain.license.id"
+    },
+    {
+      "adr_id": "ADR-192",
+      "domain": "observability",
+      "outcome": "no_deviation_found",
+      "predicate": "observability.oncall.defined"
+    }
+  ],
+  "observation_count": 14,
+  "package_id": "pages-paste-eval-fixtures",
+  "report_sha256": "51f8bfc77d1fa798074d829823057af32f1e1cfd84c7a4a96b3fd8593fa201a2",
+  "schema_version": "pathfinder-paste-eval-demo-v1",
+  "synthetic": true,
+  "workflow": "pathfinder-issue-analyze.yml"
+}

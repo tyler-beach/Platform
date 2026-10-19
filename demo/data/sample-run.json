@@ -1,0 +1,369 @@
+{
+  "confidence": {
+    "algorithm_version": "evidence-strength-v2.0.0",
+    "band": "high",
+    "caps": [],
+    "components": [
+      {
+        "dimension": "requirement_clarity",
+        "explanation": "A cited normative statement contains an explicit, operational execution constraint.",
+        "score": 0.98,
+        "weight": 0.2,
+        "weighted_contribution": 0.196
+      },
+      {
+        "dimension": "observation_resolution",
+        "explanation": "Based on cited observations; call paths are bounded by their least-certain edge, and direct facts use their collector resolution status.",
+        "score": 0.75,
+        "weight": 0.25,
+        "weighted_contribution": 0.1875
+      },
+      {
+        "dimension": "requirement_observation_linkage",
+        "explanation": "The model supplied an explicit contradiction link from a cited normative requirement to a cited source observation; the application validated both evidence types and IDs.",
+        "score": 0.98,
+        "weight": 0.2,
+        "weighted_contribution": 0.196
+      },
+      {
+        "dimension": "evidence_coverage",
+        "explanation": "Citations include normative requirement evidence and source observations.",
+        "score": 1.0,
+        "weight": 0.15,
+        "weighted_contribution": 0.15
+      },
+      {
+        "dimension": "provenance_integrity",
+        "explanation": "Every cited item resolves to a pinned input artifact and its excerpt SHA-256 matches the stored excerpt.",
+        "score": 1.0,
+        "weight": 0.1,
+        "weighted_contribution": 0.1
+      },
+      {
+        "dimension": "analysis_completeness",
+        "explanation": "Entry resolved=True; complete evidence sources=1/1; Tree-sitter syntax errors=0; resolver diagnostics=0; unresolved/dynamic reachable edges=0/3.",
+        "score": 0.95,
+        "weight": 0.1,
+        "weighted_contribution": 0.095
+      }
+    ],
+    "guardrails": [],
+    "interpretation": "Evidence-support score; not a calibrated probability.",
+    "score": 92.5
+  },
+  "coverage": [
+    {
+      "collector": "language-callgraph",
+      "complete": true,
+      "emitted": 3,
+      "failed_count": 0,
+      "inspected": 3,
+      "source_type": "code",
+      "unresolved": 0,
+      "unsupported_count": 0
+    }
+  ],
+  "evidence": [
+    {
+      "claim": "Normative requirement extracted from adr",
+      "excerpt": "Provider assessment runs asynchronously through a durable queue and a worker. The request handler must not call the provider synchronously. The worker is responsible for making provider calls and recording the result.",
+      "excerpt_sha256": "b006b5e475b563113c5e2f1b4662b35642852c6db09cb1c4faf328dfb43a8953",
+      "id": "pages-fixture-walkthrough:evidence-00001",
+      "line": 5,
+      "path": ".poc/fixtures/go/ADR-001.md",
+      "source_sha256": "f950bef10ceaacaa8571861d448bf02e202b57d796513998ad991b4176d6571a",
+      "type": "normative_requirement"
+    },
+    {
+      "claim": "Normative requirement extracted from adr",
+      "excerpt": "Slow or unavailable provider APIs must not increase request latency or consume request-serving capacity.",
+      "excerpt_sha256": "4127afdd16b27c89533d3a01b81618348869dea1531c7b5ca8d6dfed40549c2f",
+      "id": "pages-fixture-walkthrough:evidence-00002",
+      "line": 9,
+      "path": ".poc/fixtures/go/ADR-001.md",
+      "source_sha256": "f950bef10ceaacaa8571861d448bf02e202b57d796513998ad991b4176d6571a",
+      "type": "normative_requirement"
+    },
+    {
+      "claim": "Normative requirement extracted from technical_spec",
+      "excerpt": "The request handler must enqueue provider assessment asynchronously and return without waiting for the remote provider response. Synchronous or inline provider calls before the handler returns are prohibited.",
+      "excerpt_sha256": "99b79ea899c8c32cf78c24618c47fd25621f3053182bceaf6982b1b5f12ddf75",
+      "id": "pages-fixture-walkthrough:evidence-00003",
+      "line": 5,
+      "path": ".poc/fixtures/go/technical-spec.md",
+      "source_sha256": "4767eab125d61ffed87980aec10e12f5395a28b7f01f8ed53a4d3b2186b33f79",
+      "type": "normative_requirement"
+    },
+    {
+      "claim": "Normative requirement extracted from technical_spec",
+      "excerpt": "The implementation must preserve a traceable source path from the request handler to any provider call. If static analysis cannot resolve the dispatch target, the result must remain inconclusive or identify the unresolved call path.",
+      "excerpt_sha256": "97acaf080e9946b0a5700580c755751b9338d6a978103e65d51ce1f042ece9f4",
+      "id": "pages-fixture-walkthrough:evidence-00004",
+      "line": 9,
+      "path": ".poc/fixtures/go/technical-spec.md",
+      "source_sha256": "4767eab125d61ffed87980aec10e12f5395a28b7f01f8ed53a4d3b2186b33f79",
+      "type": "normative_requirement"
+    },
+    {
+      "claim": "Call edge resolved (go_types_direct_call) from (*example.com/adr-poc.Worker).Execute to (*example.com/adr-poc.AnthropicClient).Assess",
+      "excerpt": "return w.Client.Assess(ctx, req)",
+      "excerpt_sha256": "0118d7542394004b21430f09a9dc16bce99a67d86a010348bc0689dc0ceed6a2",
+      "id": "pages-fixture-walkthrough:evidence-00005",
+      "line": 20,
+      "path": ".poc/fixtures/go/main.go",
+      "source_sha256": "b97b3c7883607c756e1adb7ab9f832ce975038ca4cc45fcdfccc7888c3438837",
+      "type": "resolved_call_edge"
+    },
+    {
+      "claim": "Call edge resolved (go_types_direct_call) from (*example.com/adr-poc.Handler).Submit to (*example.com/adr-poc.Worker).Execute",
+      "excerpt": "return h.Worker.Execute(ctx, req)",
+      "excerpt_sha256": "46e0bd5110f8029288fa3e642359d5614d387688f42e112d3534169f1c020272",
+      "id": "pages-fixture-walkthrough:evidence-00006",
+      "line": 31,
+      "path": ".poc/fixtures/go/main.go",
+      "source_sha256": "b97b3c7883607c756e1adb7ab9f832ce975038ca4cc45fcdfccc7888c3438837",
+      "type": "resolved_call_edge"
+    },
+    {
+      "claim": "Call edge resolved_approximate (go_types_cha_interface_dispatch) from (*example.com/adr-poc.Handler).Submit to (*example.com/adr-poc.AnthropicClient).Assess",
+      "excerpt": "return h.Provider.Assess(ctx, req)",
+      "excerpt_sha256": "34840c03908be33ab2bce8990e0d921cedbee9f85d8ba118f4a1003832354677",
+      "id": "pages-fixture-walkthrough:evidence-00007",
+      "line": 33,
+      "path": ".poc/fixtures/go/main.go",
+      "source_sha256": "b97b3c7883607c756e1adb7ab9f832ce975038ca4cc45fcdfccc7888c3438837",
+      "type": "resolved_call_edge"
+    },
+    {
+      "claim": "Added or removed diff line",
+      "excerpt": "- return enqueueAssessment(ctx, req)",
+      "excerpt_sha256": "44e59d81a8e0bfeb7bb85dcb73dc8ba06364ddfce92d332f67eecd75fba99941",
+      "id": "pages-fixture-walkthrough:evidence-00008",
+      "line": 5,
+      "path": ".poc/fixtures/go/change.diff",
+      "source_sha256": "846f33c3da83d067ac1322a64437b863fb494a45beb65c5ca431e3717baaa9c2",
+      "type": "diff_line"
+    },
+    {
+      "claim": "Added or removed diff line",
+      "excerpt": "+ return h.Provider.Assess(ctx, req)",
+      "excerpt_sha256": "fdc4b8ddf55dfe216d3eb678f758da226ad0528bc33a0feba572e96e4f4ad228",
+      "id": "pages-fixture-walkthrough:evidence-00009",
+      "line": 6,
+      "path": ".poc/fixtures/go/change.diff",
+      "source_sha256": "846f33c3da83d067ac1322a64437b863fb494a45beb65c5ca431e3717baaa9c2",
+      "type": "diff_line"
+    }
+  ],
+  "finding": {
+    "evidence_ids": [
+      "pages-fixture-walkthrough:evidence-00001",
+      "pages-fixture-walkthrough:evidence-00003",
+      "pages-fixture-walkthrough:evidence-00002",
+      "pages-fixture-walkthrough:evidence-00004",
+      "pages-fixture-walkthrough:evidence-00005",
+      "pages-fixture-walkthrough:evidence-00006",
+      "pages-fixture-walkthrough:evidence-00007",
+      "pages-fixture-walkthrough:evidence-00008",
+      "pages-fixture-walkthrough:evidence-00009"
+    ],
+    "outcome": "supported_deviation",
+    "summary": "The selected entry function directly invokes a provider-shaped assessment method despite an asynchronous/non-blocking requirement.",
+    "validation_status": "valid"
+  },
+  "observations": [
+    {
+      "evidence_class": "static_code_observation",
+      "id": "obs:a86be55010fad44569224df56c9d1756242ffc86e2d34ca112f090dde8f3cfb3",
+      "locator": {
+        "end": 20,
+        "kind": "line",
+        "start": 20
+      },
+      "predicate": "code.call_edge",
+      "redacted": false,
+      "resolution": {
+        "basis": "go_types_direct_call",
+        "source_status": "resolved",
+        "status": "resolved"
+      },
+      "source_path": ".poc/fixtures/go/main.go",
+      "source_sha256": "b97b3c7883607c756e1adb7ab9f832ce975038ca4cc45fcdfccc7888c3438837",
+      "subject": {
+        "id": "pages-fixture-walkthrough:main.go::(*example.com/adr-poc.Worker).Execute",
+        "kind": "function",
+        "name": "(*example.com/adr-poc.Worker).Execute"
+      },
+      "value": {
+        "call_expression": "(*AnthropicClient).Assess(t1, ctx, req)",
+        "dispatch_kind": "direct",
+        "edge_id": "pages-fixture-walkthrough:edge-00001",
+        "reachable_from_entry": true,
+        "target": "(*example.com/adr-poc.AnthropicClient).Assess"
+      }
+    },
+    {
+      "evidence_class": "static_code_observation",
+      "id": "obs:67426078c69d5cb5ee9a732925557056ef797cbd0f108583eb28f30edb9b0785",
+      "locator": {
+        "end": 31,
+        "kind": "line",
+        "start": 31
+      },
+      "predicate": "code.call_edge",
+      "redacted": false,
+      "resolution": {
+        "basis": "go_types_direct_call",
+        "source_status": "resolved",
+        "status": "resolved"
+      },
+      "source_path": ".poc/fixtures/go/main.go",
+      "source_sha256": "b97b3c7883607c756e1adb7ab9f832ce975038ca4cc45fcdfccc7888c3438837",
+      "subject": {
+        "id": "pages-fixture-walkthrough:main.go::(*example.com/adr-poc.Handler).Submit",
+        "kind": "function",
+        "name": "(*example.com/adr-poc.Handler).Submit"
+      },
+      "value": {
+        "call_expression": "(*Worker).Execute(t1, ctx, req)",
+        "dispatch_kind": "direct",
+        "edge_id": "pages-fixture-walkthrough:edge-00002",
+        "reachable_from_entry": true,
+        "target": "(*example.com/adr-poc.Worker).Execute"
+      }
+    },
+    {
+      "evidence_class": "static_code_observation",
+      "id": "obs:e71cf100b2ad0d7a5475842eaf1f41e10e5b47315e98fadd15bc9bb265877081",
+      "locator": {
+        "end": 33,
+        "kind": "line",
+        "start": 33
+      },
+      "predicate": "code.call_edge",
+      "redacted": false,
+      "resolution": {
+        "basis": "go_types_cha_interface_dispatch",
+        "source_status": "resolved_approximate",
+        "status": "approximate"
+      },
+      "source_path": ".poc/fixtures/go/main.go",
+      "source_sha256": "b97b3c7883607c756e1adb7ab9f832ce975038ca4cc45fcdfccc7888c3438837",
+      "subject": {
+        "id": "pages-fixture-walkthrough:main.go::(*example.com/adr-poc.Handler).Submit",
+        "kind": "function",
+        "name": "(*example.com/adr-poc.Handler).Submit"
+      },
+      "value": {
+        "call_expression": "invoke t6.Assess(ctx, req)",
+        "dispatch_kind": "cha",
+        "edge_id": "pages-fixture-walkthrough:edge-00003",
+        "reachable_from_entry": true,
+        "target": "(*example.com/adr-poc.AnthropicClient).Assess"
+      }
+    }
+  ],
+  "sample": {
+    "comparison": "spec-vs-implementation",
+    "input_sha256": "24c2995253d6c1219aac787786d70b6d2fb26c2a07e5db95fa2d0b36fe72c7b6",
+    "label": "Synthetic Go fixture · deterministic mock provider",
+    "language": "go",
+    "outcome": "supported_deviation",
+    "provider": "mock",
+    "repository_path": ".poc/fixtures/go",
+    "root_function": "Submit",
+    "run_id": "pages-fixture-walkthrough",
+    "run_status": "complete",
+    "synthetic": true
+  },
+  "schema_version": "adr-demo-run-v1",
+  "stages": [
+    {
+      "counts": {
+        "artifacts": 4
+      },
+      "description": "Record immutable input paths, sizes, and SHA-256 versions.",
+      "event_count": 2,
+      "id": "admission",
+      "status": "success",
+      "title": "Pin inputs"
+    },
+    {
+      "counts": {
+        "errors": 0,
+        "files": 1
+      },
+      "description": "Index syntax and report parser diagnostics.",
+      "event_count": 2,
+      "id": "syntax",
+      "status": "success",
+      "title": "Parse syntax"
+    },
+    {
+      "counts": {
+        "edges": 3,
+        "functions": 3,
+        "reachable_functions": 3,
+        "root_resolved": true
+      },
+      "description": "Build symbols, call edges, and entry reachability.",
+      "event_count": 2,
+      "id": "semantic_analysis",
+      "status": "success",
+      "title": "Resolve code behavior"
+    },
+    {
+      "counts": {
+        "code_files": 1,
+        "incomplete_sources": 0,
+        "observations": 3,
+        "sources": 1
+      },
+      "description": "Normalize source facts and expose collection coverage.",
+      "event_count": 2,
+      "id": "source_collection",
+      "status": "success",
+      "title": "Collect observations"
+    },
+    {
+      "counts": {
+        "evidence": 9,
+        "requirements": 4
+      },
+      "description": "Link requirement, source, and diff evidence to pinned artifacts.",
+      "event_count": 1,
+      "id": "evidence",
+      "status": "success",
+      "title": "Assemble evidence"
+    },
+    {
+      "counts": {
+        "estimated_input_tokens": 4778,
+        "input_tokens": 4778,
+        "max_input_tokens": 12000,
+        "max_output_tokens": 1000
+      },
+      "description": "Estimate input use and record whether a bounded call is allowed.",
+      "event_count": 3,
+      "id": "budget",
+      "status": "approved",
+      "title": "Check model budget"
+    },
+    {
+      "counts": {},
+      "description": "Use the deterministic mock adapter, then apply evidence and citation gates.",
+      "event_count": 2,
+      "id": "model",
+      "status": "success",
+      "title": "Assess and validate"
+    },
+    {
+      "counts": {},
+      "description": "Persist the finding, evidence score, report, and linked CSV rows.",
+      "event_count": 1,
+      "id": "report",
+      "status": "success",
+      "title": "Write the audit report"
+    }
+  ]
+}

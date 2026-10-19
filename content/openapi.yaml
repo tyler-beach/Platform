@@ -1,0 +1,510 @@
+openapi: 3.1.0
+info:
+  title: ADR Deviation Platform API
+  version: 1.0.0
+  description: >
+    Production-target REST/JSON mapping of the adrplatform.v1 Protobuf control-plane
+    API. The contract and deterministic mock responses are intended for production
+    implementation; this documentation does not imply a deployed API server.
+    Public JSON names follow protobuf JSON mapping.
+  contact:
+    name: ADR Deviation Platform maintainers
+    url: https://github.com/tyler-beach/Platform
+servers:
+  - url: .
+    description: Relative to the documentation origin; not a live service URL.
+tags:
+  - name: Analysis Jobs
+    description: Asynchronous analysis lifecycle.
+  - name: Findings
+    description: Validated, version-bound assessment results.
+paths:
+  /v1/workspaces/{workspaceId}/analysis-jobs:
+    post:
+      tags: [Analysis Jobs]
+      operationId: createAnalysisJob
+      summary: Create or reuse an analysis job
+      description: >
+        Validates immutable inputs and accepts asynchronous work. Idempotency
+        is scoped to workspace and operation. Same key and canonical request
+        reuses the original job; same key with a different request returns 409.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAnalysisJobRequest'
+            example:
+              workspaceId: ws_example
+              idempotencyKey: pr-482-head-9c4c0d8
+              comparisonMode: COMPARISON_MODE_IMPLEMENTATION_TO_ADR
+              inputArtifacts:
+                - artifactId: repo_platform
+                  artifactVersionId: commit_9c4c0d8
+                  kind: ARTIFACT_KIND_CODE_CHANGE
+                  sourceUri: https://github.com/example/service/pull/482
+                  contentSha256: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+                  revision: 9c4c0d8
+                - artifactId: adr_security
+                  artifactVersionId: adr_version_17
+                  kind: ARTIFACT_KIND_ADR
+                  sourceUri: repo://service/docs/adr/0017-security.md
+                  contentSha256: abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+                  revision: '17'
+              correlationId: ci-run-482
+      responses:
+        '202':
+          description: Accepted; analysis runs asynchronously.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateAnalysisJobResponse'
+              example:
+                job:
+                  jobId: job_01JAXAMPLE482
+                  workspaceId: ws_example
+                  comparisonMode: COMPARISON_MODE_SPECIFICATION_TO_IMPLEMENTATION
+                  status: ANALYSIS_JOB_STATUS_QUEUED
+                  inputArtifacts:
+                    - artifactId: spec_session_service
+                      artifactVersionId: spec_revision_12
+                      kind: ARTIFACT_KIND_TECHNICAL_SPECIFICATION
+                      sourceUri: repo://session-service/docs/session-service-spec.md
+                      contentSha256: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+                      revision: '12'
+                  createdAt: '2026-10-17T23:30:00Z'
+                  updatedAt: '2026-10-17T23:30:00Z'
+                  pipelineVersion: pathfinder-pipeline-example-1
+                  correlationId: ci-pr-482
+                reusedExistingJob: false
+        '400': { $ref: '#/components/responses/InvalidArgument' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /v1/workspaces/{workspaceId}/analysis-jobs/{jobId}:
+    get:
+      tags: [Analysis Jobs]
+      operationId: getAnalysisJob
+      summary: Get current job state
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/JobId'
+      responses:
+        '200':
+          description: Authorized job snapshot.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GetAnalysisJobResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /v1/workspaces/{workspaceId}/analysis-jobs/{jobId}:cancel:
+    post:
+      tags: [Analysis Jobs]
+      operationId: cancelAnalysisJob
+      summary: Request cancellation
+      description: Best-effort; does not roll back completed side effects.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/JobId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CancelAnalysisJobRequest' }
+      responses:
+        '200':
+          description: Cancellation request result and latest job snapshot.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CancelAnalysisJobResponse' }
+        '400': { $ref: '#/components/responses/InvalidArgument' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /v1/workspaces/{workspaceId}/analysis-jobs/{jobId}/findings:
+    get:
+      tags: [Findings]
+      operationId: listFindings
+      summary: List findings for a job
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/JobId'
+        - name: pageSize
+          in: query
+          description: Desired page size; zero or omitted selects server default.
+          schema: { type: integer, minimum: 0, maximum: 500, default: 0 }
+        - name: pageToken
+          in: query
+          description: Opaque server-issued pagination token; never parse or modify.
+          schema: { type: string, maxLength: 4096 }
+      responses:
+        '200':
+          description: One page of findings.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ListFindingsResponse' }
+              example:
+                findings:
+                  - findingId: fnd_ses_005_pdb_minavailable
+                    jobId: job_01JAXAMPLE482
+                    outcome: FINDING_OUTCOME_DEVIATION_SUPPORTED
+                    severity: FINDING_SEVERITY_HIGH
+                    reviewStatus: REVIEW_STATUS_PENDING
+                    claim: The supplied PodDisruptionBudget conflicts with ADR-002.
+                    rationale: minAvailable is 2; the accepted decision specifies 1. This may block voluntary disruption but does not prove an outage.
+                    decisionIds: [ADR-002]
+                    requirementIds: [SES-005]
+                    evidence:
+                      - evidenceId: ev_pdb_001
+                        artifactId: deploy_session_pdb
+                        artifactVersionId: git_9c4c0d8
+                        sourceUri: repo://session-service/deploy/session/pdb.yaml
+                        path: deploy/session/pdb.yaml
+                        startLine: 8
+                        endLine: 10
+                        symbolOrSection: PodDisruptionBudget.spec
+                        excerptSha256: fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210
+                    humanReviewRequired: true
+                    validationStatus: VALIDATED
+                    findingFingerprint: sha256:example-pdb-policy-fingerprint
+                    createdAt: '2026-10-17T23:30:16Z'
+                nextPageToken: ''
+        '400': { $ref: '#/components/responses/InvalidArgument' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /v1/workspaces/{workspaceId}/findings/{findingId}:
+    get:
+      tags: [Findings]
+      operationId: getFinding
+      summary: Get a finding and its evidence references
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - name: findingId
+          in: path
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 200 }
+      responses:
+        '200':
+          description: Authorized finding snapshot.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GetFindingResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/PermissionDenied' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalError' }
+components:
+  parameters:
+    WorkspaceId:
+      name: workspaceId
+      in: path
+      required: true
+      schema: { type: string, minLength: 1, maxLength: 200 }
+    JobId:
+      name: jobId
+      in: path
+      required: true
+      schema: { type: string, minLength: 1, maxLength: 200 }
+  responses:
+    InvalidArgument:
+      description: Invalid request or unsupported enum/value.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+          example:
+            type: https://example.invalid/problems/invalid-argument
+            title: Invalid request
+            status: 400
+            detail: The comparison mode requires a code-change artifact.
+            code: INVALID_ARGUMENT
+            requestId: req_example
+            retryable: false
+            violations:
+              - field: inputArtifacts
+                reason: Missing required artifact kind
+    Unauthenticated:
+      description: Authentication missing or invalid.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    PermissionDenied:
+      description: Caller is not authorized.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    NotFound:
+      description: Missing or intentionally concealed resource.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Conflict:
+      description: Idempotency-key reuse with a different request or invalid transition.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+          example:
+            type: https://example.invalid/problems/conflict
+            title: Conflict
+            status: 409
+            detail: The idempotency key was used for a different request.
+            code: IDEMPOTENCY_KEY_REUSED
+            requestId: req_example
+            retryable: false
+    RateLimited:
+      description: Request or resource budget throttled.
+      headers:
+        Retry-After:
+          schema: { type: integer }
+          description: Optional retry delay in seconds.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    InternalError:
+      description: Unexpected internal error; details are safe and non-sensitive.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Unavailable:
+      description: A required dependency is temporarily unavailable.
+      headers:
+        Retry-After:
+          schema: { type: integer }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+  schemas:
+    CreateAnalysisJobRequest:
+      type: object
+      additionalProperties: false
+      required: [workspaceId, idempotencyKey, comparisonMode, inputArtifacts]
+      properties:
+        workspaceId: { type: string, minLength: 1, maxLength: 200 }
+        idempotencyKey:
+          type: string
+          minLength: 8
+          maxLength: 200
+          pattern: '^[\x21-\x7E]+$'
+        comparisonMode: { $ref: '#/components/schemas/ComparisonMode' }
+        inputArtifacts:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items: { $ref: '#/components/schemas/ArtifactRef' }
+        correlationId: { type: string, maxLength: 200 }
+    ArtifactRef:
+      type: object
+      additionalProperties: false
+      required: [kind]
+      properties:
+        artifactId:
+          type: string
+          maxLength: 200
+          description: Stable logical artifact ID, if registered.
+        artifactVersionId:
+          type: string
+          maxLength: 200
+          description: Immutable source version ID; required for registered sources.
+        kind: { $ref: '#/components/schemas/ArtifactKind' }
+        sourceUri:
+          type: string
+          maxLength: 4096
+          description: Canonical locator, not an authorization grant.
+        contentSha256: { type: string, pattern: '^[a-f0-9]{64}$' }
+        revision: { type: string, maxLength: 512 }
+    ComparisonMode:
+      type: string
+      enum:
+        - COMPARISON_MODE_UNSPECIFIED
+        - COMPARISON_MODE_IMPLEMENTATION_TO_ADR
+        - COMPARISON_MODE_SPECIFICATION_TO_ADR
+        - COMPARISON_MODE_SPECIFICATION_TO_IMPLEMENTATION
+    ArtifactKind:
+      type: string
+      enum:
+        - ARTIFACT_KIND_UNSPECIFIED
+        - ARTIFACT_KIND_CODE_CHANGE
+        - ARTIFACT_KIND_TECHNICAL_SPECIFICATION
+        - ARTIFACT_KIND_ADR
+        - ARTIFACT_KIND_SOURCE_FILE
+        - ARTIFACT_KIND_API_CONTRACT
+        - ARTIFACT_KIND_CONFIGURATION
+    AnalysisJobStatus:
+      type: string
+      enum:
+        - ANALYSIS_JOB_STATUS_UNSPECIFIED
+        - ANALYSIS_JOB_STATUS_QUEUED
+        - ANALYSIS_JOB_STATUS_RUNNING
+        - ANALYSIS_JOB_STATUS_NEEDS_REVIEW
+        - ANALYSIS_JOB_STATUS_SUCCEEDED
+        - ANALYSIS_JOB_STATUS_FAILED
+        - ANALYSIS_JOB_STATUS_CANCELLED
+        - ANALYSIS_JOB_STATUS_EXPIRED
+    FindingOutcome:
+      type: string
+      enum:
+        - FINDING_OUTCOME_UNSPECIFIED
+        - FINDING_OUTCOME_DEVIATION_SUPPORTED
+        - FINDING_OUTCOME_POTENTIAL_DEVIATION
+        - FINDING_OUTCOME_NO_DEVIATION_FOUND
+        - FINDING_OUTCOME_INCONCLUSIVE
+    FindingSeverity:
+      type: string
+      enum:
+        - FINDING_SEVERITY_UNSPECIFIED
+        - FINDING_SEVERITY_INFO
+        - FINDING_SEVERITY_LOW
+        - FINDING_SEVERITY_MEDIUM
+        - FINDING_SEVERITY_HIGH
+        - FINDING_SEVERITY_CRITICAL
+    ReviewStatus:
+      type: string
+      enum:
+        - REVIEW_STATUS_UNSPECIFIED
+        - REVIEW_STATUS_NOT_REQUIRED
+        - REVIEW_STATUS_PENDING
+        - REVIEW_STATUS_ACCEPTED
+        - REVIEW_STATUS_DISMISSED
+        - REVIEW_STATUS_DEFERRED
+        - REVIEW_STATUS_NEEDS_MORE_EVIDENCE
+    CreateAnalysisJobResponse:
+      type: object
+      required: [job, reusedExistingJob]
+      properties:
+        job: { $ref: '#/components/schemas/AnalysisJob' }
+        reusedExistingJob: { type: boolean }
+    GetAnalysisJobResponse:
+      type: object
+      required: [job]
+      properties:
+        job: { $ref: '#/components/schemas/AnalysisJob' }
+    AnalysisJob:
+      type: object
+      required: [jobId, workspaceId, comparisonMode, status, createdAt, updatedAt]
+      properties:
+        jobId: { type: string }
+        workspaceId: { type: string }
+        comparisonMode: { $ref: '#/components/schemas/ComparisonMode' }
+        status: { $ref: '#/components/schemas/AnalysisJobStatus' }
+        inputArtifacts:
+          type: array
+          items: { $ref: '#/components/schemas/ArtifactRef' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        pipelineVersion: { type: string }
+        terminalErrorCode:
+          type: string
+          description: Stable safe category, never raw provider/stack error text.
+        correlationId: { type: string }
+    CancelAnalysisJobRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        workspaceId: { type: string }
+        jobId: { type: string }
+        reason: { type: string, maxLength: 4000 }
+    CancelAnalysisJobResponse:
+      type: object
+      required: [job, cancellationRequested]
+      properties:
+        job: { $ref: '#/components/schemas/AnalysisJob' }
+        cancellationRequested: { type: boolean }
+    EvidenceRef:
+      type: object
+      required: [evidenceId, artifactId, artifactVersionId]
+      properties:
+        evidenceId: { type: string }
+        artifactId: { type: string }
+        artifactVersionId: { type: string }
+        sourceUri:
+          type: string
+          description: Authorized canonical location for the immutable source version.
+        path: { type: string }
+        startLine:
+          type: integer
+          minimum: 0
+          description: One-based when line-addressable; zero for non-line-addressable source.
+        endLine:
+          type: integer
+          minimum: 0
+          description: Inclusive end line; zero for non-line-addressable source.
+        symbolOrSection: { type: string }
+        excerptSha256: { type: string, pattern: '^[a-f0-9]{64}$' }
+    Finding:
+      type: object
+      required: [findingId, jobId, outcome, severity, reviewStatus, claim, rationale, createdAt]
+      properties:
+        findingId: { type: string }
+        jobId: { type: string }
+        outcome: { $ref: '#/components/schemas/FindingOutcome' }
+        severity: { $ref: '#/components/schemas/FindingSeverity' }
+        reviewStatus: { $ref: '#/components/schemas/ReviewStatus' }
+        claim: { type: string, maxLength: 2000 }
+        rationale: { type: string, maxLength: 12000 }
+        decisionIds:
+          type: array
+          items: { type: string }
+        requirementIds:
+          type: array
+          items: { type: string }
+        evidence:
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/EvidenceRef' }
+        humanReviewRequired: { type: boolean }
+        validationStatus:
+          type: string
+          enum: [NOT_RUN, VALIDATED, INVALID_SCHEMA, INVALID_EVIDENCE, INVALID_APPLICABILITY, INCONCLUSIVE]
+          description: Provisional enum carried as string in current Proto; ratify or type in a future versioned contract.
+        findingFingerprint: { type: string }
+        createdAt: { type: string, format: date-time }
+    ListFindingsResponse:
+      type: object
+      required: [findings, nextPageToken]
+      properties:
+        findings:
+          type: array
+          items: { $ref: '#/components/schemas/Finding' }
+        nextPageToken:
+          type: string
+          description: Empty when there is no next page.
+    GetFindingResponse:
+      type: object
+      required: [finding]
+      properties:
+        finding: { $ref: '#/components/schemas/Finding' }
+    FieldViolation:
+      type: object
+      required: [field, reason]
+      properties:
+        field: { type: string }
+        reason: { type: string }
+    Problem:
+      type: object
+      description: RFC 9457 Problem Details extended with stable client fields.
+      required: [type, title, status, code, requestId, retryable]
+      properties:
+        type: { type: string, format: uri-reference }
+        title: { type: string }
+        status: { type: integer, minimum: 400, maximum: 599 }
+        detail:
+          type: string
+          description: Safe description; never contains secrets or internal stack traces.
+        instance: { type: string, format: uri-reference }
+        code: { type: string, description: Stable machine-readable error code. }
+        requestId: { type: string }
+        retryable: { type: boolean }
+        violations:
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/FieldViolation' }
