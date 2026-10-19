@@ -3,5 +3,6 @@ site/
 public/content/
 .DS_Store
 __pycache__/
+**/.adr_pack_cache/
 *.py[cod]
 src/generated-doc-index.json

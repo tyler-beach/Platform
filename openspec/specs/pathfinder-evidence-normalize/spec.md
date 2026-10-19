@@ -1,7 +1,7 @@
 # pathfinder-evidence-normalize Specification
 
 ## Purpose
-TBD - created by archiving change pathfinder-evidence-normalize. Update Purpose after archive.
+Define the deterministic Pathfinder evidence-normalize stage that turns package observations into a canonically ordered, provenance-bound list with explicit locator precision before catalog evaluation—without inventing observations or calling a model.
 ## Requirements
 ### Requirement: Normalize observations into a canonical provenance-bound shape
 

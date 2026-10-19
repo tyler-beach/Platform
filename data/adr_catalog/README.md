@@ -18,11 +18,18 @@ Working **prototype corpus** of **200** organization-style ADRs / 200 typed requ
 
 ## Replace with your real ADRs
 
-1. Add or replace markdown under `data/adr_catalog/adrs/` (or extend `generate_pack.py`).
-2. Ensure every predicate exists in this pack’s `predicates.json` (generator merges synthetic registry + org-wide predicates).
-3. Run `python3 data/adr_catalog/generate_pack.py`.
-4. Run `go test ./...` in `go/pathfinder` and evaluate `sample_packages/session-and-pdb`.
-5. Keep `label_status` honest until requirements are reviewed.
+Use the offline import tool (no model calls): [`tools/adr_pack/README.md`](../../tools/adr_pack/README.md).
+
+1. Copy company ADR markdown into a directory (private clone recommended).
+2. `python3 -m tools.adr_pack validate path/to/adrs`
+3. `python3 -m tools.adr_pack scaffold path/to/adrs --predicates data/adr_catalog/predicates.json`
+4. Optional local Claude drafts via Claude Code CLI (no API key; dry-run first): `python3 -m tools.adr_pack suggest path/to/adrs --predicates data/adr_catalog/predicates.json` then `--execute --yes` if you accept usage.
+5. Humans complete/approve each `.md.req.json` sidecar (kind, predicate, subject, applicability).
+6. `python3 -m tools.adr_pack build path/to/adrs --out path/to/pack --base-predicates data/adr_catalog/predicates.json`
+7. Point Pathfinder catalog mode at that pack; run Go tests / a sample evaluate.
+8. Keep `label_status` honest until requirements are reviewed.
+
+The prototype generator remains available: `python3 data/adr_catalog/generate_pack.py`.
 
 Do **not** paste private ADR bodies into public issues. For private org use, run Pathfinder in a private clone with the same pack layout.
 
