@@ -24,6 +24,16 @@ Expect:
 - Catalog identity (`platform-real-adr-v1`, mode `real`, manifest hash)
 - Outcome counts and a short notable-requirements table
 - Coverage notes: `inconclusive` = missing extraction, not “ok”
+- Results are separated by role: `design_assertion` means the tech spec proposes it; `implementation_fact` means supplied code/config states it
+- When semantic extraction is enabled, the comment/report includes extraction status and bounded token usage
+
+## Optional semantic extraction
+
+The default deterministic path is free of provider calls and still useful for explicit patterns. To ask Anthropic to propose additional catalog facts from pasted prose, set repository variable `PATHFINDER_ENABLE_MODEL_EXTRACT=true`, set `PATHFINDER_ANTHROPIC_MODEL` to the approved model ID, and add Actions secret `ANTHROPIC_API_KEY`.
+
+The Go normalizer performs one token-count preflight, stops above 20,000 input tokens, permits at most one generation request with a 4,000-token and 64-fact cap plus a 60-second deadline, and never retries. It validates exact quotes and catalog types before evidence reaches the shared evaluator. Provider failures fall back to deterministic extraction and remain labeled; they do not count as semantic success. This prototype does not run a live Anthropic evaluation in CI.
+
+These are per-invocation limits rather than an organization spend quota. Every issue edit or rerun can invoke the workflow again. Keep semantic extraction off on public repositories; restrict triggers and add a durable quota before enabling it broadly.
 
 Common first-run outcomes:
 

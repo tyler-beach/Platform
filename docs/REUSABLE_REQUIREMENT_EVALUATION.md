@@ -43,7 +43,7 @@ Per-requirement outcomes remain `supported_deviation`, `no_deviation_found`, `no
 
 ### GitHub Issue intake
 
-Open a **Pathfinder analyze package** issue (public/synthetic content only). Provide a tech-spec, optional **same-repo pull request** (changed text files), and/or a single sample code snippet. A deterministic paste extractor (`paste_heuristic_v1`) fills allowlisted observations when you omit hand-written observation JSON. Go on Actions evaluates the catalog, comments aggregate status + outcome counts, uploads the full report artifact, and appends a lean job record on `pathfinder-jobs`. Unextracted predicates stay `inconclusive`. See `docs/ISSUE_ANALYZE_WORKFLOW.md`.
+Open a **Pathfinder analyze package** issue (public/synthetic content only). Provide a tech spec, optional **same-repo pull request** (changed text files), and/or a single sample code snippet. With no hand-written observations, the Go workflow normalizes the pinned artifacts at evaluation time. Deterministic extraction is the default; administrators may enable one bounded Anthropic semantic pass for additional catalog-supported claims. Both produce the same typed observation envelope: tech specs carry `design_assertion`; code/config/PR files carry `implementation_fact`. The shared evaluator runs separately for each role, preserving design/implementation mismatches and keeping missing evidence `inconclusive`. The workflow comments role-specific outcomes, uploads the full report artifact, and appends a lean job record on `pathfinder-jobs`. See `docs/ISSUE_ANALYZE_WORKFLOW.md` for configuration, token limits and privacy boundaries.
 
 ## Requirement kinds
 
@@ -69,7 +69,7 @@ The PDB path uses `pdb_collector.py` through the Kubernetes capability. The TTL 
 
 ## Shared observation contract
 
-An observation should carry at least: `evidence_id`, typed `predicate`, `subject`, typed `value`, `artifact_id`, immutable `revision`, repository-relative `path`, source SHA-256, and a typed locator. Values must be checked against their declared types; Python booleans must not be accepted as integers.
+An observation carries `evidence_id`, typed `predicate`, `subject`, typed `value`, `evidence_role`, `artifact_id`, immutable `revision`, repository-relative `path`, source SHA-256, and a typed locator. The role is derived from the pinned artifact, not from the model or user-supplied observation. Values must be checked against their declared types; Python booleans must not be accepted as integers.
 
 ## Outcome semantics
 
@@ -82,7 +82,7 @@ A collector that did not run, could not parse a manifest, or cannot determine wo
 
 ## AI and deterministic boundaries
 
-Use retrieval and AI to find candidate ADRs and propose normalized requirements when language is ambiguous. Validate the proposed structure against the kind/predicate catalog and preserve provenance. Use deterministic handlers for numeric comparisons, resource presence, boolean properties, and set membership when observation semantics are explicit. AI may assist with semantic mapping or triage, but should not manufacture source evidence or silently convert uncertainty into a confident result.
+Use retrieval and AI to find candidate ADRs and propose normalized requirements when language is ambiguous. Validate the proposed structure against the kind/predicate catalog and preserve provenance. Use deterministic handlers for numeric comparisons, resource presence, boolean properties, and set membership when observation semantics are explicit. The optional semantic extractor may propose source-grounded candidates only: Go checks catalog types and subjects, resolves an exact unique quote, and derives provenance before the shared evaluator runs. It cannot decide alignment or deviation. Token preflight and a hard per-run cap bound provider use; see the issue workflow guide. Model silence or unsupported claims remain inconclusive.
 
 ## Validation sequence
 

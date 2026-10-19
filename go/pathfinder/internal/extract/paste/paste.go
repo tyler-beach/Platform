@@ -35,6 +35,7 @@ var trueOnlyPredicates = map[string]struct{}{
 
 type artifact struct {
 	id, path, revision, digest, content, language string
+	role                                          string
 }
 
 type rule struct {
@@ -118,7 +119,9 @@ func artifactsFromPackage(pkg map[string]any) []artifact {
 	var out []artifact
 	if tech, ok := asMap(pkg["tech_spec"]); ok {
 		if content, ok := tech["content"].(string); ok && strings.TrimSpace(content) != "" {
-			out = append(out, makeArtifact(tech, content, "tech_spec", "issue/tech-spec.md", "markdown"))
+			a := makeArtifact(tech, content, "tech_spec", "issue/tech-spec.md", "markdown")
+			a.role = "design_assertion"
+			out = append(out, a)
 		}
 	}
 	code, _ := pkg["code"].([]any)
@@ -138,7 +141,9 @@ func artifactsFromPackage(pkg map[string]any) []artifact {
 			continue
 		}
 		path := stringValue(block["path"], fmt.Sprintf("issue/sample-code-%d.txt", i))
-		out = append(out, makeArtifact(block, content, fmt.Sprintf("code-%d", i), path, detectLanguage(path, content)))
+		a := makeArtifact(block, content, fmt.Sprintf("code-%d", i), path, detectLanguage(path, content))
+		a.role = "implementation_fact"
+		out = append(out, a)
 	}
 	return out
 }
@@ -199,6 +204,7 @@ func candidate(predicate string, value any, a artifact, start, end int, subjects
 		"revision":      a.revision,
 		"path":          a.path,
 		"source_sha256": a.digest,
+		"evidence_role": a.role,
 		"locator":       lineSpan(a.content, start, end),
 	}
 }
@@ -584,7 +590,10 @@ func extractJSON(a artifact, subjects map[string]string) []map[string]any {
 func resolveConflicts(candidates []map[string]any) []map[string]any {
 	groups := map[string][]map[string]any{}
 	for _, item := range candidates {
-		key := fmt.Sprint(item["predicate"]) + "\x00" + fmt.Sprint(item["subject"])
+		// Design assertions and implementation facts are independent claims.
+		// Conflicts within one role are inconclusive; cross-role disagreement is
+		// preserved for the shared evaluator to report separately.
+		key := fmt.Sprint(item["evidence_role"]) + "\x00" + fmt.Sprint(item["predicate"]) + "\x00" + fmt.Sprint(item["subject"])
 		groups[key] = append(groups[key], item)
 	}
 	keys := make([]string, 0, len(groups))

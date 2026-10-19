@@ -3,6 +3,10 @@ name: Pathfinder Go Analyze (reusable)
 
 on:
   workflow_call:
+    secrets:
+      ANTHROPIC_API_KEY:
+        description: Optional Anthropic API key; used only when repository semantic extraction is explicitly enabled
+        required: false
     inputs:
       issue_number:
         description: Issue number to evaluate
@@ -20,7 +24,7 @@ permissions:
 
 jobs:
   analyze:
-    name: Intake → ensure → evaluate → publish
+    name: Intake → normalize → evaluate → publish
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -39,7 +43,7 @@ jobs:
           go build -o "$RUNNER_TEMP/pathfinder-issue-analyze" ./cmd/pathfinder-issue-analyze
           go build -o "$RUNNER_TEMP/pathfinder-evaluate-package" ./cmd/pathfinder-evaluate-package
 
-      - name: Stage — intake / ensure / evaluate / publish
+      - name: Stage — intake / normalize / evaluate / publish
         id: run
         env:
           GH_TOKEN: ${{ github.token }}
@@ -47,6 +51,9 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           ISSUE_NUMBER: ${{ inputs.issue_number }}
           DO_COMMENT: ${{ inputs.comment }}
+          PATHFINDER_ENABLE_MODEL_EXTRACT: ${{ vars.PATHFINDER_ENABLE_MODEL_EXTRACT }}
+          ANTHROPIC_MODEL: ${{ vars.PATHFINDER_ANTHROPIC_MODEL }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           mkdir -p "$RUNNER_TEMP/pathfinder-issue"
           set +e

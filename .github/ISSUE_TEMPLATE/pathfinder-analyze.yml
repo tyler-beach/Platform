@@ -19,7 +19,8 @@ body:
         3. Paste a **Tech spec** and/or single **Sample code** snippet, and optionally Domains.
 
         Multi-file code must come from a same-repo PR (forks are rejected). Tech spec is optional when a PR is provided.
-        A deterministic paste extractor turns high-confidence claims into typed observations.
+        By default, a deterministic extractor turns high-confidence claims into typed observations. Repository administrators can optionally enable bounded Anthropic semantic extraction for broader prose coverage.
+        Tech specs are reported as `design_assertion`; code/config/PR content is reported as `implementation_fact`. Both use the same evidence schema and evaluator, with role-specific results so proposed intent is not presented as implemented behavior.
         Hand-written **Observations JSON** is optional and overrides extraction when provided.
         Unextracted predicates stay `inconclusive` (silence is not treated as compliance).
   - type: checkboxes

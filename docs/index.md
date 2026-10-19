@@ -11,6 +11,7 @@ hide:
 <div class="home-hero__actions">
 <a class="md-button md-button--primary" href="./system-architecture/">Explore the architecture</a>
 <a class="md-button md-button--primary" href="./demo/">Run the interactive PoC demo</a>
+<a class="md-button" href="./ISSUE_ANALYZE_WORKFLOW/">Submit a spec or code sample</a>
 <a class="md-button" href="./ENGINEERING_PLAYBOOK/">Engineering playbook</a>
 </div>
 <div class="home-hero__signals">
@@ -83,4 +84,4 @@ hide:
 </div>
 </section>
 
-<div class="home-status"><span class="home-status__mark">i</span><div><strong>Current status: design baseline plus runnable PoC</strong><p>The repository includes GitHub Actions workflows and a deterministic local/mock analysis harness; these are not the proposed production API, AWS workers, database, or Step Functions state machine. <a href="./demo/">Explore the PoC and its run outputs</a>, then follow the <a href="./ROADMAP/">roadmap</a> and <a href="./OPEN_QUESTIONS/">open questions</a> for outstanding implementation and approval decisions.</p></div></div>
+<div class="home-status"><span class="home-status__mark">i</span><div><strong>Current status: GitHub Actions issue-based analysis prototype</strong><p>Submit a tech spec and/or code sample in a GitHub Issue to evaluate against the prototype ADR catalog. The Go workflow normalizes both into shared, version-pinned evidence while keeping design assertions separate from implementation facts. Deterministic extraction is the default; bounded Anthropic semantic extraction is an administrator-controlled option. This remains a prototype: the AWS API, production database/retrieval and Step Functions workflow are not implemented. <a href="./ISSUE_ANALYZE_WORKFLOW/">Read how to run an issue analysis</a>, <a href="./demo/">explore the demo and run outputs</a>, then follow the <a href="./ROADMAP/">roadmap</a> and <a href="./OPEN_QUESTIONS/">open questions</a>.</p></div></div>

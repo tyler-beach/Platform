@@ -10,7 +10,6 @@ import (
 
 	"github.com/tyler-beach/Platform/go/pathfinder/internal/adapt/pr"
 	"github.com/tyler-beach/Platform/go/pathfinder/internal/collect/pkgcollect"
-	"github.com/tyler-beach/Platform/go/pathfinder/internal/extract/paste"
 	"github.com/tyler-beach/Platform/go/pathfinder/internal/predicates"
 )
 
@@ -305,7 +304,7 @@ func pinArtifactHashes(packageObj map[string]any) map[string]any {
 	return out
 }
 
-// PackageFromIssue builds a pinned package; catalogDir used for paste subjects + collector validation.
+// PackageFromIssue builds a pinned package; catalogDir is retained for caller compatibility.
 func PackageFromIssue(body string, issueNumber int, catalogDir string, subjects map[string]string, reg *predicates.Registry, opts Options) (map[string]any, error) {
 	sections := ParseFormSections(body)
 	if !AttestationAccepted(body, sections) {
@@ -351,9 +350,10 @@ func PackageFromIssue(body string, issueNumber int, catalogDir string, subjects 
 		return nil, &Error{Msg: "package schema_version must be pathfinder-evidence-package-v1"}
 	}
 	pkg = pinArtifactHashes(pkg)
-	pkg, err = paste.EnsureObservations(pkg, subjects)
-	if err != nil {
-		return nil, err
+	// Keep raw pinned artifacts intact until the evaluation boundary chooses its
+	// extractor. This lets explicit semantic extraction run before heuristics.
+	if _, ok := pkg["observations"]; !ok {
+		pkg["observations"] = []any{}
 	}
 	if _, err := pkgcollect.CollectObservations(pkg, reg); err != nil {
 		return nil, err
@@ -409,15 +409,21 @@ func RenderResultComment(report, packageObj map[string]any, runURL string) (stri
 	if v, ok := report["in_scope_count"]; ok {
 		lines = append(lines, fmt.Sprintf("- **In-scope requirements:** %v / %v", v, report["catalog_size"]))
 	}
+	if v, ok := report["result_count"]; ok {
+		lines = append(lines, fmt.Sprintf("- **Role-specific evaluations:** %v across evidence roles %v", v, report["evidence_roles"]))
+	}
 	extraction, _ := report["extraction"].(map[string]any)
 	if extraction == nil {
 		extraction, _ = packageObj["extraction"].(map[string]any)
 	}
 	if extraction != nil {
 		lines = append(lines, fmt.Sprintf(
-			"- **Paste extractor:** `%v` (%v observations)",
-			extraction["extractor"], extraction["observation_count"],
+			"- **Evidence extraction:** `%v` (status `%v`, %v accepted observations)",
+			extraction["extractor"], extraction["status"], extraction["observation_count"],
 		))
+		if extraction["input_tokens"] != nil || extraction["output_tokens"] != nil {
+			lines = append(lines, fmt.Sprintf("- **Semantic model usage:** %v input / %v output tokens; at most one generation call", extraction["input_tokens"], extraction["output_tokens"]))
+		}
 	}
 	scope, _ := packageObj["scope"].(map[string]any)
 	if scope == nil || len(asSlice(scope["domains"])) == 0 {
@@ -476,9 +482,9 @@ func RenderResultComment(report, packageObj map[string]any, runURL string) (stri
 	if len(notable) == 0 {
 		lines = append(lines, "_No confident aligned/deviation results; most in-scope requirements were inconclusive or out of scope._")
 	} else {
-		lines = append(lines, "| ADR | Domain | Outcome | Predicate |", "|---|---|---|---|")
+		lines = append(lines, "| ADR | Domain | Evidence role | Outcome | Predicate |", "|---|---|---|---|---|")
 		for _, row := range notable {
-			lines = append(lines, fmt.Sprintf("| `%v` | %v | `%v` | `%v` |", row["adr_id"], row["domain"], row["outcome"], row["predicate"]))
+			lines = append(lines, fmt.Sprintf("| `%v` | %v | `%v` | `%v` | `%v` |", row["adr_id"], row["domain"], row["evidence_role"], row["outcome"], row["predicate"]))
 		}
 	}
 	lines = append(lines,

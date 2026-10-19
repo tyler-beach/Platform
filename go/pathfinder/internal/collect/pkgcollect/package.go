@@ -65,6 +65,9 @@ func CollectObservations(packageObj map[string]any, reg *predicates.Registry) ([
 		if nonemptyString(block["artifact_id"]) {
 			id = block["artifact_id"].(string)
 		}
+		if _, duplicate := artifacts[id]; duplicate {
+			return nil, &Error{Msg: fmt.Sprintf("duplicate artifact_id %q", id)}
+		}
 		path := "tech_spec"
 		if nonemptyString(block["path"]) {
 			path = block["path"].(string)
@@ -73,7 +76,7 @@ func CollectObservations(packageObj map[string]any, reg *predicates.Registry) ([
 		if nonemptyString(block["revision"]) {
 			rev = block["revision"].(string)
 		}
-		artifacts[id] = map[string]any{"sha256": digest, "path": path, "revision": rev}
+		artifacts[id] = map[string]any{"sha256": digest, "path": path, "revision": rev, "evidence_role": "design_assertion"}
 	}
 	codeList, _ := packageObj["code"].([]any)
 	for index, raw := range codeList {
@@ -93,6 +96,9 @@ func CollectObservations(packageObj map[string]any, reg *predicates.Registry) ([
 		if nonemptyString(block["artifact_id"]) {
 			id = block["artifact_id"].(string)
 		}
+		if _, duplicate := artifacts[id]; duplicate {
+			return nil, &Error{Msg: fmt.Sprintf("duplicate artifact_id %q", id)}
+		}
 		path := id
 		if nonemptyString(block["path"]) {
 			path = block["path"].(string)
@@ -101,7 +107,7 @@ func CollectObservations(packageObj map[string]any, reg *predicates.Registry) ([
 		if nonemptyString(block["revision"]) {
 			rev = block["revision"].(string)
 		}
-		artifacts[id] = map[string]any{"sha256": digest, "path": path, "revision": rev}
+		artifacts[id] = map[string]any{"sha256": digest, "path": path, "revision": rev, "evidence_role": "implementation_fact"}
 	}
 
 	observationsIn, exists := packageObj["observations"]
@@ -177,13 +183,34 @@ func validateObservation(raw any, index int, artifacts map[string]map[string]any
 			return nil, &Error{Msg: fmt.Sprintf("observations[%d] expected string", index)}
 		}
 	}
-	sourceSHA := fmt.Sprint(item["source_sha256"])
-	if !sha256Re.MatchString(sourceSHA) {
-		art := artifacts[item["artifact_id"].(string)]
-		if art == nil {
-			return nil, &Error{Msg: fmt.Sprintf("observations[%d] missing source_sha256 and unknown artifact_id", index)}
+	sourceSHA := ""
+	if rawSHA, exists := item["source_sha256"]; exists && rawSHA != nil {
+		if !nonemptyString(rawSHA) || !sha256Re.MatchString(rawSHA.(string)) {
+			return nil, &Error{Msg: fmt.Sprintf("observations[%d].source_sha256 must be a SHA-256 digest", index)}
 		}
-		sourceSHA = art["sha256"].(string)
+		sourceSHA = rawSHA.(string)
+	}
+	art := artifacts[item["artifact_id"].(string)]
+	role := "implementation_fact"
+	if art != nil {
+		if !sha256Re.MatchString(sourceSHA) {
+			sourceSHA = art["sha256"].(string)
+		}
+		if sourceSHA != art["sha256"] || item["revision"] != art["revision"] || item["path"] != art["path"] {
+			return nil, &Error{Msg: fmt.Sprintf("observations[%d] provenance does not match pinned artifact", index)}
+		}
+		role = art["evidence_role"].(string)
+	} else if !sha256Re.MatchString(sourceSHA) {
+		return nil, &Error{Msg: fmt.Sprintf("observations[%d] missing source_sha256 and unknown artifact_id", index)}
+	}
+	if rawRole, exists := item["evidence_role"]; exists && rawRole != nil {
+		suppliedRole, ok := rawRole.(string)
+		if !ok || (suppliedRole != "" && suppliedRole != role) {
+			return nil, &Error{Msg: fmt.Sprintf("observations[%d].evidence_role does not match pinned artifact", index)}
+		}
+	}
+	if role != "design_assertion" && role != "implementation_fact" {
+		return nil, &Error{Msg: fmt.Sprintf("observations[%d].evidence_role is invalid", index)}
 	}
 	return map[string]any{
 		"evidence_id":   item["evidence_id"],
@@ -194,6 +221,7 @@ func validateObservation(raw any, index int, artifacts map[string]map[string]any
 		"revision":      item["revision"],
 		"path":          item["path"],
 		"source_sha256": sourceSHA,
+		"evidence_role": role,
 		"locator":       locator,
 		"collector":     CollectorID,
 	}, nil

@@ -17,7 +17,7 @@ Submit a **pinned evidence package** through a GitHub Issue and receive a catalo
    - Link a **same-repo pull request** (changed text files are fetched at the PR head; forks denied), and/or
    - Paste **Tech spec (markdown)** and/or a single **Sample code** snippet. Domains optional.
 4. Leave **Observations JSON** empty unless you want to override extraction.
-5. Submit. The workflow extracts allowlisted predicates, evaluates the catalog, and comments results.
+5. Submit. The workflow normalizes candidate evidence, evaluates the catalog, and comments role-specific results.
 
 Tech spec is optional when a same-repo PR is provided. Multi-file code must come from the PR adapter (not zip/bundles). You can still paste a complete `pathfinder-evidence-package-v1` in **Full package JSON** if you prefer.
 
@@ -25,7 +25,24 @@ Re-run via **Actions → Pathfinder Issue Package Evaluation → Run workflow** 
 
 ## What extraction can and cannot do
 
-The paste extractor (`paste_heuristic_v1`) is deterministic (no model calls). It emits observations only for high-confidence matches, for example:
+By default, the deterministic paste extractor (`paste_heuristic_v1`) runs without model calls. Tech specs become `design_assertion` evidence; code, config and PR files become `implementation_fact` evidence. They share one typed observation format and the same catalog evaluator, while results stay separate by role. A mismatch between proposed intent and supplied implementation is therefore visible as two results rather than merged away.
+
+For broader prose coverage, repositories can explicitly enable optional semantic extraction with an Anthropic API key. The model proposes only catalog-allowlisted facts and exact quotes. Go validates every quote against the pinned artifact, derives all provenance and the evidence role, then sends the same evidence contract to the generic evaluator. Model output never decides alignment or deviation.
+
+The flow is generic and does not add a collector or workflow per ADR. This prototype still loads its checked-in catalog and builds the allowlist from applicable rows; it does not yet retrieve a small relevant ADR subset from an enterprise vector store. Enterprise scale therefore still needs ADR retrieval/partitioning and durable organization-wide spend/trigger controls before broad opt-in.
+
+Semantic extraction is opt-in and bounded:
+
+- Set repository variable `PATHFINDER_ENABLE_MODEL_EXTRACT=true`.
+- Set repository variable `PATHFINDER_ANTHROPIC_MODEL` to the approved model ID.
+- Add Actions secret `ANTHROPIC_API_KEY`.
+- The workflow performs one exact-request token-count preflight, stops above 20,000 input tokens, allows at most one generation call, caps output at 4,000 tokens and 64 candidate facts, and has a 60-second deadline. It does not retry or repair model output.
+- Secret-like content caught by the preflight scanner is not sent to Anthropic. The scanner is best-effort; the public/synthetic attestation still applies.
+- Token usage and model/prompt/schema identity are recorded in report metadata. Source text and model responses are not printed to logs or issue comments.
+- Provider, budget or validation failures are reported as unavailable/partial semantic extraction and deterministic evidence can still be evaluated. Absence remains inconclusive.
+- These are per-workflow limits, not an organization spend quota. Each issue edit, dispatch, or rerun can incur another bounded call. Keep it disabled on a public repo and add trigger authorization plus a durable quota before enabling broadly.
+
+The deterministic extractor emits observations only for high-confidence matches, for example:
 
 - Session TTL / idle timeout with explicit units
 - Encryption at rest, TLS policy tokens (`tls-1-2-strict`, `tls-1-3-only`, `legacy-ssl`)
@@ -37,10 +54,10 @@ The paste extractor (`paste_heuristic_v1`) is deterministic (no model calls). It
 It does **not**:
 
 - Treat “not mentioned” as `false` for most presence checks
-- Cover all 100 catalog predicates from arbitrary prose
+- Cover all active catalog predicates from arbitrary prose
 - Invent values when two conflicting numbers appear (both dropped)
 
-Unmatched requirements stay `inconclusive`. Aggregate status is often `mixed` for real pastes.
+Unmatched requirements stay `inconclusive`. Aggregate status is often `mixed` for real pastes. Semantic extraction increases candidate coverage, but it does not turn model silence into evidence or establish compliance by itself.
 
 ## Runtime
 
