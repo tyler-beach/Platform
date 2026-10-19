@@ -152,6 +152,128 @@ class AdrPackTests(unittest.TestCase):
             self.assertTrue(row["adr_revision"].startswith("sha256:"))
             self.assertEqual(row["approval_state"], "approved")
 
+    def test_claude_suggest_dry_run_and_execute_mock(self) -> None:
+        from tools.adr_pack.claude_suggest import suggest_with_claude
+
+        with tempfile.TemporaryDirectory() as tmp:
+            adrs = Path(tmp)
+            path = adrs / "ADR-ACME-001.md"
+            path.write_text(GOOD_ADR, encoding="utf-8")
+            scaffold_adrs(adrs, use_heuristics=False)
+
+            dry = suggest_with_claude(adrs, dry_run=True, max_calls=3)
+            self.assertEqual(dry.dry_run, 1)
+            self.assertEqual(dry.called, 0)
+            side = load_sidecar(sidecar_path_for(path))
+            assert side is not None
+            self.assertNotEqual(side.get("suggestion_source"), "claude")
+
+            def fake_transport(endpoint: str, body: dict) -> tuple[dict, str]:
+                self.assertEqual(endpoint, "messages")
+                self.assertLessEqual(body.get("max_tokens", 0), 350)
+                payload = {
+                    "model": body["model"],
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": json.dumps(
+                                {
+                                    "kind": "numeric_max",
+                                    "predicate": "session.ttl_seconds",
+                                    "subject": "session",
+                                    "limit": 600,
+                                    "confidence": "high",
+                                    "notes": "matches decision",
+                                }
+                            ),
+                        }
+                    ],
+                    "usage": {"input_tokens": 120, "output_tokens": 40},
+                    "id": "msg_test",
+                }
+                return payload, "req_test"
+
+            live = suggest_with_claude(
+                adrs,
+                dry_run=False,
+                max_calls=3,
+                transport=fake_transport,
+                use_cache=True,
+            )
+            self.assertEqual(live.called, 1)
+            self.assertEqual(live.updated, 1)
+            side2 = load_sidecar(sidecar_path_for(path))
+            assert side2 is not None
+            self.assertEqual(side2["suggestion_source"], "claude")
+            self.assertEqual(side2["approval_state"], "draft")
+            self.assertEqual(side2["predicate"], "session.ttl_seconds")
+            self.assertEqual(side2["kind"], "numeric_max")
+            self.assertEqual(side2["model_suggestion"]["request_id"], "req_test")
+
+            # Cache hit: wipe fields so sidecar needs help again, but fingerprint matches
+            side2["predicate"] = ""
+            side2["subject"] = ""
+            side2["kind"] = ""
+            sidecar_path_for(path).write_text(json.dumps(side2, indent=2) + "\n", encoding="utf-8")
+            calls = {"n": 0}
+
+            def counting_transport(endpoint: str, body: dict) -> tuple[dict, str]:
+                calls["n"] += 1
+                return fake_transport(endpoint, body)
+
+            again = suggest_with_claude(
+                adrs,
+                dry_run=False,
+                transport=counting_transport,
+                use_cache=True,
+            )
+            self.assertEqual(calls["n"], 0)
+            self.assertEqual(again.skipped_cache, 1)
+
+    def test_claude_suggest_respects_max_calls(self) -> None:
+        from tools.adr_pack.claude_suggest import suggest_with_claude
+
+        with tempfile.TemporaryDirectory() as tmp:
+            adrs = Path(tmp)
+            for i in range(3):
+                (adrs / f"ADR-ACME-00{i}.md").write_text(
+                    GOOD_ADR.replace("ADR-ACME-001", f"ADR-ACME-00{i}"),
+                    encoding="utf-8",
+                )
+            scaffold_adrs(adrs, use_heuristics=False)
+            calls = {"n": 0}
+
+            def fake_transport(endpoint: str, body: dict) -> tuple[dict, str]:
+                calls["n"] += 1
+                return {
+                    "model": "mock",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": json.dumps(
+                                {
+                                    "kind": "boolean_required",
+                                    "predicate": f"test.pred.{calls['n']}",
+                                    "subject": "x",
+                                    "confidence": "low",
+                                }
+                            ),
+                        }
+                    ],
+                    "usage": {"input_tokens": 50, "output_tokens": 20},
+                }, f"r{calls['n']}"
+
+            stats = suggest_with_claude(
+                adrs,
+                dry_run=False,
+                max_calls=1,
+                transport=fake_transport,
+                use_cache=False,
+            )
+            self.assertEqual(calls["n"], 1)
+            self.assertEqual(stats.called, 1)
+            self.assertGreaterEqual(stats.skipped_budget, 1)
+
 
 if __name__ == "__main__":
     unittest.main()

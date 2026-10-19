@@ -10,6 +10,7 @@
 - [x] 2.3 Build gates for draft vs approved complete rows.
 - [x] 2.4 Heuristic suggestion labeling tests.
 - [x] 2.5 CLI entrypoint (`python3 -m tools.adr_pack`).
+- [x] 2.6 Opt-in budgeted Claude `suggest` (dry-run default, cache, never approve).
 
 ## 3. Docs
 

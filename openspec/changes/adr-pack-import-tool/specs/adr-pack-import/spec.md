@@ -59,3 +59,26 @@ Deterministic text heuristics MAY suggest kind, limit, or predicate candidates. 
 - **THEN** the sidecar may include a suggested `kind` of `numeric_max` and `limit` of `600`
 - **AND** `approval_state` remains not approved
 - **AND** a `suggestion_source` of `heuristic` is recorded
+
+### Requirement: Optional Claude suggestions are budgeted and never approving
+
+The tool MAY offer an opt-in Claude suggestion command for incomplete sidecars. Default operation MUST remain offline. Live calls MUST require explicit execute confirmation, enforce call/token budgets, prefer cache hits, send Decision text (not full unbounded ADR bodies), and MUST NOT set `approval_state` to `approved`.
+
+#### Scenario: Dry-run does not call the model
+- **GIVEN** incomplete draft sidecars
+- **WHEN** `suggest` runs without execute confirmation
+- **THEN** no Anthropic Messages request is sent
+- **AND** the report counts how many ADRs would be eligible within budget
+
+#### Scenario: Execute fills drafts but does not approve
+- **GIVEN** an incomplete sidecar and a configured Anthropic API key
+- **WHEN** `suggest --execute --yes` runs within budget
+- **THEN** empty kind/predicate/subject fields may be filled from model JSON
+- **AND** `approval_state` remains `draft`
+- **AND** model metadata (model id, prompt hash, token usage, request id) is recorded on the sidecar
+
+#### Scenario: Budget stops further calls
+- **GIVEN** more incomplete ADRs than `--max-calls`
+- **WHEN** suggest execute runs
+- **THEN** at most `--max-calls` Messages requests are made
+- **AND** remaining ADRs are reported as skipped for budget

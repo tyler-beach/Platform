@@ -11,7 +11,7 @@ Company testers need to aim Pathfinder at their own ADRs. Today the real pack is
   - `scaffold`: write draft typed sidecars (`.md.req.json`) next to ADRs (never invent approved requirements).
   - `build`: emit `requirements.jsonl`, merged `predicates.json`, and `catalog_manifest.json` from completed sidecars + ADR digests.
 - Optional deterministic heuristics may *suggest* kind/limit/predicate candidates and mark them `needs_review`; they MUST NOT auto-approve.
-- No Anthropic/Bedrock/network model calls.
+- Optional local Claude assist via `suggest` is opt-in, budgeted, cached, dry-run by default, and MUST NEVER auto-approve. Default `validate`/`scaffold`/`build` remain offline.
 
 ## Non-goals
 

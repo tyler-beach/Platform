@@ -23,6 +23,19 @@ Optional: `limit`, `approved_set`, `forbidden`, `applicability.languages`, `labe
 
 Regex over the Decision section for `MUST NOT exceed N`, `at least N`, bare `MUST` → candidate `kind`/`limit`. Predicate suggestion only by matching known registry keys or a slug from the title; always `suggestion_source=heuristic` and never approval.
 
+## Optional Claude assist
+
+Command: `python3 -m tools.adr_pack suggest` (separate from offline scaffold).
+
+Controls:
+- Default dry-run; live path requires `--execute --yes` + `ANTHROPIC_API_KEY`
+- Budgets: `--max-calls` (default 10), per-call max output tokens, cumulative input/output caps
+- Skip approved and already-complete (kind+predicate+subject) sidecars
+- Content-hash cache under `adrs/.adr_pack_cache/` (gitignored)
+- Prompt sends title/domain/status + truncated Decision + known predicate ids only
+- Default model: `ANTHROPIC_MODEL` or `claude-haiku-4-5` (cheaper local testing)
+- Merge fills empty fields only; forces `approval_state=draft`
+
 ## Layout
 
 - `tools/adr_pack/` package + `__main__.py`
