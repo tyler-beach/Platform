@@ -26,4 +26,4 @@
 - [x] 4.2 Run Go unit/race tests, vet, pure-domain checks, OpenSpec validation, workflow YAML parsing, and relevant repo checks; report that no Go fuzz harness exists and live Anthropic evaluation was not run.
 - [x] 4.3 Review secrets/logging, prompt injection, output-validation, retry/deadline, token-budget, and duplicate-run behavior adversarially.
 - [x] 4.4 Reconcile the current-state OpenSpec spec and documentation; leave the change active if any acceptance proof is outstanding.
-- [ ] 4.5 Push the isolated branch and open a reviewable PR; do not merge it.
+- [x] 4.5 Push the isolated branch and open a reviewable PR; do not merge it.
