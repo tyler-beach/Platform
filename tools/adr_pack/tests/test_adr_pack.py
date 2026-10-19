@@ -230,6 +230,48 @@ class AdrPackTests(unittest.TestCase):
             self.assertEqual(calls["n"], 0)
             self.assertEqual(again.skipped_cache, 1)
 
+    def test_complete_via_claude_cli_parses_json(self) -> None:
+        from unittest import mock
+
+        from tools.adr_pack import claude_suggest as cs
+
+        fake = mock.Mock(
+            returncode=0,
+            stdout=json.dumps(
+                {
+                    "result": json.dumps(
+                        {
+                            "kind": "numeric_max",
+                            "predicate": "session.ttl_seconds",
+                            "subject": "session",
+                            "limit": 600,
+                            "confidence": "medium",
+                        }
+                    ),
+                    "session_id": "sess1",
+                    "usage": {"input_tokens": 11, "output_tokens": 22},
+                    "model": "haiku",
+                }
+            ),
+            stderr="",
+        )
+        with mock.patch.object(cs.shutil, "which", return_value="/usr/bin/claude"), mock.patch.object(
+            cs.subprocess, "run", return_value=fake
+        ) as run:
+            out = cs.complete_via_claude_cli(
+                model="haiku",
+                system="sys",
+                user="user prompt",
+                max_tokens=100,
+            )
+        self.assertEqual(out["provider"], "claude-cli")
+        self.assertEqual(out["request_id"], "sess1")
+        self.assertIn("session.ttl_seconds", out["text"])
+        cmd = run.call_args.args[0]
+        self.assertEqual(cmd[0], "/usr/bin/claude")
+        self.assertIn("-p", cmd)
+        self.assertNotIn("shell", cmd[0])
+
     def test_claude_suggest_respects_max_calls(self) -> None:
         from tools.adr_pack.claude_suggest import suggest_with_claude
 

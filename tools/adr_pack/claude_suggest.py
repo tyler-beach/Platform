@@ -16,6 +16,9 @@ import http.client
 import json
 import os
 import re
+import shutil
+import subprocess
+import tempfile
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -25,12 +28,28 @@ from .parse import ParsedADR, list_adr_files, parse_adr_markdown
 from .sidecar import KINDS, load_sidecar, sidecar_path_for, write_sidecar
 
 PROMPT_VERSION = "adr-pack-claude-suggest-v1"
-DEFAULT_MODEL = "claude-haiku-4-5"
+DEFAULT_MODEL_API = "claude-haiku-4-5"
+DEFAULT_MODEL_CLI = "haiku"
 DEFAULT_MAX_CALLS = 10
 DEFAULT_MAX_OUTPUT_TOKENS = 350
 DEFAULT_MAX_DECISION_CHARS = 2000
 DEFAULT_MAX_PREDICATES_IN_PROMPT = 80
 ANTHROPIC_VERSION = "2023-06-01"
+# Keep CLI calls answer-only; do not grant repo tools.
+_CLI_DISALLOWED_TOOLS = (
+    "Bash",
+    "Edit",
+    "Write",
+    "Read",
+    "MultiEdit",
+    "NotebookEdit",
+    "Glob",
+    "Grep",
+    "WebFetch",
+    "WebSearch",
+    "Task",
+    "Agent",
+)
 
 SYSTEM = (
     "You help draft typed Pathfinder requirement sidecars from ADR Decision text. "
@@ -273,7 +292,103 @@ def call_messages(
         "input_tokens": usage.get("input_tokens"),
         "output_tokens": usage.get("output_tokens"),
         "model": payload.get("model") or model,
+        "provider": "anthropic-api",
     }
+
+
+def resolve_claude_bin(claude_bin: str | None = None) -> str:
+    candidate = claude_bin or os.environ.get("CLAUDE_CLI") or "claude"
+    if os.path.isabs(candidate) and os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+        return candidate
+    found = shutil.which(candidate)
+    if not found:
+        raise RuntimeError(
+            "Claude Code CLI not found on PATH. Install/login with `claude`, "
+            "or pass --claude-bin / set CLAUDE_CLI. "
+            "Alternatively use --via api with ANTHROPIC_API_KEY."
+        )
+    return found
+
+
+def complete_via_claude_cli(
+    *,
+    model: str,
+    system: str,
+    user: str,
+    max_tokens: int,
+    claude_bin: str | None = None,
+    timeout_sec: int = 120,
+) -> dict[str, Any]:
+    """Use local Claude Code (`claude -p`) with subscription login — no API key.
+
+    Runs in an empty temp cwd and denies common tools so the CLI answers the
+    prompt instead of browsing the repo.
+    """
+    del max_tokens  # CLI has no direct max_tokens; call budget still applies upstream.
+    binary = resolve_claude_bin(claude_bin)
+    # Fixed argv shape; prompt is a single argument (no shell).
+    cmd = [
+        binary,
+        "-p",
+        user,
+        "--append-system-prompt",
+        system,
+        "--output-format",
+        "json",
+        "--model",
+        model,
+        "--disallowedTools",
+        *_CLI_DISALLOWED_TOOLS,
+    ]
+    with tempfile.TemporaryDirectory(prefix="adr-pack-claude-cli-") as tmp:
+        try:
+            proc = subprocess.run(
+                cmd,
+                cwd=tmp,
+                capture_output=True,
+                text=True,
+                timeout=timeout_sec,
+                check=False,
+                env=os.environ.copy(),
+            )
+        except subprocess.TimeoutExpired as ex:
+            raise RuntimeError(f"claude CLI timed out after {timeout_sec}s") from ex
+    if proc.returncode != 0:
+        err = (proc.stderr or proc.stdout or "").strip()[:500]
+        raise RuntimeError(f"claude CLI exited {proc.returncode}: {err}")
+    stdout = (proc.stdout or "").strip()
+    if not stdout:
+        raise RuntimeError("claude CLI returned empty stdout")
+    try:
+        payload = json.loads(stdout)
+    except json.JSONDecodeError:
+        # Fallback: treat raw stdout as the model text.
+        return {
+            "text": stdout,
+            "request_id": "",
+            "input_tokens": None,
+            "output_tokens": None,
+            "model": model,
+            "provider": "claude-cli",
+        }
+    text = ""
+    if isinstance(payload, dict):
+        if isinstance(payload.get("result"), str):
+            text = payload["result"]
+        elif isinstance(payload.get("text"), str):
+            text = payload["text"]
+        else:
+            text = json.dumps(payload)
+        usage = payload.get("usage") if isinstance(payload.get("usage"), dict) else {}
+        return {
+            "text": text.strip(),
+            "request_id": str(payload.get("session_id") or payload.get("id") or ""),
+            "input_tokens": usage.get("input_tokens"),
+            "output_tokens": usage.get("output_tokens"),
+            "model": str(payload.get("model") or model),
+            "provider": "claude-cli",
+        }
+    raise RuntimeError("claude CLI JSON output was not an object")
 
 
 def merge_suggestion(side: dict[str, Any], suggestion: dict[str, Any], meta: dict[str, Any]) -> dict[str, Any]:
@@ -287,7 +402,7 @@ def merge_suggestion(side: dict[str, Any], suggestion: dict[str, Any], meta: dic
         out["label_status"] = "needs_human_typing"
     out["model_suggestion"] = {
         "prompt_version": PROMPT_VERSION,
-        "provider": "anthropic",
+        "provider": meta.get("provider") or "claude",
         "model": meta.get("model"),
         "prompt_sha256": meta.get("prompt_sha256"),
         "request_id": meta.get("request_id"),
@@ -314,11 +429,18 @@ def suggest_with_claude(
     max_input_tokens_total: int = 50_000,
     max_output_tokens_total: int = 4_000,
     model: str | None = None,
+    via: str = "claude-cli",
+    claude_bin: str | None = None,
     transport: Transport | None = None,
     use_cache: bool = True,
 ) -> SuggestStats:
     stats = SuggestStats()
-    model_name = model or os.getenv("ANTHROPIC_MODEL") or DEFAULT_MODEL
+    if via not in {"claude-cli", "api"}:
+        raise ValueError("via must be 'claude-cli' or 'api'")
+    if via == "api":
+        model_name = model or os.getenv("ANTHROPIC_MODEL") or DEFAULT_MODEL_API
+    else:
+        model_name = model or os.getenv("CLAUDE_CLI_MODEL") or DEFAULT_MODEL_CLI
     budget = Budget(
         max_calls=max_calls,
         max_output_tokens_per_call=max_output_tokens,
@@ -338,7 +460,8 @@ def suggest_with_claude(
 
     cpath = cache_path(adrs_dir)
     cache = load_cache(cpath) if use_cache else {}
-    tx = transport or anthropic_transport
+    if transport is not None:
+        via = "api"
 
     for path in list_adr_files(adrs_dir):
         stats.considered += 1
@@ -397,16 +520,34 @@ def suggest_with_claude(
 
         try:
             started = time.monotonic()
-            result = call_messages(
-                model=model_name,
-                system=SYSTEM,
-                user=user,
-                max_tokens=budget.max_output_tokens_per_call,
-                transport=tx,
-            )
+            if transport is not None:
+                result = call_messages(
+                    model=model_name,
+                    system=SYSTEM,
+                    user=user,
+                    max_tokens=budget.max_output_tokens_per_call,
+                    transport=transport,
+                )
+            elif via == "api":
+                result = call_messages(
+                    model=model_name,
+                    system=SYSTEM,
+                    user=user,
+                    max_tokens=budget.max_output_tokens_per_call,
+                    transport=anthropic_transport,
+                )
+            else:
+                result = complete_via_claude_cli(
+                    model=model_name,
+                    system=SYSTEM,
+                    user=user,
+                    max_tokens=budget.max_output_tokens_per_call,
+                    claude_bin=claude_bin,
+                )
             suggestion = validate_suggestion(parse_model_json(result["text"]))
             budget.record(result.get("input_tokens") or est_in, result.get("output_tokens"))
             meta = {
+                "provider": result.get("provider") or via,
                 "model": result.get("model") or model_name,
                 "prompt_sha256": prompt_sha,
                 "request_id": result.get("request_id"),
@@ -444,6 +585,7 @@ def suggest_with_claude(
         save_cache(cpath, cache)
 
     stats.usage = {
+        "via": via if transport is None else "api",
         "model": model_name,
         "dry_run": dry_run,
         "calls": budget.calls,
