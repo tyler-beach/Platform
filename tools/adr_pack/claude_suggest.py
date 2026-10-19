@@ -213,12 +213,22 @@ def validate_suggestion(data: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+# Literal HTTPS URLs only — never concatenate caller-controlled path segments
+# into a urllib URL (avoids file:// / open-redirect style scheme abuse).
+_ANTHROPIC_URLS = {
+    "messages": "https://api.anthropic.com/v1/messages",
+}
+
+
 def anthropic_transport(endpoint: str, body: dict[str, Any]) -> tuple[dict[str, Any], str]:
     key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
     if not key:
         raise RuntimeError("ANTHROPIC_API_KEY is not set")
+    url = _ANTHROPIC_URLS.get(endpoint)
+    if url is None:
+        raise ValueError(f"unsupported Anthropic endpoint {endpoint!r}")
     req = urllib.request.Request(
-        "https://api.anthropic.com/v1/" + endpoint,
+        url,
         data=json.dumps(body).encode("utf-8"),
         headers={
             "content-type": "application/json",
