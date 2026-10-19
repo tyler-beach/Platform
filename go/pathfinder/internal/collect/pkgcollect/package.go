@@ -6,9 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"regexp"
 	"strings"
 
+	"github.com/tyler-beach/Platform/go/pathfinder/internal/evidence"
 	"github.com/tyler-beach/Platform/go/pathfinder/internal/predicates"
 )
 
@@ -16,8 +16,6 @@ const (
 	PackageSchema = "pathfinder-evidence-package-v1"
 	CollectorID   = "structured_package"
 )
-
-var sha256Re = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
 type Error struct{ Msg string }
 
@@ -49,8 +47,41 @@ func LoadPackage(path string) (map[string]any, error) {
 	return packageObj, nil
 }
 
-// CollectObservations validates observations; never synthesizes missing ones.
+// CollectObservations validates observations against the predicate registry and
+// normalizes them; never synthesizes missing ones.
 func CollectObservations(packageObj map[string]any, reg *predicates.Registry) ([]map[string]any, error) {
+	artifacts, err := indexArtifacts(packageObj)
+	if err != nil {
+		return nil, err
+	}
+
+	observationsIn, exists := packageObj["observations"]
+	if !exists || observationsIn == nil {
+		return []map[string]any{}, nil
+	}
+	list, ok := observationsIn.([]any)
+	if !ok {
+		return nil, &Error{Msg: "observations must be a list"}
+	}
+	for index, raw := range list {
+		if err := validateRegistryObservation(raw, index, reg); err != nil {
+			return nil, err
+		}
+	}
+	normalized, err := evidence.NormalizeObservations(list, artifacts)
+	if err != nil {
+		if pe, ok := err.(*evidence.Error); ok {
+			return nil, &Error{Msg: pe.Msg}
+		}
+		return nil, err
+	}
+	for _, obs := range normalized {
+		obs["collector"] = CollectorID
+	}
+	return normalized, nil
+}
+
+func indexArtifacts(packageObj map[string]any) (map[string]map[string]any, error) {
 	artifacts := map[string]map[string]any{}
 	if block, ok := packageObj["tech_spec"].(map[string]any); ok && nonemptyString(block["content"]) {
 		content := block["content"].(string)
@@ -103,50 +134,25 @@ func CollectObservations(packageObj map[string]any, reg *predicates.Registry) ([
 		}
 		artifacts[id] = map[string]any{"sha256": digest, "path": path, "revision": rev}
 	}
-
-	observationsIn, exists := packageObj["observations"]
-	if !exists || observationsIn == nil {
-		return []map[string]any{}, nil
-	}
-	list, ok := observationsIn.([]any)
-	if !ok {
-		return nil, &Error{Msg: "observations must be a list"}
-	}
-	seen := map[string]struct{}{}
-	var out []map[string]any
-	for index, raw := range list {
-		obs, err := validateObservation(raw, index, artifacts, reg)
-		if err != nil {
-			return nil, err
-		}
-		id := obs["evidence_id"].(string)
-		if _, dup := seen[id]; dup {
-			return nil, &Error{Msg: "observation evidence_ids must be unique"}
-		}
-		seen[id] = struct{}{}
-		out = append(out, obs)
-	}
-	return out, nil
+	return artifacts, nil
 }
 
-func validateObservation(raw any, index int, artifacts map[string]map[string]any, reg *predicates.Registry) (map[string]any, error) {
+func validateRegistryObservation(raw any, index int, reg *predicates.Registry) error {
 	item, ok := raw.(map[string]any)
 	if !ok {
-		return nil, &Error{Msg: fmt.Sprintf("observations[%d] must be an object", index)}
+		return &Error{Msg: fmt.Sprintf("observations[%d] must be an object", index)}
 	}
-	for _, field := range []string{"evidence_id", "predicate", "subject", "artifact_id", "revision", "path"} {
-		if !nonemptyString(item[field]) {
-			return nil, &Error{Msg: fmt.Sprintf("observations[%d].%s must be a non-empty string", index, field)}
-		}
+	if !nonemptyString(item["predicate"]) {
+		return &Error{Msg: fmt.Sprintf("observations[%d].predicate must be a non-empty string", index)}
 	}
 	pred := item["predicate"].(string)
 	meta, err := reg.Get(pred)
 	if err != nil {
-		return nil, &Error{Msg: err.Error()}
+		return &Error{Msg: err.Error()}
 	}
 	collectors, err := reg.CollectorsFor(pred)
 	if err != nil {
-		return nil, &Error{Msg: err.Error()}
+		return &Error{Msg: err.Error()}
 	}
 	allowed := false
 	for _, c := range collectors {
@@ -156,47 +162,24 @@ func validateObservation(raw any, index int, artifacts map[string]map[string]any
 		}
 	}
 	if !allowed {
-		return nil, &Error{Msg: fmt.Sprintf("observations[%d] predicate %q is not collectable via %s", index, pred, CollectorID)}
-	}
-	locator, ok := item["locator"].(map[string]any)
-	if !ok || !nonemptyString(locator["kind"]) {
-		return nil, &Error{Msg: fmt.Sprintf("observations[%d].locator must be typed", index)}
+		return &Error{Msg: fmt.Sprintf("observations[%d] predicate %q is not collectable via %s", index, pred, CollectorID)}
 	}
 	value := item["value"]
 	switch meta.ValueType {
 	case "number":
 		if !isNumber(value) {
-			return nil, &Error{Msg: fmt.Sprintf("observations[%d] expected number", index)}
+			return &Error{Msg: fmt.Sprintf("observations[%d] expected number", index)}
 		}
 	case "boolean":
 		if _, ok := value.(bool); !ok {
-			return nil, &Error{Msg: fmt.Sprintf("observations[%d] expected boolean", index)}
+			return &Error{Msg: fmt.Sprintf("observations[%d] expected boolean", index)}
 		}
 	case "string":
 		if !nonemptyString(value) {
-			return nil, &Error{Msg: fmt.Sprintf("observations[%d] expected string", index)}
+			return &Error{Msg: fmt.Sprintf("observations[%d] expected string", index)}
 		}
 	}
-	sourceSHA := fmt.Sprint(item["source_sha256"])
-	if !sha256Re.MatchString(sourceSHA) {
-		art := artifacts[item["artifact_id"].(string)]
-		if art == nil {
-			return nil, &Error{Msg: fmt.Sprintf("observations[%d] missing source_sha256 and unknown artifact_id", index)}
-		}
-		sourceSHA = art["sha256"].(string)
-	}
-	return map[string]any{
-		"evidence_id":   item["evidence_id"],
-		"predicate":     item["predicate"],
-		"subject":       item["subject"],
-		"value":         value,
-		"artifact_id":   item["artifact_id"],
-		"revision":      item["revision"],
-		"path":          item["path"],
-		"source_sha256": sourceSHA,
-		"locator":       locator,
-		"collector":     CollectorID,
-	}, nil
+	return nil
 }
 
 func isNumber(v any) bool {
