@@ -250,7 +250,16 @@ def anthropic_transport(endpoint: str, body: dict[str, Any]) -> tuple[dict[str, 
         "x-api-key": key,
         "anthropic-version": ANTHROPIC_VERSION,
     }
-    conn = http.client.HTTPSConnection("api.anthropic.com", timeout=60)
+    # Explicit verifying context (Bandit B323 / CWE-295): never disable hostname
+    # or cert checks for the optional --via api path.
+    tls = ssl.create_default_context()
+    if not tls.check_hostname or tls.verify_mode != ssl.CERT_REQUIRED:
+        raise RuntimeError("refusing Anthropic API call without TLS certificate verification")
+    conn = http.client.HTTPSConnection(
+        "api.anthropic.com",
+        timeout=60,
+        context=tls,
+    )
     try:
         conn.request("POST", "/v1/messages", body=payload, headers=headers)
         response = conn.getresponse()
