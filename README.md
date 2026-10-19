@@ -31,8 +31,8 @@ This public Pages deployment contains the synthetic mock walkthrough. Actions hi
 ## Start here in the repository
 
 - [Project brief](docs/PROJECT_BRIEF.md)
-- [GitHub V1 prototype PRD](docs/PRD.md)
-- [AWS target product PRD](docs/PRD_FINAL_PRODUCT.md)
+- [GitHub V1 prototype PRD](PRDs/PRD.md)
+- [AWS target product PRD](PRDs/PRD_FINAL_PRODUCT.md)
 - [Architecture overview](docs/architecture-overview.md)
 - [gRPC and Protobuf design](docs/RPC_AND_PROTOBUF.md)
 - [AI pipeline and harness](docs/AI_PIPELINE.md)
