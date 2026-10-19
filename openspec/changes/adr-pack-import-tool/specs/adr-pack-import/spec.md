@@ -5,16 +5,22 @@
 The ADR pack import tool MUST validate a directory of markdown ADRs without calling a model or network API. Validation MUST report structural errors and readiness gaps that block a Pathfinder pack build.
 
 #### Scenario: Missing Decision section fails
-- **GIVEN** a markdown ADR file without a `## Decision` section (or equivalent Decision heading)
+- **GIVEN** a markdown ADR file without a `## Decision Outcome` or `## Decision` section
 - **WHEN** `validate` runs
 - **THEN** the tool reports an error for that file
 - **AND** the overall validate exit status is non-zero when any error exists
 
 #### Scenario: Missing domain warns
-- **GIVEN** an ADR with a Decision section but no Domain metadata
+- **GIVEN** an ADR with a Decision Outcome/Decision section but no Domain/category metadata
 - **WHEN** `validate` runs
-- **THEN** the tool reports a warning for missing domain
-- **AND** does not invent a domain value
+- **THEN** the tool reports a warning for missing domain/category
+- **AND** does not invent a domain value as approved Pathfinder applicability
+
+#### Scenario: MADR Decision Outcome is accepted
+- **GIVEN** a MADR markdown ADR with YAML frontmatter status/categories and a `## Decision Outcome` section
+- **WHEN** `validate` or `scaffold` runs
+- **THEN** the Decision Outcome text is treated as the decision body
+- **AND** status/categories from frontmatter are available for sidecar drafting
 
 ### Requirement: Scaffold typed sidecars without approving them
 

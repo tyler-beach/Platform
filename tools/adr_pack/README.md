@@ -9,6 +9,20 @@ Claude never auto-approves. Treat every suggestion as a review checklist.
 
 Live `suggest` uses your local **Claude Code CLI** (`claude -p`) and subscription login. It does **not** open an Anthropic HTTPS client or require `ANTHROPIC_API_KEY`.
 
+## ADR input format (MADR supported)
+
+Point the tool at a directory of Markdown ADRs. **[MADR](https://adr.github.io/madr/)** is supported:
+
+- YAML frontmatter (`status`, `categories` / `category`, `decision-makers`, …)
+- `## Decision Outcome` (required content for Pathfinder drafting)
+- Filenames like `0007-use-short-session-ttl.md` → id `ADR-0007`
+- Category subfolders (e.g. `decisions/backend/*.md`) are scanned recursively
+- Skips `adr-template.md` / `README.md`
+
+Also accepted: Pathfinder-style `## Decision` plus `- **Status:**` / `- **Domain:**` bullets.
+
+For Pathfinder applicability, prefer a domain/category in frontmatter (`categories: [identity]`) or a Domain bullet. Otherwise validate warns and may use the parent folder name as a hint.
+
 ## Offline flow
 
 ```bash

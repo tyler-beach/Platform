@@ -39,6 +39,32 @@ BAD_ADR = """# ADR-ACME-002 — Incomplete
 No decision yet.
 """
 
+MADR_ADR = """---
+status: accepted
+date: 2024-06-01
+decision-makers: Platform Architecture
+categories: [identity, security]
+---
+# Use short session TTL
+
+## Context and Problem Statement
+
+How long may authenticated sessions live?
+
+## Considered Options
+
+* 600 seconds
+* 3600 seconds
+
+## Decision Outcome
+
+Chosen option: "600 seconds", because authenticated session lifetime MUST NOT exceed 600 seconds.
+
+### Consequences
+
+* Good, because stolen tokens expire quickly
+"""
+
 
 class AdrPackTests(unittest.TestCase):
     def test_parse_and_validate(self) -> None:
@@ -55,6 +81,33 @@ class AdrPackTests(unittest.TestCase):
             by_name = {Path(r["path"]).name: r for r in reports}
             self.assertTrue(by_name["ADR-ACME-002.md"]["errors"])
             self.assertFalse(by_name["ADR-ACME-001.md"]["errors"])
+
+    def test_parse_madr_format(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            adrs = Path(tmp)
+            path = adrs / "0007-use-short-session-ttl.md"
+            path.write_text(MADR_ADR, encoding="utf-8")
+            parsed = parse_adr_markdown(path)
+            self.assertEqual(parsed.adr_id, "ADR-0007")
+            self.assertEqual(parsed.status.lower(), "accepted")
+            self.assertEqual(parsed.domain, "identity")
+            self.assertIn("MUST NOT exceed 600", parsed.decision)
+            self.assertEqual(parsed.format_hint, "madr")
+            errors, reports = validate_adrs(adrs)
+            self.assertEqual(errors, 0)
+            self.assertTrue(reports[0]["pack_ready"] is False)  # no sidecar yet
+
+    def test_list_adr_files_recursive_skips_template(self) -> None:
+        from tools.adr_pack.parse import list_adr_files
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "backend").mkdir()
+            (root / "backend" / "0001-use-quarkus.md").write_text(MADR_ADR, encoding="utf-8")
+            (root / "adr-template.md").write_text(MADR_ADR, encoding="utf-8")
+            files = list_adr_files(root)
+            names = [p.name for p in files]
+            self.assertEqual(names, ["0001-use-quarkus.md"])
 
     def test_heuristic_numeric_max(self) -> None:
         s = suggest_from_decision("Lifetime MUST NOT exceed 600 seconds.")
