@@ -26,11 +26,13 @@ The documentation source is in the docs folder and is presented through a React 
 - [Pathfinder operations](docs/PATHFINDER_OPERATIONS.md)
 - [Executable semantic-analysis PoC](https://tyler-beach.github.io/Platform/EXECUTABLE_POC/)
 
-This public Pages deployment contains the synthetic mock walkthrough. Actions history and detailed CSV run-data exports are disabled by default; the workflow rejects those exports unless the repository is an organization-owned private/internal repository with Pages visibility and explicit opt-ins configured. Before using real source data for a demo, clone the project into the intended private organization and verify its Pages visibility settings. The REST/OpenAPI document is a proposed façade, not a claim of a deployed HTTP server.
+This public Pages deployment contains the synthetic mock walkthrough. Actions history and detailed CSV run-data exports are disabled by default; the workflow rejects those exports unless the repository is an organization-owned private/internal repository with Pages visibility and explicit opt-ins configured. The Pathfinder usage dashboard reads a compact public aggregate updated by each run; private Pages cannot anonymously fetch this data branch and will need an authenticated data path. Before using real source data for a demo, clone the project into the intended private organization and verify its Pages visibility settings. The REST/OpenAPI document is a proposed façade, not a claim of a deployed HTTP server.
 
 ## Start here in the repository
 
 - [Project brief](docs/PROJECT_BRIEF.md)
+- [GitHub V1 prototype PRD](docs/PRD.md)
+- [AWS target product PRD](docs/PRD_FINAL_PRODUCT.md)
 - [Architecture overview](docs/architecture-overview.md)
 - [gRPC and Protobuf design](docs/RPC_AND_PROTOBUF.md)
 - [AI pipeline and harness](docs/AI_PIPELINE.md)

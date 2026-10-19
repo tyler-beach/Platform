@@ -19,6 +19,7 @@ import {
 import DemoExplorer from './components/DemoExplorer.jsx';
 import EvaluationDashboard from './components/EvaluationDashboard.jsx';
 import RunExplorer from './components/RunExplorer.jsx';
+import UsageDashboard from './components/UsageDashboard.jsx';
 
 const BRAND = 'Pathfinder';
 const repository = document.querySelector('meta[name="adr-repository"]')?.content || 'tyler-beach/Platform';
@@ -45,6 +46,7 @@ function Header() {
       <NavLink to="/architecture" className={({ isActive }) => `global-nav__link ${isActive ? 'is-active' : ''}`}><BookOpen size={16} /> Architecture</NavLink>
       <NavLink to="/demo" className={({ isActive }) => `global-nav__link ${isActive ? 'is-active' : ''}`}><Workflow size={16} /> Walkthrough</NavLink>
       <NavLink to="/explore" className={({ isActive }) => `global-nav__link ${isActive ? 'is-active' : ''}`}><Activity size={16} /> Run Explorer</NavLink>
+      <NavLink to="/usage" className={({ isActive }) => `global-nav__link ${isActive ? 'is-active' : ''}`}><Activity size={16} /> Usage</NavLink>
       <a href={pageAsset('pathfinder-flow/')} className="global-nav__link global-nav__link--explore"><Workflow size={16} /> Explore workflow <span className="nav-live-mark" aria-hidden="true" /></a>
       <NavLink to="/evaluation" className={({ isActive }) => `global-nav__link ${isActive ? 'is-active' : ''}`}><ShieldCheck size={16} /> Evaluation</NavLink>
     </nav>
@@ -265,6 +267,10 @@ function EvaluationRoute() {
   return <Shell wide><EvaluationDashboard /></Shell>;
 }
 
+function UsageRoute() {
+  return <Shell wide><UsageDashboard /></Shell>;
+}
+
 function LegacyRoute() {
   const location = useLocation();
   const resolved = resolveLegacyPath(location.pathname, documentPaths, BASE_URL);
@@ -291,5 +297,5 @@ function RunExplorerRoute() {
 }
 
 export default function App() {
-  return <Routes><Route path="/" element={<Home />} /><Route path="/architecture/*" element={<Shell wide><ArchitectureRouter /></Shell>} /><Route path="/demo/*" element={<DemoRoute />} /><Route path="/explore/*" element={<RunExplorerRoute />} /><Route path="/evaluation/*" element={<EvaluationRoute />} /><Route path="/not-found" element={<NotFound />} /><Route path="*" element={<LegacyRoute />} /></Routes>;
+  return <Routes><Route path="/" element={<Home />} /><Route path="/architecture/*" element={<Shell wide><ArchitectureRouter /></Shell>} /><Route path="/demo/*" element={<DemoRoute />} /><Route path="/explore/*" element={<RunExplorerRoute />} /><Route path="/evaluation/*" element={<EvaluationRoute />} /><Route path="/usage/*" element={<UsageRoute />} /><Route path="/not-found" element={<NotFound />} /><Route path="*" element={<LegacyRoute />} /></Routes>;
 }

@@ -1327,3 +1327,56 @@ button.run-graph-node:hover { border-color:#64cdbd; background:#143043; }
 .run-artifact-files .run-log-file pre { max-height:360px; }
 .run-artifact-card .run-artifact-inspect { display:inline-flex; align-items:center; gap:6px; white-space:nowrap; }
 @media(max-width:620px) { .run-artifact-card .run-artifact { flex-wrap:wrap; } .run-artifact-card .run-artifact-inspect { margin-left:30px; } }
+
+.usage-page { max-width:1240px; margin:0 auto; padding:34px 0 72px; }
+.usage-hero { display:flex; align-items:flex-end; justify-content:space-between; gap:24px; padding:clamp(24px,4vw,44px); border:1px solid #263e55; border-radius:20px; background:radial-gradient(ellipse at 90% 0%,rgba(20,184,166,.16),transparent 34%),linear-gradient(125deg,#0b1726,#102438 70%,#0d242c); }
+.usage-kicker { display:inline-flex; align-items:center; gap:7px; color:#7ddfd1; font:700 9px/1.5 var(--mono); letter-spacing:.12em; text-transform:uppercase; }
+.usage-hero h1 { margin:15px 0 10px; color:#f1f7fd; font:800 clamp(34px,5vw,54px)/1.04 var(--display); letter-spacing:-.06em; }
+.usage-hero p { max-width:740px; margin:0; color:#b5c7d8; font-size:13px; line-height:1.75; }
+.usage-refresh { display:inline-flex; align-items:center; justify-content:center; gap:8px; flex:0 0 auto; min-height:40px; padding:0 12px; border:1px solid #3a5369; border-radius:7px; color:#e0edf8; background:#122337; font-size:11px; font-weight:650; cursor:pointer; }
+.usage-refresh:disabled { opacity:.65; cursor:wait; }
+.usage-spin { animation:usage-rotate 1s linear infinite; }
+@keyframes usage-rotate { to { transform:rotate(360deg); } }
+.usage-status { display:flex; align-items:center; gap:9px; flex-wrap:wrap; margin:14px 0; padding:11px 13px; border:1px solid #24483f; border-radius:7px; color:#a8e8d8; background:#0b211f; font-size:10px; }
+.usage-status small { margin-left:auto; color:#7e9c9f; font:9px var(--mono); }
+.usage-status--warning { border-color:#665538; color:#e9cb89; background:#211b10; }
+.usage-empty { display:grid; justify-items:center; gap:9px; margin-top:18px; padding:48px 20px; border:1px dashed #385064; border-radius:12px; color:#9db2c3; text-align:center; background:#0a1925; }
+.usage-empty h2 { margin:0; color:#dce9f2; font:700 20px var(--display); }
+.usage-empty p { max-width:640px; margin:0; font-size:11px; line-height:1.7; }
+.usage-metrics { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin:14px 0; }
+.usage-metric { display:grid; gap:11px; padding:15px; border:1px solid #243b4c; border-radius:9px; background:#0a1925; }
+.usage-metric > div { display:flex; align-items:center; justify-content:space-between; color:#839caf; font-size:10px; }
+.usage-metric > div svg { color:#7ddfd1; }
+.usage-metric strong { color:#e3eff7; font:760 29px/1 var(--display); letter-spacing:-.04em; }
+.usage-metric small { color:#8099ad; font-size:9px; }
+.usage-panel { min-width:0; padding:17px; border:1px solid #243b4c; border-radius:9px; background:#0a1925; }
+.usage-panel__heading { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+.usage-panel__heading h2 { margin:5px 0 0; color:#e3eff7; font:730 18px/1.2 var(--display); letter-spacing:-.03em; }
+.usage-panel__heading > span { color:#8099ad; font-size:9px; }
+.usage-trend { display:flex; align-items:stretch; gap:6px; height:154px; margin-top:16px; padding:0 0 3px; overflow-x:auto; }
+.usage-trend__day { display:grid; grid-template-rows:14px minmax(0,1fr) 14px; gap:5px; flex:1 0 30px; min-width:30px; text-align:center; }
+.usage-trend__day > span { color:#90aaaF; font:9px var(--mono); }
+.usage-trend__day > div { display:flex; align-items:flex-end; justify-content:center; border-bottom:1px solid #294153; background:linear-gradient(180deg,transparent,#102432); }
+.usage-trend__day i { width:60%; border-radius:3px 3px 0 0; background:linear-gradient(180deg,#72dfcf,#238d83); }
+.usage-trend__day small { color:#7791a4; font:8px var(--mono); }
+.usage-muted { margin:12px 0 0; color:#8099ad; font-size:9px; line-height:1.65; }
+.usage-lower-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin-top:10px; }
+.usage-outcomes { display:grid; gap:0; margin:13px 0 0; padding:0; list-style:none; }
+.usage-outcomes li { display:flex; justify-content:space-between; gap:12px; padding:10px 0; border-top:1px solid #203747; color:#afc2d0; font-size:10px; }
+.usage-outcomes strong { color:#e2eef5; font:700 11px var(--mono); }
+.usage-telemetry-panel { margin-top:10px; }
+.usage-query-controls { display:flex; flex-wrap:wrap; gap:10px; margin-top:13px; }
+.usage-query-controls label { display:grid; gap:5px; color:#8099ad; font-size:9px; }
+.usage-query-controls select { min-width:150px; padding:7px 9px; border:1px solid #2a4558; border-radius:6px; background:#0d202d; color:#d7e6ef; font:600 10px var(--display); }
+.usage-table-wrap { overflow-x:auto; margin-top:14px; }
+.usage-telemetry-table { width:100%; border-collapse:collapse; color:#afc2d0; font-size:10px; text-align:right; white-space:nowrap; }
+.usage-telemetry-table th,.usage-telemetry-table td { padding:9px 10px; border-top:1px solid #203747; }
+.usage-telemetry-table thead th { color:#8099ad; font-size:9px; font-weight:650; }
+.usage-telemetry-table th:first-child { text-align:left; }
+.usage-telemetry-table tbody th { color:#d7e6ef; font-weight:600; }
+.usage-telemetry-table td { font-family:var(--mono); font-variant-numeric:tabular-nums; }
+.usage-ai-panel > strong { display:block; margin-top:19px; color:#edcf8d; font:700 14px var(--display); }
+.usage-ai-panel > p { margin:8px 0 0; color:#91a7b8; font-size:10px; line-height:1.75; }
+.usage-source-note { margin:12px 2px 0; color:#708a9c; font:9px/1.6 var(--mono); }
+@media(max-width:760px) { .usage-hero { align-items:flex-start; flex-direction:column; } .usage-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); } .usage-lower-grid { grid-template-columns:minmax(0,1fr); } }
+@media(max-width:620px) { .usage-page { padding-top:20px; } .usage-status small { width:100%; margin:0; } .usage-metric { padding:12px; } .usage-metric strong { font-size:24px; } }

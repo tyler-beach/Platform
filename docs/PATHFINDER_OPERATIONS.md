@@ -10,7 +10,17 @@
 
 - Branch: `pathfinder-jobs` (machine commits only)
 - File: `jobs/jobs.jsonl` (append-only lean records)
+- Aggregate: `dashboard/summary.json` (90-day operational projection, regenerated with each ledger commit)
 - Soft-fail: evaluate comment/artifacts are kept if ledger push fails after retries
+
+## Usage dashboard and OpenTelemetry
+
+- Pages route: `/usage`; it fetches the aggregate from the public `pathfinder-jobs` branch and refreshes every five minutes while open. Analysis updates do not redeploy the Pages site.
+- Data scope: job counts, allowlisted package statuses/requirement outcomes, and fixed-stage run/error/skipped/duration aggregates. No raw traces or issue/run identifiers are placed in the dashboard projection. The Pages site and data branch must both be public for anonymous browser reads.
+- Stage telemetry comes from measured Go instrumentation and is present even if no external OTLP endpoint is configured. The projection updates in the same serialized ledger write and Pages refreshes it without a Pages redeployment.
+- Optional OTLP/HTTP export: set Actions variable `OTEL_EXPORTER_OTLP_ENDPOINT` and, when needed, secret `OTEL_EXPORTER_OTLP_HEADERS`. No endpoint means no telemetry export. Export failure does not fail analysis.
+- The current workflow makes no model call. AI token and spend data are unavailable, not zero.
+- Full design, privacy limits, and migration implications: `PATHFINDER_USAGE_DASHBOARD.md`.
 
 ## Catalog modes
 
