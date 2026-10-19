@@ -11,7 +11,6 @@ from pathlib import Path
 from .claude_suggest import (
     DEFAULT_MAX_CALLS,
     DEFAULT_MAX_OUTPUT_TOKENS,
-    DEFAULT_MODEL_API,
     DEFAULT_MODEL_CLI,
     suggest_with_claude,
 )
@@ -60,15 +59,6 @@ def main(argv: list[str] | None = None) -> int:
         help="predicates.json whose ids may be reused",
     )
     p_sg.add_argument(
-        "--via",
-        choices=("claude-cli", "api"),
-        default="claude-cli",
-        help=(
-            "claude-cli: local Claude Code login (`claude -p`, no API key; default). "
-            "api: direct Anthropic Messages API (requires ANTHROPIC_API_KEY)."
-        ),
-    )
-    p_sg.add_argument(
         "--claude-bin",
         default=None,
         help="Path to Claude Code binary (default: CLAUDE_CLI or `claude` on PATH)",
@@ -76,12 +66,12 @@ def main(argv: list[str] | None = None) -> int:
     p_sg.add_argument(
         "--execute",
         action="store_true",
-        help="Actually invoke Claude (default is dry-run; also requires --yes)",
+        help="Actually invoke Claude Code CLI (default is dry-run; also requires --yes)",
     )
     p_sg.add_argument(
         "--yes",
         action="store_true",
-        help="Required with --execute to confirm usage/spend",
+        help="Required with --execute to confirm usage",
     )
     p_sg.add_argument("--max-calls", type=int, default=DEFAULT_MAX_CALLS)
     p_sg.add_argument("--max-output-tokens", type=int, default=DEFAULT_MAX_OUTPUT_TOKENS)
@@ -90,10 +80,7 @@ def main(argv: list[str] | None = None) -> int:
     p_sg.add_argument(
         "--model",
         default=None,
-        help=(
-            f"Model id/alias (claude-cli default {DEFAULT_MODEL_CLI}; "
-            f"api default {DEFAULT_MODEL_API} / ANTHROPIC_MODEL)"
-        ),
+        help=f"Claude Code model alias (default {DEFAULT_MODEL_CLI} / CLAUDE_CLI_MODEL)",
     )
     p_sg.add_argument(
         "--no-cache",
@@ -167,21 +154,15 @@ def main(argv: list[str] | None = None) -> int:
             max_input_tokens_total=args.max_input_tokens_total,
             max_output_tokens_total=args.max_output_tokens_total,
             model=args.model,
-            via=args.via,
             claude_bin=args.claude_bin,
             use_cache=not args.no_cache,
         )
         print(json.dumps(asdict(stats), indent=2))
         if dry_run:
-            channel = (
-                "Claude Code CLI calls"
-                if args.via == "claude-cli"
-                else "Anthropic API Messages calls"
-            )
             print(
-                f"\nDry-run only (no {channel}). "
+                "\nDry-run only (no Claude Code CLI calls). "
                 f"{stats.dry_run} ADR(s) would be sent within budget. "
-                f"Re-run with --execute --yes --via {args.via}.",
+                "Re-run with --execute --yes.",
                 file=sys.stderr,
             )
         return 1 if stats.failed and stats.called == 0 and not dry_run else 0

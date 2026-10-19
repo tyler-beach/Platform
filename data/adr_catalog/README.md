@@ -23,7 +23,7 @@ Use the offline import tool (no model calls): [`tools/adr_pack/README.md`](../..
 1. Copy company ADR markdown into a directory (private clone recommended).
 2. `python3 -m tools.adr_pack validate path/to/adrs`
 3. `python3 -m tools.adr_pack scaffold path/to/adrs --predicates data/adr_catalog/predicates.json`
-4. Optional local Claude drafts via Claude Code CLI (no API key; dry-run first): `python3 -m tools.adr_pack suggest path/to/adrs --predicates data/adr_catalog/predicates.json --via claude-cli` then `--execute --yes` if you accept usage.
+4. Optional local Claude drafts via Claude Code CLI (no API key; dry-run first): `python3 -m tools.adr_pack suggest path/to/adrs --predicates data/adr_catalog/predicates.json` then `--execute --yes` if you accept usage.
 5. Humans complete/approve each `.md.req.json` sidecar (kind, predicate, subject, applicability).
 6. `python3 -m tools.adr_pack build path/to/adrs --out path/to/pack --base-predicates data/adr_catalog/predicates.json`
 7. Point Pathfinder catalog mode at that pack; run Go tests / a sample evaluate.

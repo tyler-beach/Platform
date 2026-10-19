@@ -12,12 +12,10 @@ Responsible defaults:
 from __future__ import annotations
 
 import hashlib
-import http.client
 import json
 import os
 import re
 import shutil
-import ssl
 import subprocess
 import tempfile
 import time
@@ -29,13 +27,11 @@ from .parse import ParsedADR, list_adr_files, parse_adr_markdown
 from .sidecar import KINDS, load_sidecar, sidecar_path_for, write_sidecar
 
 PROMPT_VERSION = "adr-pack-claude-suggest-v1"
-DEFAULT_MODEL_API = "claude-haiku-4-5"
 DEFAULT_MODEL_CLI = "haiku"
 DEFAULT_MAX_CALLS = 10
 DEFAULT_MAX_OUTPUT_TOKENS = 350
 DEFAULT_MAX_DECISION_CHARS = 2000
 DEFAULT_MAX_PREDICATES_IN_PROMPT = 80
-ANTHROPIC_VERSION = "2023-06-01"
 # Keep CLI calls answer-only; do not grant repo tools.
 _CLI_DISALLOWED_TOOLS = (
     "Bash",
@@ -232,49 +228,6 @@ def validate_suggestion(data: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
-def anthropic_transport(endpoint: str, body: dict[str, Any]) -> tuple[dict[str, Any], str]:
-    """POST to Anthropic Messages over HTTPS.
-
-    Uses http.client with a fixed host/path (not urllib) so the request target
-    cannot be steered at file:// or other caller-controlled schemes.
-    """
-    key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
-    if not key:
-        raise RuntimeError("ANTHROPIC_API_KEY is not set")
-    if endpoint != "messages":
-        raise ValueError(f"unsupported Anthropic endpoint {endpoint!r}")
-
-    payload = json.dumps(body).encode("utf-8")
-    headers = {
-        "content-type": "application/json",
-        "x-api-key": key,
-        "anthropic-version": ANTHROPIC_VERSION,
-    }
-    # Explicit verifying context (Bandit B323 / CWE-295): never disable hostname
-    # or cert checks for the optional --via api path.
-    tls = ssl.create_default_context()
-    if not tls.check_hostname or tls.verify_mode != ssl.CERT_REQUIRED:
-        raise RuntimeError("refusing Anthropic API call without TLS certificate verification")
-    conn = http.client.HTTPSConnection(
-        "api.anthropic.com",
-        timeout=60,
-        context=tls,
-    )
-    try:
-        conn.request("POST", "/v1/messages", body=payload, headers=headers)
-        response = conn.getresponse()
-        raw = response.read()
-        request_id = response.getheader("request-id") or ""
-        if response.status >= 400:
-            detail = raw.decode("utf-8", errors="replace")[:500]
-            raise RuntimeError(f"Anthropic HTTP {response.status}: {detail}")
-        return json.loads(raw), request_id
-    except OSError as ex:
-        raise RuntimeError(f"Anthropic request failed: {ex}") from ex
-    finally:
-        conn.close()
-
-
 def call_messages(
     *,
     model: str,
@@ -283,6 +236,7 @@ def call_messages(
     max_tokens: int,
     transport: Transport,
 ) -> dict[str, Any]:
+    """Test/helper wrapper around an injected transport (no network in production path)."""
     body = {
         "model": model,
         "max_tokens": max_tokens,
@@ -302,7 +256,7 @@ def call_messages(
         "input_tokens": usage.get("input_tokens"),
         "output_tokens": usage.get("output_tokens"),
         "model": payload.get("model") or model,
-        "provider": "anthropic-api",
+        "provider": "test-transport",
     }
 
 
@@ -314,8 +268,7 @@ def resolve_claude_bin(claude_bin: str | None = None) -> str:
     if not found:
         raise RuntimeError(
             "Claude Code CLI not found on PATH. Install/login with `claude`, "
-            "or pass --claude-bin / set CLAUDE_CLI. "
-            "Alternatively use --via api with ANTHROPIC_API_KEY."
+            "or pass --claude-bin / set CLAUDE_CLI."
         )
     return found
 
@@ -439,18 +392,16 @@ def suggest_with_claude(
     max_input_tokens_total: int = 50_000,
     max_output_tokens_total: int = 4_000,
     model: str | None = None,
-    via: str = "claude-cli",
     claude_bin: str | None = None,
     transport: Transport | None = None,
     use_cache: bool = True,
 ) -> SuggestStats:
+    """Suggest typed fields via local Claude Code CLI (or an injected test transport).
+
+    Production path does not open HTTPS sockets; it shells out to `claude -p`.
+    """
     stats = SuggestStats()
-    if via not in {"claude-cli", "api"}:
-        raise ValueError("via must be 'claude-cli' or 'api'")
-    if via == "api":
-        model_name = model or os.getenv("ANTHROPIC_MODEL") or DEFAULT_MODEL_API
-    else:
-        model_name = model or os.getenv("CLAUDE_CLI_MODEL") or DEFAULT_MODEL_CLI
+    model_name = model or os.getenv("CLAUDE_CLI_MODEL") or DEFAULT_MODEL_CLI
     budget = Budget(
         max_calls=max_calls,
         max_output_tokens_per_call=max_output_tokens,
@@ -470,8 +421,6 @@ def suggest_with_claude(
 
     cpath = cache_path(adrs_dir)
     cache = load_cache(cpath) if use_cache else {}
-    if transport is not None:
-        via = "api"
 
     for path in list_adr_files(adrs_dir):
         stats.considered += 1
@@ -538,14 +487,6 @@ def suggest_with_claude(
                     max_tokens=budget.max_output_tokens_per_call,
                     transport=transport,
                 )
-            elif via == "api":
-                result = call_messages(
-                    model=model_name,
-                    system=SYSTEM,
-                    user=user,
-                    max_tokens=budget.max_output_tokens_per_call,
-                    transport=anthropic_transport,
-                )
             else:
                 result = complete_via_claude_cli(
                     model=model_name,
@@ -557,7 +498,7 @@ def suggest_with_claude(
             suggestion = validate_suggestion(parse_model_json(result["text"]))
             budget.record(result.get("input_tokens") or est_in, result.get("output_tokens"))
             meta = {
-                "provider": result.get("provider") or via,
+                "provider": result.get("provider") or "claude-cli",
                 "model": result.get("model") or model_name,
                 "prompt_sha256": prompt_sha,
                 "request_id": result.get("request_id"),
@@ -595,7 +536,7 @@ def suggest_with_claude(
         save_cache(cpath, cache)
 
     stats.usage = {
-        "via": via if transport is None else "api",
+        "via": "test-transport" if transport is not None else "claude-cli",
         "model": model_name,
         "dry_run": dry_run,
         "calls": budget.calls,

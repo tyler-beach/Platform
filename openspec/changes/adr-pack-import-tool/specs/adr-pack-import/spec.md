@@ -71,18 +71,18 @@ The tool MAY offer an opt-in Claude suggestion command for incomplete sidecars. 
 - **AND** the report counts how many ADRs would be eligible within budget
 
 #### Scenario: Execute fills drafts but does not approve
-- **GIVEN** an incomplete sidecar and either Claude Code CLI auth or an Anthropic API key
+- **GIVEN** an incomplete sidecar and Claude Code CLI auth
 - **WHEN** `suggest --execute --yes` runs within budget
 - **THEN** empty kind/predicate/subject fields may be filled from model JSON
 - **AND** `approval_state` remains `draft`
 - **AND** model metadata (provider, model id, prompt hash, token usage, request id) is recorded on the sidecar
 
-#### Scenario: Claude Code CLI path does not require API key
+#### Scenario: Suggest does not require Anthropic API key
 - **GIVEN** `claude` is installed and logged in locally
 - **AND** `ANTHROPIC_API_KEY` is unset
-- **WHEN** `suggest --via claude-cli --execute --yes` runs
+- **WHEN** `suggest --execute --yes` runs
 - **THEN** the tool invokes the Claude Code CLI print mode
-- **AND** it does not require `ANTHROPIC_API_KEY`
+- **AND** it does not open an in-process Anthropic HTTPS client
 
 #### Scenario: Budget stops further calls
 - **GIVEN** more incomplete ADRs than `--max-calls`

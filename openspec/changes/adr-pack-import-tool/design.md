@@ -27,17 +27,15 @@ Regex over the Decision section for `MUST NOT exceed N`, `at least N`, bare `MUS
 
 Command: `python3 -m tools.adr_pack suggest` (separate from offline scaffold).
 
-Providers (`--via`):
-- `claude-cli` (default): local Claude Code `claude -p` using subscription login; **no API key**
-- `api`: direct Anthropic Messages HTTPS; requires `ANTHROPIC_API_KEY`
+Provider: local Claude Code CLI only (`claude -p` + subscription login). No in-process Anthropic HTTPS client and no `ANTHROPIC_API_KEY` requirement.
 
 Controls:
 - Default dry-run; live path requires `--execute --yes`
-- Budgets: `--max-calls` (default 10), per-call max output tokens (API), cumulative input/output caps
+- Budgets: `--max-calls` (default 10), cumulative input/output estimate caps
 - Skip approved and already-complete (kind+predicate+subject) sidecars
 - Content-hash cache under `adrs/.adr_pack_cache/` (gitignored)
 - Prompt sends title/domain/status + truncated Decision + known predicate ids only
-- CLI mode: empty temp cwd + disallowed tools; default model alias `haiku`
+- Empty temp cwd + disallowed tools; default model alias `haiku`
 - Merge fills empty fields only; forces `approval_state=draft`
 
 ## Layout
