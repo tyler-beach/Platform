@@ -11,8 +11,8 @@ on:
         type: string
 
 permissions:
-  contents: write
-  issues: write
+  contents: read
+  issues: read
 
 concurrency:
   group: pathfinder-issue-analyze-${{ github.event.issue.number || inputs.issue_number }}
@@ -26,6 +26,9 @@ jobs:
       contains(github.event.issue.title, '[Pathfinder analyze]') ||
       contains(join(github.event.issue.labels.*.name, ','), 'pathfinder-analyze')
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: read
     outputs:
       number: ${{ steps.issue.outputs.number }}
     steps:
@@ -49,6 +52,8 @@ jobs:
     with:
       issue_number: ${{ needs.resolve.outputs.number }}
       comment: true
+    secrets:
+      OTEL_EXPORTER_OTLP_HEADERS: ${{ secrets.OTEL_EXPORTER_OTLP_HEADERS }}
     permissions:
       contents: write
       issues: write

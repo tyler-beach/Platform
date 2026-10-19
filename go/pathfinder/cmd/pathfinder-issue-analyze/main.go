@@ -1,13 +1,16 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/tyler-beach/Platform/go/pathfinder/internal/adapt/pr"
 	"github.com/tyler-beach/Platform/go/pathfinder/internal/catalog"
@@ -16,9 +19,29 @@ import (
 	"github.com/tyler-beach/Platform/go/pathfinder/internal/issueintake"
 	"github.com/tyler-beach/Platform/go/pathfinder/internal/jobledger"
 	"github.com/tyler-beach/Platform/go/pathfinder/internal/predicates"
+	"github.com/tyler-beach/Platform/go/pathfinder/internal/telemetry"
 )
 
 func main() {
+	ctx := context.Background()
+	tel := telemetry.Initialize(ctx, "pathfinder-issue-analyze")
+	ctx, span := tel.Start(ctx, "pathfinder.analysis")
+	code := run(ctx, tel)
+	if code == 0 {
+		tel.RecordJob(ctx, "ok")
+	} else {
+		tel.RecordJob(ctx, "error")
+	}
+	span.End()
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	if err := tel.Shutdown(shutdownCtx); err != nil {
+		fmt.Fprintln(os.Stderr, "warning: OpenTelemetry flush failed (details redacted)")
+	}
+	os.Exit(code)
+}
+
+func run(ctx context.Context, tel *telemetry.Runtime) int {
 	issueNumber := flag.Int("issue-number", -1, "GitHub issue number (0 allowed for local body-file runs)")
 	repo := flag.String("repo", os.Getenv("GITHUB_REPOSITORY"), "owner/repo")
 	runURL := flag.String("run-url", os.Getenv("RUN_URL"), "workflow run URL")
@@ -31,7 +54,7 @@ func main() {
 
 	if *issueNumber < 0 {
 		fmt.Fprintln(os.Stderr, "--issue-number is required")
-		os.Exit(2)
+		return 2
 	}
 	work := *workDir
 	if work == "" {
@@ -39,12 +62,12 @@ func main() {
 		work, err = os.MkdirTemp("", "pathfinder-issue-")
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
-			os.Exit(2)
+			return 2
 		}
 	}
 	if err := os.MkdirAll(work, 0o755); err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(2)
+		return 2
 	}
 	run := *runURL
 	if run == "" {
@@ -55,6 +78,7 @@ func main() {
 	exitCode := 0
 	var body, title string
 	var err error
+	_, finishStage := tel.Stage(ctx, "intake")
 	if *bodyFile != "" {
 		raw, readErr := os.ReadFile(*bodyFile)
 		if readErr != nil {
@@ -70,6 +94,7 @@ func main() {
 			body, title, err = fetchIssue(*repo, *issueNumber)
 		}
 	}
+	finishStage(err)
 
 	if err == nil {
 		lowerTitle := strings.ToLower(title)
@@ -85,10 +110,12 @@ func main() {
 	if modeFlag == "" && body != "" {
 		modeFlag = issueintake.CatalogModeFromIssueBody(body)
 	}
+	_, finishStage = tel.Stage(ctx, "catalog_load")
 	mode, modeErr := catalog.ResolveMode(modeFlag)
 	if modeErr != nil {
 		fmt.Fprintln(os.Stderr, modeErr)
-		os.Exit(2)
+		finishStage(modeErr)
+		return 2
 	}
 	catalogDir := *catalogDirFlag
 	if catalogDir == "" {
@@ -96,23 +123,28 @@ func main() {
 		catalogDir, resolveErr = catalog.ResolveDir(repoRoot, mode)
 		if resolveErr != nil {
 			fmt.Fprintln(os.Stderr, resolveErr)
-			os.Exit(2)
+			finishStage(resolveErr)
+			return 2
 		}
 	}
 
 	reg, regErr := predicates.Load(catalogDir)
-	if err == nil && regErr != nil {
-		err = regErr
-	}
 	var rows []map[string]any
-	if err == nil {
-		rows, err = catalog.LoadRequirements(catalogDir, reg)
+	catalogErr := regErr
+	if catalogErr == nil {
+		rows, catalogErr = catalog.LoadRequirements(catalogDir, reg)
 	}
+	if err == nil {
+		err = catalogErr
+	}
+	finishStage(catalogErr)
 	subjects := catalog.SubjectMap(rows)
 
 	var packageObj map[string]any
 	var report map[string]any
-	if err == nil {
+	_, finishStage = tel.Stage(ctx, "package_build")
+	packageAttempted := err == nil
+	if packageAttempted {
 		opts := issueintake.Options{Repo: *repo}
 		if *repo != "" {
 			opts.PRClient = pr.NewGHClient()
@@ -125,29 +157,75 @@ func main() {
 			err = werr
 		}
 	}
-	if err == nil {
+	packageStageErr := telemetry.ErrSkipped
+	if packageAttempted {
+		packageStageErr = err
+	}
+	finishStage(packageStageErr)
+	_, finishStage = tel.Stage(ctx, "evaluation")
+	evaluationAttempted := err == nil
+	if evaluationAttempted {
 		report, err = evaluate.EvaluatePackageWithMode(packageObj, catalogDir, "accepted", mode)
 	}
-	if err == nil {
+	evaluationStageErr := telemetry.ErrSkipped
+	if evaluationAttempted {
+		evaluationStageErr = err
+	}
+	finishStage(evaluationStageErr)
+	_, finishStage = tel.Stage(ctx, "report_write")
+	reportWriteAttempted := err == nil
+	if reportWriteAttempted {
 		if werr := writeJSON(filepath.Join(work, "report.json"), report); werr != nil {
 			err = werr
 		}
 	}
+	reportWriteErr := telemetry.ErrSkipped
+	if reportWriteAttempted {
+		reportWriteErr = err
+	}
+	finishStage(reportWriteErr)
 	var commentMD string
-	if err == nil {
+	_, finishStage = tel.Stage(ctx, "publication")
+	publicationAttempted := err == nil
+	if publicationAttempted {
 		commentMD, err = issueintake.RenderResultComment(report, packageObj, run)
 	}
+	publicationErr := telemetry.ErrSkipped
+	if publicationAttempted {
+		publicationErr = err
+	}
+	finishStage(publicationErr)
 	writeJobRecord := func(evalErr error) {
-		rec, rerr := jobledger.Build(
-			*issueNumber,
-			*repo,
-			os.Getenv("GITHUB_RUN_ID"),
-			os.Getenv("GITHUB_RUN_ATTEMPT"),
-			engine.EngineVersion,
-			packageObj,
-			report,
-			evalErr,
-		)
+		_, finishStage := tel.Stage(ctx, "ledger")
+		buildRecord := func() (jobledger.Record, error) {
+			return jobledger.BuildWithTelemetry(
+				*issueNumber,
+				*repo,
+				os.Getenv("GITHUB_RUN_ID"),
+				os.Getenv("GITHUB_RUN_ATTEMPT"),
+				engine.EngineVersion,
+				packageObj,
+				report,
+				evalErr,
+				tel.StageSnapshot(),
+			)
+		}
+		rec, rerr := buildRecord()
+		if rerr != nil {
+			fmt.Fprintln(os.Stderr, "job record:", rerr)
+			finishStage(rerr)
+			return
+		}
+		tmpPath := filepath.Join(work, "job.json.telemetry.tmp")
+		if werr := jobledger.WriteFile(tmpPath, rec); werr != nil {
+			fmt.Fprintln(os.Stderr, "job record write:", werr)
+			finishStage(werr)
+			_ = os.Remove(tmpPath)
+			return
+		}
+		finishStage(nil)
+		rec, rerr = buildRecord()
+		_ = os.Remove(tmpPath)
 		if rerr != nil {
 			fmt.Fprintln(os.Stderr, "job record:", rerr)
 			return
@@ -162,23 +240,26 @@ func main() {
 		msg := err.Error()
 		commentMD = issueintake.RenderErrorComment(msg, run)
 		_ = os.WriteFile(filepath.Join(work, "comment.md"), []byte(commentMD), 0o644)
-		writeJobRecord(err)
 		enc, _ := json.Marshal(map[string]any{"ok": false, "error": msg})
 		fmt.Fprintln(os.Stderr, string(enc))
 		if *comment {
 			if *repo == "" {
 				fmt.Fprintln(os.Stderr, "repo required to comment")
-				os.Exit(2)
+				writeJobRecord(err)
+				return 2
 			}
-			if cerr := publishComment(*repo, *issueNumber, filepath.Join(work, "comment.md")); cerr != nil {
+			_, finishStage = tel.Stage(ctx, "publication")
+			cerr := publishComment(*repo, *issueNumber, filepath.Join(work, "comment.md"))
+			if cerr != nil {
 				fmt.Fprintln(os.Stderr, cerr)
 			}
+			finishStage(cerr)
 		}
-		os.Exit(exitCode)
+		writeJobRecord(err)
+		return exitCode
 	}
 
 	_ = os.WriteFile(filepath.Join(work, "comment.md"), []byte(commentMD), 0o644)
-	writeJobRecord(nil)
 	out, _ := json.Marshal(map[string]any{
 		"ok":               true,
 		"aggregate_status": report["aggregate_status"],
@@ -187,16 +268,29 @@ func main() {
 		"report_path":      filepath.Join(work, "report.json"),
 	})
 	fmt.Println(string(out))
+	publicationFailed := false
 	if *comment {
 		if *repo == "" {
 			fmt.Fprintln(os.Stderr, "repo required to comment")
-			os.Exit(2)
+			_, finishStage = tel.Stage(ctx, "publication")
+			finishStage(errors.New("comment publication requires a repository"))
+			writeJobRecord(nil)
+			return 2
 		}
+		_, finishStage = tel.Stage(ctx, "publication")
 		if cerr := publishComment(*repo, *issueNumber, filepath.Join(work, "comment.md")); cerr != nil {
 			fmt.Fprintln(os.Stderr, cerr)
-			os.Exit(2)
+			publicationFailed = true
+			finishStage(cerr)
+		} else {
+			finishStage(nil)
 		}
 	}
+	writeJobRecord(nil)
+	if publicationFailed {
+		return 2
+	}
+	return 0
 }
 
 func writeJSON(path string, value any) error {

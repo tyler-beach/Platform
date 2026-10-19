@@ -51,8 +51,8 @@ permissions:
   pages: read
 
 concurrency:
-  group: docs-${{ github.event_name }}-${{ github.event.workflow_run.id || github.ref }}
-  cancel-in-progress: true
+  group: github-pages-${{ github.repository }}
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -89,6 +89,39 @@ jobs:
         run: npm test
       - name: Build React Pages application
         run: npm run build
+      - name: Prepare access-controlled Pathfinder dashboard snapshot
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          mkdir -p site/data
+          : > "$RUNNER_TEMP/pathfinder-empty-ledger.jsonl"
+          (cd go/pathfinder && go run ./cmd/pathfinder-dashboard-summary \
+            --input "$RUNNER_TEMP/pathfinder-empty-ledger.jsonl" \
+            --output ../../site/data/empty-summary.json \
+            --window-days 90)
+          cp site/data/empty-summary.json site/data/summary.json
+          if ! gh api "/repos/${GITHUB_REPOSITORY}" > "$RUNNER_TEMP/pathfinder-repository.json"; then
+            echo "Could not verify repository privacy; using an empty dashboard snapshot."
+            exit 0
+          fi
+          if ! gh api "/repos/${GITHUB_REPOSITORY}/pages" > "$RUNNER_TEMP/pathfinder-pages.json"; then
+            echo "Could not verify Pages privacy; using an empty dashboard snapshot."
+            exit 0
+          fi
+          if ! gh api "/repos/${GITHUB_REPOSITORY}/contents/dashboard/summary.json?ref=pathfinder-jobs" > "$RUNNER_TEMP/pathfinder-summary-response.json"; then
+            echo "No ledger summary is available yet; using an empty dashboard snapshot."
+            exit 0
+          fi
+          if ! python scripts/prepare-pathfinder-pages-data.py \
+            --repository "$RUNNER_TEMP/pathfinder-repository.json" \
+            --pages "$RUNNER_TEMP/pathfinder-pages.json" \
+            --contents "$RUNNER_TEMP/pathfinder-summary-response.json" \
+            --output site/data/summary.json; then
+            echo "Private publication checks did not pass; using an empty dashboard snapshot."
+          fi
       - name: Generate the synthetic mock walkthrough from the PoC
         env:
           DEMO_ROOT: ${{ runner.temp }}/adr-poc-pages-demo
@@ -303,9 +336,62 @@ jobs:
         with:
           path: site
 
-  deploy:
+      - name: Save deployable site bundle for data-only refreshes
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: pages-site-${{ github.run_id }}-${{ github.run_attempt }}
+          path: site
+          retention-days: 14
+
+  persist-site:
     if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.event_name == 'workflow_run')
     needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Check out repository for GitHub authentication
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Download the built site artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: pages-site-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/pages-site-bundle
+      - name: Persist deployable site bundle on pathfinder-pages
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          BUNDLE_DIR: ${{ runner.temp }}/pages-site-bundle
+          DEST_DIR: ${{ runner.temp }}/pages-site-persist
+        run: |
+          set -euo pipefail
+          gh auth setup-git
+          if gh api "/repos/${GITHUB_REPOSITORY}/branches/pathfinder-pages" >/dev/null 2>&1; then
+            gh repo clone "$GITHUB_REPOSITORY" "$DEST_DIR" -- --depth 1 --single-branch --branch pathfinder-pages
+          else
+            mkdir -p "$DEST_DIR"
+            git -C "$DEST_DIR" init --quiet --initial-branch=pathfinder-pages
+            git -C "$DEST_DIR" remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          fi
+          git -C "$DEST_DIR" rm -r --ignore-unmatch .
+          cp -R "$BUNDLE_DIR/." "$DEST_DIR/"
+          cp "$DEST_DIR/data/empty-summary.json" "$DEST_DIR/data/summary.json"
+          touch "$DEST_DIR/.nojekyll"
+          git -C "$DEST_DIR" config user.name "github-actions[bot]"
+          git -C "$DEST_DIR" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C "$DEST_DIR" add -A
+          if git -C "$DEST_DIR" diff --cached --quiet; then
+            echo "Persisted Pages bundle is already current."
+            exit 0
+          fi
+          git -C "$DEST_DIR" commit --quiet -m "chore(pages): persist built site bundle"
+          git -C "$DEST_DIR" push origin HEAD:pathfinder-pages
+
+  deploy:
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.event_name == 'workflow_run')
+    needs: [build, persist-site]
     runs-on: ubuntu-latest
     environment:
       name: github-pages

@@ -1,0 +1,94 @@
+name: Pathfinder Pages Data Refresh
+
+on:
+  workflow_run:
+    workflows: ["Pathfinder Issue Package Evaluation"]
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: github-pages-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    if: github.event.workflow_run.event != 'pull_request' && github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      actions: read
+    outputs:
+      should_publish: ${{ steps.artifact.outputs.should_publish }}
+    steps:
+      - name: Require the source run's Pathfinder evaluation artifact
+        id: artifact
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          SOURCE_RUN_ID: ${{ github.event.workflow_run.id }}
+          SOURCE_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+        run: |
+          expected="pathfinder-issue-evaluation-${SOURCE_RUN_ID}-${SOURCE_RUN_ATTEMPT}"
+          present="$(gh api "/repos/${GITHUB_REPOSITORY}/actions/runs/${SOURCE_RUN_ID}/artifacts" --jq ".artifacts | any(.name == \"${expected}\")")"
+          echo "should_publish=${present}" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    needs: gate
+    if: needs.gate.outputs.should_publish == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Check out source for the privacy-checked publisher
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          path: source
+      - name: Check out the persisted static site bundle
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: pathfinder-pages
+          path: pages-site
+      - name: Prepare updated summary in the saved bundle
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          cp pages-site/data/empty-summary.json pages-site/data/summary.json
+          if ! gh api "/repos/${GITHUB_REPOSITORY}" > "$RUNNER_TEMP/pathfinder-repository.json"; then
+            echo "Could not verify repository privacy; the deployment will contain an empty summary."
+          elif ! gh api "/repos/${GITHUB_REPOSITORY}/pages" > "$RUNNER_TEMP/pathfinder-pages.json"; then
+            echo "Could not verify Pages privacy; the deployment will contain an empty summary."
+          elif ! gh api "/repos/${GITHUB_REPOSITORY}/contents/dashboard/summary.json?ref=pathfinder-jobs" > "$RUNNER_TEMP/pathfinder-summary-response.json"; then
+            echo "No ledger summary is available; the deployment will contain an empty summary."
+          else
+            python source/scripts/prepare-pathfinder-pages-data.py \
+              --repository "$RUNNER_TEMP/pathfinder-repository.json" \
+              --pages "$RUNNER_TEMP/pathfinder-pages.json" \
+              --contents "$RUNNER_TEMP/pathfinder-summary-response.json" \
+              --output pages-site/data/summary.json || \
+              echo "Private publication checks did not pass; retaining the empty summary."
+          fi
+          python3 - "$GITHUB_WORKSPACE/pages-site" "$RUNNER_TEMP/pages-root" <<'PY'
+          import shutil
+          import sys
+          from pathlib import Path
+          shutil.copytree(Path(sys.argv[1]), Path(sys.argv[2]), ignore=shutil.ignore_patterns(".git"))
+          PY
+      - name: Upload the saved site as a Pages artifact
+        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
+        with:
+          path: ${{ runner.temp }}/pages-root
+      - name: Deploy refreshed dashboard data
+        id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4

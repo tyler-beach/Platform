@@ -52,7 +52,11 @@ Do not emit high-cardinality job/repository/trace identifiers as metric labels. 
 
 ## OpenTelemetry trace design
 
-Use OpenTelemetry Go as the primary instrumentation API. Correlate by trace ID and job ID. Recommended spans:
+The GitHub PoC's two Go analysis CLIs now use optional OpenTelemetry Go with OTLP/HTTP export. The issue-analysis command records a root analysis span and bounded spans for intake, catalog load, package build, evaluation, report write, publication, and ledger-record creation. Package evaluation records package build, evaluation, and report write stages. Stage/outcome counters and duration histograms use fixed labels. The issue workflow also retains a fixed-key snapshot of measured stage counts/durations in its per-run record for the Pages aggregate, even when no external OTLP endpoint is configured. OTLP export and flush have deadlines and do not change the analysis result.
+
+The PoC deliberately omits job/run/issue identifiers, repository names, source paths, prompts, content, evidence IDs, and error messages from telemetry. The root trace ID is the only correlation identity. Keep metrics low-cardinality; do not add IDs as metric labels. The PoC makes no model calls, so it emits no GenAI usage or spend metrics. See `PATHFINDER_USAGE_DASHBOARD.md` for configuration and current deployment boundaries.
+
+For the future model-backed service, use OpenTelemetry Go and add spans only when those stages exist. Candidate spans include:
 - analysis.ingest
 - artifact.normalize
 - decision.resolve
@@ -64,7 +68,7 @@ Use OpenTelemetry Go as the primary instrumentation API. Correlate by trace ID a
 - finding.persist
 - finding.publish
 
-Recommended attributes (adapt to current GenAI semantic-convention status):
+Candidate attributes for a future privacy-reviewed model-backed service (not currently emitted):
 - operation name;
 - provider/model identifier;
 - prompt version/hash and output schema version;
@@ -72,7 +76,7 @@ Recommended attributes (adapt to current GenAI semantic-convention status):
 - evidence count and token/context budget;
 - latency, token usage, retry count and validation status;
 - finding outcome and review requirement;
-- job ID and pipeline version.
+- approved opaque correlation identity and pipeline version.
 
 ## Privacy by default
 Do not record full prompts, source code, documents, raw evidence excerpts, API keys, credentials, or unredacted model responses in standard traces. Record hashes, IDs, counts, status and timing. If sample payload capture is needed for a restricted debugging workflow, make it opt-in, access-controlled, retention-limited, redacted, and approved for the data class. Treat model input/output tracing as sensitive data collection, not harmless debug logging.
