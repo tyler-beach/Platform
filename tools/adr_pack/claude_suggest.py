@@ -212,40 +212,38 @@ def validate_suggestion(data: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
-# Literal HTTPS URLs only — never concatenate caller-controlled path segments
-# into a urllib URL (avoids file:// / open-redirect style scheme abuse).
-_ANTHROPIC_URLS = {
-    "messages": "https://api.anthropic.com/v1/messages",
-}
-
-
 def anthropic_transport(endpoint: str, body: dict[str, Any]) -> tuple[dict[str, Any], str]:
+    """POST to Anthropic Messages over HTTPS.
+
+    Uses http.client with a fixed host/path (not urllib) so the request target
+    cannot be steered at file:// or other caller-controlled schemes.
+    """
     key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
     if not key:
         raise RuntimeError("ANTHROPIC_API_KEY is not set")
-    url = _ANTHROPIC_URLS.get(endpoint)
-    if url is None:
+    if endpoint != "messages":
         raise ValueError(f"unsupported Anthropic endpoint {endpoint!r}")
-    req = urllib.request.Request(
-        url,
-        data=json.dumps(body).encode("utf-8"),
-        headers={
-            "content-type": "application/json",
-            "x-api-key": key,
-            "anthropic-version": ANTHROPIC_VERSION,
-        },
-        method="POST",
-    )
+
+    payload = json.dumps(body).encode("utf-8")
+    headers = {
+        "content-type": "application/json",
+        "x-api-key": key,
+        "anthropic-version": ANTHROPIC_VERSION,
+    }
+    conn = http.client.HTTPSConnection("api.anthropic.com", timeout=60)
     try:
-        with urllib.request.urlopen(req, timeout=60) as response:
-            raw = response.read()
-            request_id = response.headers.get("request-id", "")
+        conn.request("POST", "/v1/messages", body=payload, headers=headers)
+        response = conn.getresponse()
+        raw = response.read()
+        request_id = response.getheader("request-id") or ""
+        if response.status >= 400:
+            detail = raw.decode("utf-8", errors="replace")[:500]
+            raise RuntimeError(f"Anthropic HTTP {response.status}: {detail}")
         return json.loads(raw), request_id
-    except urllib.error.HTTPError as ex:
-        detail = ex.read().decode("utf-8", errors="replace")[:500]
-        raise RuntimeError(f"Anthropic HTTP {ex.code}: {detail}") from ex
-    except urllib.error.URLError as ex:
-        raise RuntimeError(f"Anthropic request failed: {ex.reason}") from ex
+    except OSError as ex:
+        raise RuntimeError(f"Anthropic request failed: {ex}") from ex
+    finally:
+        conn.close()
 
 
 def call_messages(
