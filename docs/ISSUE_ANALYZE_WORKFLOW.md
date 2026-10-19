@@ -17,7 +17,7 @@ Submit a **pinned evidence package** through a GitHub Issue and receive a catalo
    - Link a **same-repo pull request** (changed text files are fetched at the PR head; forks denied), and/or
    - Paste **Tech spec (markdown)** and/or a single **Sample code** snippet. Domains optional.
 4. Leave **Observations JSON** empty unless you want to override extraction.
-5. Submit. The workflow normalizes candidate evidence, evaluates the catalog, and comments role-specific results.
+5. Submit. The workflow normalizes candidate evidence, evaluates each requirement once against all accepted evidence, and retains source type in result provenance.
 
 Tech spec is optional when a same-repo PR is provided. Multi-file code must come from the PR adapter (not zip/bundles). You can still paste a complete `pathfinder-evidence-package-v1` in **Full package JSON** if you prefer.
 
@@ -25,7 +25,7 @@ Re-run via **Actions → Pathfinder Issue Package Evaluation → Run workflow** 
 
 ## What extraction can and cannot do
 
-By default, the deterministic paste extractor (`paste_heuristic_v1`) runs without model calls. Tech specs become `design_assertion` evidence; code, config and PR files become `implementation_fact` evidence. They share one typed observation format and the same catalog evaluator, while results stay separate by role. A mismatch between proposed intent and supplied implementation is therefore visible as two results rather than merged away.
+By default, the deterministic paste extractor (`paste_heuristic_v1`) runs without model calls. Tech specs become `design_assertion` evidence; code, config and PR files become `implementation_fact` evidence. They share one typed observation format and are evaluated together once per requirement. A mismatch between proposed intent and supplied implementation remains a conflicting-evidence result with both sources cited; it is not split into two outcomes.
 
 For broader prose coverage, repositories can explicitly enable optional semantic extraction with an Anthropic API key. The model proposes only catalog-allowlisted facts and exact quotes. Go validates every quote against the pinned artifact, derives all provenance and the evidence role, then sends the same evidence contract to the generic evaluator. Model output never decides alignment or deviation.
 

@@ -24,7 +24,7 @@ Expect:
 - Catalog identity (`platform-real-adr-v1`, mode `real`, manifest hash)
 - Outcome counts and a short notable-requirements table
 - Coverage notes: `inconclusive` = missing extraction, not “ok”
-- Results are separated by role: `design_assertion` means the tech spec proposes it; `implementation_fact` means supplied code/config states it
+- Each requirement gets one result from all accepted evidence. Evidence provenance retains `design_assertion` for tech specs and `implementation_fact` for code/config; conflicting values are reported as inconclusive with both sources cited
 - When semantic extraction is enabled, the comment/report includes extraction status and bounded token usage
 
 ## Optional semantic extraction

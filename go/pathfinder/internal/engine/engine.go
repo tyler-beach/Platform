@@ -152,6 +152,9 @@ func Evaluate(requirement map[string]any, observations []any, adrStatus string, 
 		for _, key := range []string{"evidence_id", "artifact_id", "revision", "path", "source_sha256", "locator"} {
 			prov[key] = item[key]
 		}
+		if role, ok := item["evidence_role"]; ok {
+			prov["evidence_role"] = role
+		}
 		provenance = append(provenance, prov)
 	}
 

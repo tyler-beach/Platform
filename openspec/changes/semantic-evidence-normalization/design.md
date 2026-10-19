@@ -7,7 +7,7 @@
 3. A token-count request measures the actual model request shape. If the count is unavailable or exceeds policy, no generation call is made. The generation call is single-attempt, deadline-bound, and capped at the configured output tokens.
 4. The model may return only candidate `(artifact_id, predicate, subject, value, exact_quote)` records. It cannot choose the evidence role, revision, path, offsets, IDs, applicability, requirement outcome, or severity.
 5. Go validates predicates, subjects, value types, output count, artifact membership and quote resolution. A quote must occur exactly once in the cited artifact; Go derives the locator, source hash, revision, role and evidence ID. Ambiguous or fabricated quotes are rejected and counted as unresolved.
-6. Deterministic collectors validate the resulting common evidence objects. The generic engine evaluates each in-scope requirement independently for each role present in the input. Results carry `evidence_role`; proposed design alignment is not represented as implementation alignment.
+6. Deterministic collectors validate the resulting common evidence objects. The generic engine evaluates each in-scope requirement once against all matching observations. Result provenance retains each observation's `evidence_role`, allowing conflicting sources to be reviewed without splitting the requirement result.
 7. The report records extraction mode, prompt/schema/model versions, counted and observed usage, budget decision, and safe provider request ID. It never stores or logs raw prompts/responses or credentials.
 
 ## Evidence envelope
@@ -28,7 +28,7 @@ This establishes an input-format-neutral boundary, not a universal ontology. The
 
 ## Role-aware evaluation
 
-The requirement engine remains generic. The package evaluator partitions normalized observations by evidence role and invokes the same engine for each role expected by the pinned package. A spec-only package yields design results; code-only yields implementation results; mixed input yields both sets independently. Missing extraction in an expected role yields inconclusive for that role. Existing result rows gain a role field; aggregate status is computed across role-specific rows and the report exposes counts by role so users can distinguish proposal from implementation.
+The requirement engine remains generic. The package evaluator invokes it once per in-scope requirement with all normalized observations. Evidence roles are provenance metadata, never an evaluation partition. If matching values conflict, the result is inconclusive and cites each source; equal values can support one finding with multiple provenance references. A requirement with no matching evidence remains inconclusive. The report may show input evidence counts by role, but never duplicates requirement outcomes by role.
 
 ## Anthropic adapter and budget
 
@@ -66,6 +66,6 @@ Can improve isolation but multiplies spend and creates divergent paths. Rejected
 
 - Unit tests: role inference, exact quote-to-source location, duplicate/ambiguous quote rejection, predicate/subject allowlist, type/range checks, deterministic IDs, budget boundaries and fallback semantics.
 - HTTP adapter tests with a local fake server: token preflight, exact request shape, auth header redaction, provider error classification, deadline, one generation attempt, usage capture and malformed responses.
-- End-to-end package tests: semantically phrased spec + Go/Python code produce same predicate/subject with separate roles; evaluator emits separate outcomes; unsupported and absent claims stay inconclusive.
+- End-to-end package tests: semantically phrased spec + Go/Python code produce common predicate/subject evidence with separate source provenance; evaluator emits one outcome with both citations, disagreements stay conflicting/inconclusive, and unsupported/absent claims stay inconclusive.
 - Adversarial fixtures: prompt injection, invented evidence IDs, wrong artifact, forged quote, secret-like content, invalid enum/value, conflicting facts and output flooding.
 - Labeled extraction fixtures record expected evidence spans and expected abstentions. Live model evaluation is not required for ordinary Go tests; report as not run unless credentials and a controlled eval are explicitly available.

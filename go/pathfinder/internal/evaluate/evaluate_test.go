@@ -41,7 +41,7 @@ func TestEvaluateSamplePackageStable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if a["schema_version"] != "pathfinder-package-evaluation-v1" {
+	if a["schema_version"] != "pathfinder-package-evaluation-v2" {
 		t.Fatalf("schema=%v", a["schema_version"])
 	}
 	if a["report_sha256"] != b["report_sha256"] {
@@ -140,14 +140,14 @@ func TestEvaluateNoApplicableRequirements(t *testing.T) {
 	}
 }
 
-func TestEvaluateSeparatesDesignAssertionsFromImplementationFacts(t *testing.T) {
+func TestEvaluateCombinesEvidenceAndPreservesSourceProvenance(t *testing.T) {
 	root := repoRoot(t)
 	catalogDir := filepath.Join(root, "data", "adr_catalog")
 	tech := "Sessions expire after 20 minutes."
 	code := "const SessionTTL = 3600 // Sessions expire after 60 minutes."
 	pkg := map[string]any{
 		"schema_version": "pathfinder-evidence-package-v1",
-		"package_id":     "role-separation",
+		"package_id":     "combined-evidence",
 		"scope":          map[string]any{"domains": []any{"identity"}},
 		"tech_spec":      map[string]any{"artifact_id": "spec-1", "path": "spec.md", "revision": "r1", "content": tech},
 		"code":           []any{map[string]any{"artifact_id": "code-1", "path": "session.go", "revision": "r2", "content": code}},
@@ -157,42 +157,84 @@ func TestEvaluateSeparatesDesignAssertionsFromImplementationFacts(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	roles, _ := report["evidence_roles"].([]string)
-	if len(roles) != 2 || roles[0] != "design_assertion" || roles[1] != "implementation_fact" {
-		t.Fatalf("roles=%v", roles)
-	}
 	results, _ := report["results"].([]map[string]any)
-	found := map[string]bool{}
+	var ttlResults []map[string]any
 	for _, row := range results {
 		if row["predicate"] == "session.ttl_seconds" && row["in_scope"] == true {
-			found[fmt.Sprint(row["evidence_role"])] = true
+			ttlResults = append(ttlResults, row)
 		}
 	}
-	if !found["design_assertion"] || !found["implementation_fact"] {
-		t.Fatalf("role-separated requirement results missing: %v", found)
+	if len(ttlResults) != 1 {
+		t.Fatalf("expected one combined requirement result, got %d: %#v", len(ttlResults), ttlResults)
+	}
+	if ttlResults[0]["outcome"] != "inconclusive" || ttlResults[0]["relationship"] != "conflicting_evidence" {
+		t.Fatalf("spec/code disagreement should be retained as a conflict: %#v", ttlResults[0])
+	}
+	provenance, _ := ttlResults[0]["provenance"].([]map[string]any)
+	if len(provenance) != 2 {
+		t.Fatalf("expected both sources in result provenance, got %#v", provenance)
+	}
+	roles := map[string]bool{}
+	for _, source := range provenance {
+		roles[fmt.Sprint(source["evidence_role"])] = true
+	}
+	if !roles["design_assertion"] || !roles["implementation_fact"] {
+		t.Fatalf("combined finding lost source roles: %#v", provenance)
 	}
 }
 
-func TestAvailableRoleWithoutEvidenceIsInconclusive(t *testing.T) {
+func TestMatchingValuesFromDifferentSourcesSupportOneResult(t *testing.T) {
 	root := repoRoot(t)
 	catalogDir := filepath.Join(root, "data", "adr_catalog")
-	pkg := map[string]any{"schema_version": "pathfinder-evidence-package-v1", "package_id": "missing-role-fact", "scope": map[string]any{"domains": []any{"identity"}}, "tech_spec": map[string]any{"artifact_id": "spec-1", "path": "spec.md", "revision": "r1", "content": "Sessions expire after 20 minutes."}, "code": []any{map[string]any{"artifact_id": "code-1", "path": "session.go", "revision": "r2", "content": "package session\nfunc Start() {}"}}, "observations": []any{}}
+	pkg := map[string]any{
+		"schema_version": "pathfinder-evidence-package-v1",
+		"package_id":     "matching-evidence",
+		"scope":          map[string]any{"domains": []any{"identity"}},
+		"tech_spec":      map[string]any{"artifact_id": "spec-1", "path": "spec.md", "revision": "r1", "content": "Sessions expire after 10 minutes."},
+		"code":           []any{map[string]any{"artifact_id": "code-1", "path": "session.go", "revision": "r2", "content": "const SessionTTL = 600 // Sessions expire after 10 minutes."}},
+		"observations":   []any{},
+	}
 	report, err := evaluate.EvaluatePackageWithMode(pkg, catalogDir, "accepted", "real")
 	if err != nil {
 		t.Fatal(err)
 	}
 	results, _ := report["results"].([]map[string]any)
-	missingImplResult := false
 	for _, row := range results {
-		if row["predicate"] == "session.ttl_seconds" && row["evidence_role"] == "implementation_fact" && row["in_scope"] == true && row["outcome"] != "inconclusive" {
-			t.Fatalf("missing implementation evidence was not inconclusive: %#v", row)
+		if row["predicate"] != "session.ttl_seconds" || row["in_scope"] != true {
+			continue
 		}
-		if row["predicate"] == "session.ttl_seconds" && row["evidence_role"] == "implementation_fact" && row["in_scope"] == true {
-			missingImplResult = true
+		if row["outcome"] != "no_deviation_found" {
+			t.Fatalf("matching in-policy evidence should support one aligned result: %#v", row)
+		}
+		refs, _ := row["provenance"].([]map[string]any)
+		if len(refs) != 2 {
+			t.Fatalf("expected both source refs on the unified result, got %#v", refs)
+		}
+		return
+	}
+	t.Fatal("no in-scope session TTL result")
+}
+
+func TestNoExtractedFactRemainsInconclusiveWithoutRoleRows(t *testing.T) {
+	root := repoRoot(t)
+	catalogDir := filepath.Join(root, "data", "adr_catalog")
+	pkg := map[string]any{"schema_version": "pathfinder-evidence-package-v1", "package_id": "no-extracted-fact", "scope": map[string]any{"domains": []any{"identity"}}, "code": []any{map[string]any{"artifact_id": "code-1", "path": "session.go", "revision": "r2", "content": "package session\nfunc Start() {}"}}, "observations": []any{}}
+	report, err := evaluate.EvaluatePackageWithMode(pkg, catalogDir, "accepted", "real")
+	if err != nil {
+		t.Fatal(err)
+	}
+	results, _ := report["results"].([]map[string]any)
+	resultCount := 0
+	for _, row := range results {
+		if row["predicate"] == "session.ttl_seconds" && row["in_scope"] == true {
+			resultCount++
+			if row["outcome"] != "inconclusive" {
+				t.Fatalf("missing evidence was not inconclusive: %#v", row)
+			}
 		}
 	}
-	if !missingImplResult {
-		t.Fatal("no in-scope implementation result for session TTL")
+	if resultCount != 1 {
+		t.Fatalf("expected one unified inconclusive result, got %d", resultCount)
 	}
 }
 

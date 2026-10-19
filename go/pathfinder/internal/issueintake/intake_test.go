@@ -72,3 +72,29 @@ func TestPackageFromPasteFixtureNoSourceEcho(t *testing.T) {
 		}
 	}
 }
+
+func TestResultCommentShowsUnifiedConflictingEvidenceAndSources(t *testing.T) {
+	comment, err := issueintake.RenderResultComment(map[string]any{
+		"aggregate_status": "insufficient_coverage",
+		"counts":           map[string]int{"inconclusive": 1},
+		"results": []map[string]any{{
+			"adr_id":       "ADR-1",
+			"domain":       "identity",
+			"outcome":      "inconclusive",
+			"relationship": "conflicting_evidence",
+			"predicate":    "session.ttl_seconds",
+			"provenance": []map[string]any{
+				{"evidence_role": "design_assertion", "path": "spec.md"},
+				{"evidence_role": "implementation_fact", "path": "session.go"},
+			},
+		}},
+	}, map[string]any{}, "https://example.test/run")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"conflicting evidence", "design_assertion: <code>spec.md</code>", "implementation_fact: <code>session.go</code>"} {
+		if !strings.Contains(comment, want) {
+			t.Fatalf("comment missing %q:\n%s", want, comment)
+		}
+	}
+}

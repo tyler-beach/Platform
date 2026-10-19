@@ -18,7 +18,7 @@ import (
 	"github.com/tyler-beach/Platform/go/pathfinder/internal/predicates"
 )
 
-const ReportSchema = "pathfinder-package-evaluation-v1"
+const ReportSchema = "pathfinder-package-evaluation-v2"
 
 // AggregateStatus maps per-requirement outcomes to a package-level status.
 func AggregateStatus(outcomes []string) string {
@@ -165,56 +165,47 @@ func EvaluatePackageWithMode(packageObj map[string]any, catalogDir string, adrSt
 	pkgScope := applicability.ScopeFromPackage(ensured)
 	var results []map[string]any
 	var outcomes []string
-	roleCounts := map[string]map[string]int{}
-	inScopeCount := 0
-	roles := availableRoles(ensured, observations)
-	if len(roles) == 0 {
-		roles = []string{modelobs.RoleImplementationFact}
+	evidenceRoleCounts := map[string]int{}
+	observationValues := make([]any, 0, len(observations))
+	for _, observation := range observations {
+		observationValues = append(observationValues, observation)
+		if role, ok := observation["evidence_role"].(string); ok && role != "" {
+			evidenceRoleCounts[role]++
+		}
 	}
+	inScopeCount := 0
 	for _, row := range rows {
 		sm := applicability.InScope(pkgScope, applicability.MetaFromRow(row))
 		if sm {
 			inScopeCount++
 		}
-		for _, role := range roles {
-			if roleCounts[role] == nil {
-				roleCounts[role] = map[string]int{}
-			}
-			roleObs := make([]any, 0)
-			for _, observation := range observations {
-				if observation["evidence_role"] == role {
-					roleObs = append(roleObs, observation)
-				}
-			}
-			decision, err := engine.Evaluate(catalog.RequirementForEngine(row), roleObs, adrStatus, sm)
-			if err != nil {
-				return nil, fmt.Errorf("evaluate %v (%s): %w", row["requirement_id"], role, err)
-			}
-			label, _ := row["label_status"].(string)
-			if label == "" {
-				label = "synthetic_unadjudicated"
-			}
-			results = append(results, map[string]any{
-				"evidence_role":         role,
-				"adr_id":                row["adr_id"],
-				"domain":                row["domain"],
-				"title":                 row["title"],
-				"requirement_id":        row["requirement_id"],
-				"kind":                  row["kind"],
-				"predicate":             row["predicate"],
-				"subject":               row["subject"],
-				"outcome":               decision["outcome"],
-				"relationship":          decision["relationship"],
-				"rationale":             decision["rationale"],
-				"accepted_evidence_ids": decision["accepted_evidence_ids"],
-				"uncertainty":           decision["uncertainty"],
-				"result_sha256":         decision["result_sha256"],
-				"label_status":          label,
-				"in_scope":              sm,
-			})
-			outcomes = append(outcomes, decision["outcome"].(string))
-			roleCounts[role][decision["outcome"].(string)]++
+		decision, err := engine.Evaluate(catalog.RequirementForEngine(row), observationValues, adrStatus, sm)
+		if err != nil {
+			return nil, fmt.Errorf("evaluate %v: %w", row["requirement_id"], err)
 		}
+		label, _ := row["label_status"].(string)
+		if label == "" {
+			label = "synthetic_unadjudicated"
+		}
+		results = append(results, map[string]any{
+			"adr_id":                row["adr_id"],
+			"domain":                row["domain"],
+			"title":                 row["title"],
+			"requirement_id":        row["requirement_id"],
+			"kind":                  row["kind"],
+			"predicate":             row["predicate"],
+			"subject":               row["subject"],
+			"outcome":               decision["outcome"],
+			"relationship":          decision["relationship"],
+			"rationale":             decision["rationale"],
+			"accepted_evidence_ids": decision["accepted_evidence_ids"],
+			"provenance":            decision["provenance"],
+			"uncertainty":           decision["uncertainty"],
+			"result_sha256":         decision["result_sha256"],
+			"label_status":          label,
+			"in_scope":              sm,
+		})
+		outcomes = append(outcomes, decision["outcome"].(string))
 	}
 	counts := map[string]int{
 		"supported_deviation": 0,
@@ -246,15 +237,14 @@ func EvaluatePackageWithMode(packageObj map[string]any, catalogDir string, adrSt
 			"path":              catalogPath,
 			"requirement_count": identity.Size,
 		},
-		"observation_count": len(observations),
-		"result_count":      len(results),
-		"extraction":        extraction,
-		"evidence_roles":    roles,
-		"role_counts":       roleCounts,
-		"aggregate_status":  status,
-		"aggregate_meaning": aggregateMeaning(status),
-		"counts":            counts,
-		"results":           results,
+		"observation_count":    len(observations),
+		"result_count":         len(results),
+		"extraction":           extraction,
+		"evidence_role_counts": evidenceRoleCounts,
+		"aggregate_status":     status,
+		"aggregate_meaning":    aggregateMeaning(status),
+		"counts":               counts,
+		"results":              results,
 	}
 	fp, err := canonical.Fingerprint(report)
 	if err != nil {
@@ -279,52 +269,6 @@ func hasObservations(value any) bool {
 		return len(xs) > 0
 	}
 	return false
-}
-func observedRoles(observations []map[string]any) []string {
-	found := map[string]bool{}
-	for _, o := range observations {
-		if role, ok := o["evidence_role"].(string); ok && role != "" {
-			found[role] = true
-		}
-	}
-	out := []string{}
-	if found[modelobs.RoleDesignAssertion] {
-		out = append(out, modelobs.RoleDesignAssertion)
-	}
-	if found[modelobs.RoleImplementationFact] {
-		out = append(out, modelobs.RoleImplementationFact)
-	}
-	return out
-}
-
-func availableRoles(pkg map[string]any, observations []map[string]any) []string {
-	found := map[string]bool{}
-	if block, ok := pkg["tech_spec"].(map[string]any); ok && nonemptyContent(block) {
-		found[modelobs.RoleDesignAssertion] = true
-	}
-	if blocks, ok := pkg["code"].([]any); ok {
-		for _, raw := range blocks {
-			if block, ok := raw.(map[string]any); ok && nonemptyContent(block) {
-				found[modelobs.RoleImplementationFact] = true
-			}
-		}
-	}
-	for _, role := range observedRoles(observations) {
-		found[role] = true
-	}
-	out := []string{}
-	if found[modelobs.RoleDesignAssertion] {
-		out = append(out, modelobs.RoleDesignAssertion)
-	}
-	if found[modelobs.RoleImplementationFact] {
-		out = append(out, modelobs.RoleImplementationFact)
-	}
-	return out
-}
-
-func nonemptyContent(m map[string]any) bool {
-	s, ok := m["content"].(string)
-	return ok && strings.TrimSpace(s) != ""
 }
 func runSemanticExtraction(pkg map[string]any, rows []map[string]any, reg *predicates.Registry) map[string]any {
 	artifacts := []modelobs.SourceArtifact{}

@@ -24,11 +24,12 @@ When an evidence package includes tech_spec and/or code content and does not sup
 - **WHEN** extraction runs
 - **THEN** no observation is emitted for that predicate+subject
 
-#### Scenario: Cross-role disagreement is preserved
+#### Scenario: Cross-source disagreement is evaluated together and preserved
 - **GIVEN** a tech spec and a code artifact assert different values for the same predicate and subject
 - **WHEN** extraction runs
 - **THEN** each observation is retained with its artifact-derived role
-- **AND** each role is evaluated independently
+- **AND** the requirement produces one inconclusive conflicting-evidence result
+- **AND** the result provenance retains both source roles and artifact references
 
 #### Scenario: Issue intake accepts paste without observations JSON
 - **GIVEN** a Pathfinder analyze issue with attestation, tech spec and/or code, and no observations JSON

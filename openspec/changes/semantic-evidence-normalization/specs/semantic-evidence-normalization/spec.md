@@ -2,21 +2,28 @@
 
 ## Purpose
 
-Normalize proposed design specifications and implementation artifacts into one source-versioned evidence contract, then reuse generic requirement evaluation while preserving the distinction between intent and implementation.
+Normalize proposed design specifications and implementation artifacts into one source-versioned evidence contract, then evaluate all accepted evidence against each requirement in one shared pass while preserving source provenance.
 
 ## ADDED Requirements
 
-### Requirement: Normalize heterogeneous artifacts into role-aware evidence
+### Requirement: Normalize heterogeneous artifacts into common evidence with source provenance
 
 The Pathfinder package evaluator MUST represent facts extracted from technical specifications as `design_assertion` evidence and facts extracted from code, configuration, or runtime artifacts as `implementation_fact` evidence. Both roles MUST use the same typed observation envelope and downstream requirement evaluator. A model MUST NOT select or change an evidence role.
 
-#### Scenario: Same claim from spec and code remains distinguishable
+#### Scenario: Same requirement is evaluated once across spec and code
 - **GIVEN** a package contains a technical specification and code that refer to the same predicate and subject
 - **WHEN** both artifacts are normalized and evaluated
 - **THEN** resulting evidence shares the same observation schema
 - **AND** the spec evidence is labeled `design_assertion`
 - **AND** the code evidence is labeled `implementation_fact`
-- **AND** results are evaluated and reported separately by role
+- **AND** the requirement produces one result using all matching observations
+- **AND** each cited observation retains its artifact-derived role in result provenance
+
+#### Scenario: Conflicting source values remain visible in one result
+- **GIVEN** a package contains a specification and code that assert different values for the same predicate and subject
+- **WHEN** both artifacts are normalized and evaluated
+- **THEN** one requirement result reports conflicting evidence as inconclusive
+- **AND** provenance identifies the specification and code evidence that conflict
 
 #### Scenario: Role is derived from the pinned source artifact
 - **GIVEN** a package contains a manually supplied observation without `evidence_role`
@@ -93,20 +100,20 @@ Semantic output MUST be treated as an untrusted candidate. The application MUST 
 - **THEN** the content is treated only as source data
 - **AND** no policy, secret, permission, or tool behavior changes
 
-### Requirement: Preserve extraction method and role-specific uncertainty
+### Requirement: Preserve extraction method, source provenance, and uncertainty
 
-Reports MUST identify whether deterministic or semantic extraction ran, preserve model/prompt/schema versions and bounded usage metadata when semantic analysis ran, and report role-specific outcomes. Missing or unsupported evidence MUST remain inconclusive; model silence MUST NOT be interpreted as compliance.
+Reports MUST identify whether deterministic or semantic extraction ran and preserve model/prompt/schema versions and bounded usage metadata when semantic analysis ran. Each requirement MUST produce one evaluation over all accepted matching observations; source roles remain available in evidence provenance. Missing or unsupported evidence MUST remain inconclusive; model silence MUST NOT be interpreted as compliance.
 
-#### Scenario: Spec-only input has design results
+#### Scenario: Spec-only input produces ordinary requirement results with source provenance
 - **GIVEN** a package contains only a technical specification
 - **WHEN** evaluation finishes
-- **THEN** requirement results are labeled `design_assertion`
-- **AND** they are not represented as implementation results
+- **THEN** requirement results use the same schema and evaluation path as code input
+- **AND** cited evidence provenance identifies the source as `design_assertion`
 
 #### Scenario: Missing semantic fact is not aligned
-- **GIVEN** an applicable requirement has no validated observation for an input role
+- **GIVEN** an applicable requirement has no validated observation in any input artifact
 - **WHEN** evaluation finishes
-- **THEN** that role's outcome is `inconclusive`
+- **THEN** the single requirement outcome is `inconclusive`
 - **AND** the report states that evidence was not established
 
 #### Scenario: Provider failure does not masquerade as semantic success

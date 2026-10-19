@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"html"
 	"regexp"
 	"strings"
 
@@ -410,7 +411,10 @@ func RenderResultComment(report, packageObj map[string]any, runURL string) (stri
 		lines = append(lines, fmt.Sprintf("- **In-scope requirements:** %v / %v", v, report["catalog_size"]))
 	}
 	if v, ok := report["result_count"]; ok {
-		lines = append(lines, fmt.Sprintf("- **Role-specific evaluations:** %v across evidence roles %v", v, report["evidence_roles"]))
+		lines = append(lines, fmt.Sprintf("- **Requirement evaluations:** %v (all accepted evidence is evaluated together)", v))
+	}
+	if roleCounts, ok := report["evidence_role_counts"].(map[string]int); ok && len(roleCounts) > 0 {
+		lines = append(lines, fmt.Sprintf("- **Evidence sources:** %v", roleCounts))
 	}
 	extraction, _ := report["extraction"].(map[string]any)
 	if extraction == nil {
@@ -472,7 +476,7 @@ func RenderResultComment(report, packageObj map[string]any, runURL string) (stri
 	var notable []map[string]any
 	for _, row := range results {
 		o := row["outcome"]
-		if o == "supported_deviation" || o == "no_deviation_found" {
+		if o == "supported_deviation" || o == "no_deviation_found" || row["relationship"] == "conflicting_evidence" {
 			notable = append(notable, row)
 			if len(notable) >= 20 {
 				break
@@ -482,9 +486,13 @@ func RenderResultComment(report, packageObj map[string]any, runURL string) (stri
 	if len(notable) == 0 {
 		lines = append(lines, "_No confident aligned/deviation results; most in-scope requirements were inconclusive or out of scope._")
 	} else {
-		lines = append(lines, "| ADR | Domain | Evidence role | Outcome | Predicate |", "|---|---|---|---|---|")
+		lines = append(lines, "| ADR | Domain | Outcome | Predicate | Evidence sources |", "|---|---|---|---|---|")
 		for _, row := range notable {
-			lines = append(lines, fmt.Sprintf("| `%v` | %v | `%v` | `%v` | `%v` |", row["adr_id"], row["domain"], row["evidence_role"], row["outcome"], row["predicate"]))
+			outcome := fmt.Sprint(row["outcome"])
+			if row["relationship"] == "conflicting_evidence" {
+				outcome += " (conflicting evidence)"
+			}
+			lines = append(lines, fmt.Sprintf("| `%v` | %v | `%v` | `%v` | %s |", row["adr_id"], row["domain"], outcome, row["predicate"], escapeTableCell(provenanceSummary(row["provenance"]))))
 		}
 	}
 	lines = append(lines,
@@ -517,6 +525,47 @@ func RenderResultComment(report, packageObj map[string]any, runURL string) (stri
 		}
 	}
 	return comment, nil
+}
+
+func provenanceSummary(value any) string {
+	var refs []map[string]any
+	switch xs := value.(type) {
+	case []map[string]any:
+		refs = xs
+	case []any:
+		for _, raw := range xs {
+			if ref, ok := raw.(map[string]any); ok {
+				refs = append(refs, ref)
+			}
+		}
+	}
+	seen := map[string]bool{}
+	parts := []string{}
+	for _, ref := range refs {
+		role, _ := ref["evidence_role"].(string)
+		path, _ := ref["path"].(string)
+		if role == "" {
+			role = "source"
+		}
+		part := role
+		if path != "" {
+			path = strings.ReplaceAll(strings.ReplaceAll(path, "\r", " "), "\n", " ")
+			path = strings.ReplaceAll(html.EscapeString(path), "|", "&#124;")
+			part += ": <code>" + path + "</code>"
+		}
+		if !seen[part] {
+			seen[part] = true
+			parts = append(parts, part)
+		}
+	}
+	if len(parts) == 0 {
+		return "see report artifact"
+	}
+	return strings.Join(parts, "; ")
+}
+
+func escapeTableCell(value string) string {
+	return strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(value, "|", "\\|"), "\r", " "), "\n", " ")
 }
 
 func RenderErrorComment(message, runURL string) string {

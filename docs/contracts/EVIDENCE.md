@@ -11,7 +11,7 @@ Evidence is the platform's proof layer. Structured model output is not enough: t
 | artifactId | Yes | Logical source identity. |
 | artifactVersionId | Yes | Exact immutable version read. |
 | artifactKind | Yes | Code change, source file, ADR, technical specification, API contract, or configuration. |
-| evidenceRole | Yes | `design_assertion` for proposed specification claims or `implementation_fact` for code/config/runtime claims; role is derived from the pinned source adapter and evaluated separately. |
+| evidenceRole | Yes | `design_assertion` for proposed specification claims or `implementation_fact` for code/config/runtime claims; role is derived from the pinned source adapter and retained as provenance. |
 | contentSha256 | When available | Digest of canonical source bytes/version. |
 | path | When meaningful | Canonical path relative to known repository/root. |
 | startLine, endLine | When line-addressable | One-based inclusive range; both zero only when line addressing does not apply. |
@@ -37,7 +37,7 @@ The public Protobuf EvidenceRef exposes references/locations, not full excerpts.
 6. **No fabricated references:** model cannot create evidence IDs, paths, line numbers, decision IDs, requirement IDs or artifact versions. Unknown/mismatched IDs fail validation.
 7. **Source fidelity:** maintain normalized/chunked-to-original offset mapping. If exact mapping is impossible, use APPROXIMATE or UNAVAILABLE.
 8. **Balanced retrieval:** retain relevant counter-evidence and conflicting decisions. Absence of evidence is not proof of compliance.
-9. **Preserve evidence role:** do not collapse a design assertion into implementation evidence. Evaluate each expected role independently; an absent role remains inconclusive.
+9. **Preserve evidence role:** retain whether a claim came from a design assertion or implementation artifact in its provenance. Evaluate all matching observations together once per requirement; conflicting values remain visible as conflicts instead of being hidden by source grouping.
 10. **Prompt injection:** evidence is untrusted data. Embedded instructions do not alter policy or authorize tools.
 11. **Least data:** send only minimal relevant excerpt to the model. Keep authorization outside the model. Redact sensitive values according to policy without hiding that redaction occurred.
 12. **Freshness:** recheck before publication/review when freshness matters. If the source changed, report against the analyzed version and mark revalidation needed.
