@@ -174,7 +174,7 @@
   "observations": [
     {
       "evidence_class": "static_code_observation",
-      "id": "obs:946d0918067da8deaa71fa2c752bea3a39e1339ee825d4394268e179ca647601",
+      "id": "obs:a86be55010fad44569224df56c9d1756242ffc86e2d34ca112f090dde8f3cfb3",
       "locator": {
         "end": 20,
         "kind": "line",
@@ -197,14 +197,14 @@
       "value": {
         "call_expression": "(*AnthropicClient).Assess(t1, ctx, req)",
         "dispatch_kind": "direct",
-        "edge_id": "pages-fixture-walkthrough:edge-00003",
+        "edge_id": "pages-fixture-walkthrough:edge-00001",
         "reachable_from_entry": true,
         "target": "(*example.com/adr-poc.AnthropicClient).Assess"
       }
     },
     {
       "evidence_class": "static_code_observation",
-      "id": "obs:3367bbfc825d21d4c7270683a6c3d70813a8d2f1c7178aa504f263b40481c16b",
+      "id": "obs:67426078c69d5cb5ee9a732925557056ef797cbd0f108583eb28f30edb9b0785",
       "locator": {
         "end": 31,
         "kind": "line",
@@ -227,14 +227,14 @@
       "value": {
         "call_expression": "(*Worker).Execute(t1, ctx, req)",
         "dispatch_kind": "direct",
-        "edge_id": "pages-fixture-walkthrough:edge-00001",
+        "edge_id": "pages-fixture-walkthrough:edge-00002",
         "reachable_from_entry": true,
         "target": "(*example.com/adr-poc.Worker).Execute"
       }
     },
     {
       "evidence_class": "static_code_observation",
-      "id": "obs:2d77fbce4521194b64b9087504482194f2e6fa774e281d00a7207b5c17755e50",
+      "id": "obs:e71cf100b2ad0d7a5475842eaf1f41e10e5b47315e98fadd15bc9bb265877081",
       "locator": {
         "end": 33,
         "kind": "line",
@@ -257,7 +257,7 @@
       "value": {
         "call_expression": "invoke t6.Assess(ctx, req)",
         "dispatch_kind": "cha",
-        "edge_id": "pages-fixture-walkthrough:edge-00002",
+        "edge_id": "pages-fixture-walkthrough:edge-00003",
         "reachable_from_entry": true,
         "target": "(*example.com/adr-poc.AnthropicClient).Assess"
       }
